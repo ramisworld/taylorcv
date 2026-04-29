@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 import { AgentProgress } from "~/components/AgentProgress";
 import { CandidateInput } from "~/components/CandidateInput";
+import { CandidateProfileView } from "~/components/CandidateProfileView";
+import { CVPlanView } from "~/components/CVPlanView";
 import { CVPreview } from "~/components/CVPreview";
 import { EvidenceMapView } from "~/components/EvidenceMapView";
 import {
@@ -12,6 +14,8 @@ import {
 } from "~/components/GapQuestionsView";
 import { JobDNAView } from "~/components/JobDNAView";
 import { JobInput } from "~/components/JobInput";
+import { ProgressStepper, type ProgressStep } from "~/components/ProgressStepper";
+import { SummaryCard } from "~/components/SummaryCard";
 import { api } from "~/trpc/react";
 
 const currentApplicationStorageKey = "currentApplicationId";
@@ -25,8 +29,22 @@ export default function Home() {
     Record<string, GapAnswerDraft>
   >({});
   const [cvText, setCvText] = useState("");
-  const [loadedDraftId, setLoadedDraftId] = useState<string | null>(null);
+  const [loadedDraftKey, setLoadedDraftKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isEditingJob, setIsEditingJob] = useState(false);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const jobRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<HTMLDivElement>(null);
+  const fitRef = useRef<HTMLDivElement>(null);
+  const questionsRef = useRef<HTMLDivElement>(null);
+  const cvRef = useRef<HTMLDivElement>(null);
+
+  function scrollTo(ref: RefObject<HTMLDivElement | null>) {
+    setTimeout(() => {
+      ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }
 
   const createApplication = api.application.createApplication.useMutation({
     onSuccess: (data) => {
@@ -67,6 +85,36 @@ export default function Home() {
 
   const state = stateQuery.data ?? null;
   const appIsReady = !!applicationId && !!state;
+  const hasJob = !!state?.job;
+  const hasProfile = !!state?.candidateProfile;
+  const hasFit = !!state?.evidenceMatches.length;
+  const hasQuestions = !!state?.gapQuestions.length;
+  const hasAnswers = !!state?.gapAnswers.length;
+  const hasStrategy = !!state?.cvStrategy;
+  const hasCv = !!state?.cvDraft;
+  const currentStep: ProgressStep = !hasJob
+    ? "Job"
+    : !hasProfile
+      ? "Profile"
+      : !hasFit
+        ? "Fit"
+        : !hasStrategy && (!hasQuestions || !hasAnswers)
+          ? "Questions"
+          : "CV";
+  const primaryAction =
+    !hasJob || isEditingJob
+      ? "job"
+      : !hasProfile || isEditingProfile
+        ? "profile"
+        : !hasFit
+          ? "fit"
+          : !hasStrategy && (!hasQuestions || !hasAnswers)
+            ? "questions"
+            : !hasStrategy
+              ? "cvPlan"
+              : !hasCv
+                ? "cv"
+                : null;
 
   const submitJob = api.application.submitJob.useMutation({
     onSuccess: async () => {
@@ -75,6 +123,9 @@ export default function Home() {
           applicationId,
         });
       }
+      setIsEditingJob(false);
+      setSuccessMessage("Job analyzed");
+      scrollTo(profileRef);
       setError(null);
     },
     onError: (mutationError) => setError(mutationError.message),
@@ -87,6 +138,9 @@ export default function Home() {
           applicationId,
         });
       }
+      setIsEditingProfile(false);
+      setSuccessMessage("Profile built");
+      scrollTo(fitRef);
       setError(null);
     },
     onError: (mutationError) => setError(mutationError.message),
@@ -99,6 +153,8 @@ export default function Home() {
           applicationId,
         });
       }
+      setSuccessMessage("Fit checked");
+      scrollTo(questionsRef);
       setError(null);
     },
     onError: (mutationError) => setError(mutationError.message),
@@ -111,6 +167,7 @@ export default function Home() {
           applicationId,
         });
       }
+      scrollTo(questionsRef);
       setError(null);
     },
     onError: (mutationError) => setError(mutationError.message),
@@ -123,6 +180,7 @@ export default function Home() {
           applicationId,
         });
       }
+      scrollTo(cvRef);
       setError(null);
     },
     onError: (mutationError) => setError(mutationError.message),
@@ -135,6 +193,7 @@ export default function Home() {
           applicationId,
         });
       }
+      scrollTo(cvRef);
       setError(null);
     },
     onError: (mutationError) => setError(mutationError.message),
@@ -147,17 +206,35 @@ export default function Home() {
           applicationId,
         });
       }
+      setSuccessMessage("CV ready");
+      scrollTo(cvRef);
+      setError(null);
+    },
+    onError: (mutationError) => setError(mutationError.message),
+  });
+
+  const rewriteSection = api.application.rewriteCvSection.useMutation({
+    onSuccess: async () => {
+      if (applicationId) {
+        await utils.application.getApplicationState.invalidate({
+          applicationId,
+        });
+      }
+      scrollTo(cvRef);
       setError(null);
     },
     onError: (mutationError) => setError(mutationError.message),
   });
 
   useEffect(() => {
-    if (state?.cvDraft && state.cvDraft.id !== loadedDraftId) {
-      setLoadedDraftId(state.cvDraft.id);
+    const nextDraftKey = state?.cvDraft
+      ? `${state.cvDraft.id}:${state.cvDraft.version}`
+      : null;
+    if (state?.cvDraft && nextDraftKey !== loadedDraftKey) {
+      setLoadedDraftKey(nextDraftKey);
       setCvText(state.cvDraft.cvText);
     }
-  }, [loadedDraftId, state?.cvDraft]);
+  }, [loadedDraftKey, state?.cvDraft]);
 
   const selectedGapAnswers = useMemo(
     () =>
@@ -177,12 +254,11 @@ export default function Home() {
         <header className="border-b border-zinc-200 pb-5">
           <h1 className="text-3xl font-semibold tracking-normal">Taylor CV</h1>
           <p className="mt-1 text-sm text-zinc-600">
-            Minimal AI CV tailoring MVP.
-          </p>
-          <p className="mt-2 text-xs text-zinc-500">
-            Application: {applicationId ?? "creating..."}
+            Paste a role and your background, then create a focused tailored CV.
           </p>
         </header>
+
+        <ProgressStepper currentStep={currentStep} />
 
         {error ? (
           <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
@@ -190,131 +266,185 @@ export default function Home() {
           </div>
         ) : null}
 
-        <AgentProgress
-          agentRuns={state?.agentRuns ?? []}
-          application={state?.application}
-        />
+        {successMessage ? (
+          <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+            {successMessage}
+          </div>
+        ) : null}
 
-        <JobInput
-          disabled={!appIsReady}
-          isLoading={submitJob.isPending}
-          onChange={setJobText}
-          onSubmit={() => {
-            if (!applicationId) return;
-            submitJob.mutate({ applicationId, rawJobText: jobText });
-          }}
-          value={jobText}
-        />
+        <div ref={jobRef}>
+          {hasJob && !isEditingJob ? (
+            <SummaryCard
+              description={state.job?.summary}
+              heading={state.job?.title ?? "Job analyzed"}
+              meta={state.job?.company ?? null}
+              onEdit={() => {
+                setJobText(state.job?.rawText ?? "");
+                setIsEditingJob(true);
+                scrollTo(jobRef);
+              }}
+              title="Target Job"
+            />
+          ) : (
+            <JobInput
+              disabled={!appIsReady}
+              isLoading={submitJob.isPending}
+              isPrimary={primaryAction === "job"}
+              onChange={setJobText}
+              onSubmit={() => {
+                if (!applicationId) return;
+                submitJob.mutate({ applicationId, rawJobText: jobText });
+              }}
+              value={jobText}
+            />
+          )}
+        </div>
 
         <JobDNAView
           job={state?.job ?? null}
           requirements={state?.jobRequirements ?? []}
         />
 
-        <CandidateInput
-          disabled={!appIsReady || !state?.job}
-          isLoading={submitCandidate.isPending}
-          onChange={setCandidateText}
-          onSubmit={() => {
-            if (!applicationId) return;
-            submitCandidate.mutate({
-              applicationId,
-              rawCvText: null,
-              rawBackgroundText: candidateText,
-            });
-          }}
-          value={candidateText}
+        <div ref={profileRef}>
+          {hasProfile && !isEditingProfile ? (
+            <SummaryCard
+              description={state.candidateProfile?.summary}
+              heading="Profile built"
+              meta={`${state.candidateChunks.length} background evidence items`}
+              onEdit={() => {
+                setCandidateText(
+                  state.candidateProfile?.rawBackgroundText ??
+                    state.candidateProfile?.rawCvText ??
+                    ""
+                );
+                setIsEditingProfile(true);
+                scrollTo(profileRef);
+              }}
+              title="Your Background"
+            />
+          ) : (
+            <CandidateInput
+              disabled={!appIsReady || !state?.job}
+              isLoading={submitCandidate.isPending}
+              isPrimary={primaryAction === "profile"}
+              onChange={setCandidateText}
+              onSubmit={() => {
+                if (!applicationId) return;
+                submitCandidate.mutate({
+                  applicationId,
+                  rawCvText: null,
+                  rawBackgroundText: candidateText,
+                });
+              }}
+              value={candidateText}
+            />
+          )}
+        </div>
+
+        <CandidateProfileView
+          evidence={state?.candidateChunks ?? []}
+          profile={state?.candidateProfile ?? null}
         />
 
-        {state?.candidateProfile ? (
-          <section className="space-y-3 border-b border-zinc-200 py-6">
-            <h2 className="text-lg font-semibold text-zinc-950">
-              Candidate profile
-            </h2>
-            <p className="text-sm text-zinc-700">
-              {state.candidateProfile.summary}
-            </p>
-            <div className="space-y-2">
-              {state.candidateChunks.map((chunk) => (
-                <p
-                  className="rounded-md border border-zinc-200 p-3 text-sm text-zinc-700"
-                  key={chunk.id}
-                >
-                  {chunk.content}
-                </p>
-              ))}
-            </div>
-          </section>
-        ) : null}
+        <div ref={fitRef}>
+          <EvidenceMapView
+            disabled={
+              !appIsReady || !state?.job || !state?.candidateChunks.length
+            }
+            isLoading={runMatching.isPending}
+            isPrimary={primaryAction === "fit"}
+            matches={state?.evidenceMatches ?? []}
+            onRun={() => {
+              if (!applicationId) return;
+              runMatching.mutate({ applicationId });
+            }}
+          />
+        </div>
 
-        <EvidenceMapView
-          disabled={!appIsReady || !state?.job || !state?.candidateChunks.length}
-          isLoading={runMatching.isPending}
-          matches={state?.evidenceMatches ?? []}
-          onRun={() => {
-            if (!applicationId) return;
-            runMatching.mutate({ applicationId });
-          }}
-        />
+        <div ref={questionsRef}>
+          <GapQuestionsView
+            answers={gapAnswers}
+            disabled={!appIsReady || !state?.evidenceMatches.length}
+            isGenerating={generateQuestions.isPending}
+            isPrimary={primaryAction === "questions"}
+            isSubmitting={answerQuestions.isPending}
+            onChange={(questionId, answer) =>
+              setGapAnswers((current) => ({
+                ...current,
+                [questionId]: answer,
+              }))
+            }
+            onGenerate={() => {
+              if (!applicationId) return;
+              generateQuestions.mutate({ applicationId });
+            }}
+            onSkipAll={() => {
+              if (!applicationId || !state?.gapQuestions.length) return;
+              answerQuestions.mutate({
+                applicationId,
+                answers: state.gapQuestions.map((question) => ({
+                  gapQuestionId: question.id,
+                  buttonAnswer: "skip",
+                  elaboration: null,
+                })),
+              });
+            }}
+            onSubmit={() => {
+              if (!applicationId || selectedGapAnswers.length === 0) return;
+              answerQuestions.mutate({
+                applicationId,
+                answers: selectedGapAnswers,
+              });
+            }}
+            questions={state?.gapQuestions ?? []}
+          />
+        </div>
 
-        <GapQuestionsView
-          answers={gapAnswers}
-          disabled={!appIsReady || !state?.evidenceMatches.length}
-          isGenerating={generateQuestions.isPending}
-          isSubmitting={answerQuestions.isPending}
-          onChange={(questionId, answer) =>
-            setGapAnswers((current) => ({
-              ...current,
-              [questionId]: answer,
-            }))
-          }
-          onGenerate={() => {
-            if (!applicationId) return;
-            generateQuestions.mutate({ applicationId });
-          }}
-          onSubmit={() => {
-            if (!applicationId || selectedGapAnswers.length === 0) return;
-            answerQuestions.mutate({
-              applicationId,
-              answers: selectedGapAnswers,
-            });
-          }}
-          questions={state?.gapQuestions ?? []}
-        />
+        <div ref={cvRef}>
+          <CVPlanView strategy={state?.cvStrategy ?? null} />
 
-        {state?.cvStrategy ? (
-          <section className="space-y-2 border-b border-zinc-200 py-6">
-            <h2 className="text-lg font-semibold text-zinc-950">
-              CV strategy
-            </h2>
-            <p className="text-sm text-zinc-700">
-              {state.cvStrategy.strategySummary}
-            </p>
-            <p className="text-sm text-zinc-600">
-              {state.cvStrategy.targetPositioning}
-            </p>
-          </section>
-        ) : null}
+          <CVPreview
+            cvDraft={state?.cvDraft ?? null}
+            disabled={!appIsReady || !state?.evidenceMatches.length}
+            hasStrategy={!!state?.cvStrategy}
+            isGeneratingCv={generateCv.isPending}
+            isGeneratingStrategy={generateStrategy.isPending}
+            isCvPrimary={primaryAction === "cv"}
+            isPlanPrimary={primaryAction === "cvPlan"}
+            isRewritingSection={rewriteSection.isPending}
+            onChange={setCvText}
+            onCopy={() =>
+              void navigator.clipboard.writeText(
+                state?.cvDraft?.cvText ?? cvText
+              )
+            }
+            onGenerateCv={() => {
+              if (!applicationId || !state?.cvStrategy) return;
+              generateCv.mutate({
+                applicationId,
+                strategyId: state.cvStrategy.id,
+              });
+            }}
+            onGenerateStrategy={() => {
+              if (!applicationId) return;
+              generateStrategy.mutate({ applicationId });
+            }}
+            onRewriteSection={(sectionId, instruction) => {
+              if (!applicationId || !state?.cvDraft) return;
+              rewriteSection.mutate({
+                applicationId,
+                cvDraftId: state.cvDraft.id,
+                sectionId,
+                instruction,
+              });
+            }}
+            value={cvText}
+          />
+        </div>
 
-        <CVPreview
-          disabled={!appIsReady || !state?.evidenceMatches.length}
-          hasStrategy={!!state?.cvStrategy}
-          isGeneratingCv={generateCv.isPending}
-          isGeneratingStrategy={generateStrategy.isPending}
-          onChange={setCvText}
-          onCopy={() => void navigator.clipboard.writeText(cvText)}
-          onGenerateCv={() => {
-            if (!applicationId || !state?.cvStrategy) return;
-            generateCv.mutate({
-              applicationId,
-              strategyId: state.cvStrategy.id,
-            });
-          }}
-          onGenerateStrategy={() => {
-            if (!applicationId) return;
-            generateStrategy.mutate({ applicationId });
-          }}
-          value={cvText}
+        <AgentProgress
+          agentRuns={state?.agentRuns ?? []}
+          application={state?.application}
         />
       </div>
     </main>

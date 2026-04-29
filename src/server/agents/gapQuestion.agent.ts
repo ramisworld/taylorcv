@@ -3,6 +3,23 @@ import type { RequirementEvidenceMapRow } from "~/server/services/rag.service";
 import { runJsonAgent } from "~/server/agents/agentRunner";
 import { gapQuestionPrompt } from "~/server/prompts/gapQuestion.prompt";
 
+function gapArea(label: string) {
+  const normalized = label.toLowerCase();
+  if (/\brag\b|retrieval|ground/.test(normalized)) return "retrieval";
+  if (/agent|tool call|function/.test(normalized)) return "agentic";
+  if (/eval|reliab|safety|guardrail|quality/.test(normalized)) return "quality";
+  if (/customer|communication|stakeholder|tradeoff/.test(normalized))
+    return "communication";
+  if (/deploy|backend|integration|database|api/.test(normalized))
+    return "backend";
+  return normalized
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .split(" ")
+    .slice(0, 3)
+    .join(" ");
+}
+
 export async function runGapQuestionAgent(args: {
   applicationId: string;
   evidenceMap: RequirementEvidenceMapRow[];
@@ -17,6 +34,7 @@ export async function runGapQuestionAgent(args: {
     schema: GapQuestionOutputSchema,
     jsonSchema: AgentJsonSchemas.gapQuestion,
     mockOutput: () => {
+      const seenAreas = new Set<string>();
       const weakImportantRequirements = args.evidenceMap
         .filter(
           (row) =>
@@ -24,6 +42,12 @@ export async function runGapQuestionAgent(args: {
             (row.overallConfidence === "weak" ||
               row.overallConfidence === "missing")
         )
+        .filter((row) => {
+          const area = gapArea(row.requirementLabel);
+          if (seenAreas.has(area)) return false;
+          seenAreas.add(area);
+          return true;
+        })
         .slice(0, 5);
 
       return {

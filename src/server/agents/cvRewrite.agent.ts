@@ -18,7 +18,9 @@ export async function runCvRewriteAgent(args: {
     schema: CvRewriteOutputSchema,
     jsonSchema: AgentJsonSchemas.cvRewrite,
     mockOutput: () => ({
-      updatedSection: `${args.currentSection}\nUpdated instruction applied: ${args.instruction}`,
+      updatedSection: args.currentSection
+        ? `${args.currentSection}\n${args.instruction}`
+        : args.instruction,
     }),
   });
 }

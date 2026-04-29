@@ -78,13 +78,6 @@ export async function runEvidenceChunkCreatorAgent(args: {
           sourceType: "profile" as const,
           sourceId: null,
         })),
-        ...profile.skills.map((skill) => ({
-          chunkType: "skill" as const,
-          content: `Candidate reports practical skill with ${skill}.`,
-          tags: [skill],
-          sourceType: "profile" as const,
-          sourceId: null,
-        })),
         ...profile.achievements.map((achievement) => ({
           chunkType: "achievement" as const,
           content: achievement,

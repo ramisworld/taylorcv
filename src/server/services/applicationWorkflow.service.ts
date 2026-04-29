@@ -85,6 +85,70 @@ async function loadCandidateChunks(args: {
   `;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function formatCvSection(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean).join("\n");
+  }
+  return typeof value === "string" ? value : "";
+}
+
+function cvSectionValue(sectionId: string, text: string) {
+  const cleaned = text
+    .split("\n")
+    .map((line) => line.trim().replace(/^[-*]\s*/, ""))
+    .filter(Boolean);
+
+  if (["header", "summary"].includes(sectionId)) {
+    return cleaned.join(" ");
+  }
+
+  if (sectionId === "skills") {
+    return text
+      .split(/[\n,]/)
+      .map((item) => item.trim().replace(/^[-*]\s*/, ""))
+      .filter(Boolean);
+  }
+
+  return cleaned;
+}
+
+function buildCvTextFromJson(cvJson: Record<string, unknown>) {
+  const lines: string[] = [];
+  const header = formatCvSection(cvJson.header);
+  if (header) lines.push(header, "");
+
+  const sections: Array<[string, string]> = [
+    ["summary", "SUMMARY"],
+    ["skills", "SKILLS"],
+    ["projects", "PROJECTS"],
+    ["experience", "EXPERIENCE"],
+    ["education", "EDUCATION"],
+    ["certifications", "CERTIFICATIONS"],
+  ];
+
+  for (const [sectionId, heading] of sections) {
+    const value = cvJson[sectionId];
+    const sectionLines = Array.isArray(value)
+      ? value
+          .map((item) => String(item).trim())
+          .filter(Boolean)
+          .map((item) => (sectionId === "skills" ? item : `- ${item}`))
+      : formatCvSection(value)
+          .split("\n")
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+    if (sectionLines.length === 0) continue;
+    lines.push(heading, sectionLines.join(sectionId === "skills" ? ", " : "\n"), "");
+  }
+
+  return lines.join("\n").trim();
+}
+
 async function scoreRequirement(args: {
   anonymousSessionId: string;
   applicationId: string;
@@ -571,13 +635,60 @@ export async function generateCv(args: {
 }) {
   await assertApplicationForSession(args);
 
-  const strategy = await db.cvStrategy.findFirst({
-    where: { id: args.strategyId, applicationId: args.applicationId },
-  });
+  const [job, candidateProfile, candidateChunkCount, evidenceMap, strategy] =
+    await Promise.all([
+      db.job.findUnique({
+        where: { applicationId: args.applicationId },
+      }),
+      db.candidateProfile.findUnique({
+        where: { applicationId: args.applicationId },
+      }),
+      db.candidateChunk.count({
+        where: {
+          applicationId: args.applicationId,
+          anonymousSessionId: args.anonymousSessionId,
+        },
+      }),
+      buildRequirementEvidenceMap(args.applicationId),
+      db.cvStrategy.findFirst({
+        where: { id: args.strategyId, applicationId: args.applicationId },
+      }),
+    ]);
+
+  if (!job) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Add a job before generating the CV.",
+    });
+  }
+  if (!candidateProfile || candidateChunkCount === 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Add your background before generating the CV.",
+    });
+  }
+  if (evidenceMap.length === 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Run job fit matching before generating the CV.",
+    });
+  }
+  if (
+    !evidenceMap.some(
+      (row) =>
+        row.overallConfidence === "high" || row.overallConfidence === "medium"
+    )
+  ) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "The CV needs at least one strong or partial job fit result before generation. Answer the clarification questions or add more background.",
+    });
+  }
   if (!strategy) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: "CV generation requires a CV strategy",
+      message: "Create a CV plan before generating the CV.",
     });
   }
 
@@ -634,7 +745,9 @@ export async function rewriteCvSection(args: {
   const output = await runCvRewriteAgent({
     applicationId: args.applicationId,
     sectionId: args.sectionId,
-    currentSection: draft.cvText,
+    currentSection: formatCvSection(
+      isRecord(draft.cvJson) ? draft.cvJson[args.sectionId] : ""
+    ),
     instruction: args.instruction,
     context: await buildCvWriterContext({
       applicationId: args.applicationId,
@@ -642,17 +755,17 @@ export async function rewriteCvSection(args: {
     }).catch(() => ({})),
   });
 
-  const cvJson =
-    draft.cvJson && typeof draft.cvJson === "object" && !Array.isArray(draft.cvJson)
-      ? { ...draft.cvJson, [args.sectionId]: output.updatedSection }
-      : { [args.sectionId]: output.updatedSection };
+  const cvJson = {
+    ...(isRecord(draft.cvJson) ? draft.cvJson : {}),
+    [args.sectionId]: cvSectionValue(args.sectionId, output.updatedSection),
+  };
 
   const updatedCvDraft = await db.cvDraft.update({
     where: { id: draft.id },
     data: {
       version: draft.version + 1,
       cvJson,
-      cvText: `${draft.cvText}\n\n${args.sectionId.toUpperCase()}\n${output.updatedSection}`,
+      cvText: buildCvTextFromJson(cvJson),
     },
   });
 

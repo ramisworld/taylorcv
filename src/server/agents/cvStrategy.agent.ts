@@ -48,8 +48,8 @@ export async function runCvStrategyAgent(args: {
     jsonSchema: AgentJsonSchemas.cvStrategy,
     mockOutput: () => ({
       strategySummary:
-        "Position the candidate as a practical full-stack AI builder with direct RAG, agent workflow, OpenAI, PostgreSQL, pgvector, Next.js, and TypeScript evidence.",
-      targetPositioning: `${args.context.jobSummary.title} candidate focused on shipping working AI product workflows.`,
+        "Lead with the strongest applied AI projects and keep unsupported requirements out of headline claims.",
+      targetPositioning: `${args.context.jobSummary.title} candidate who turns business problems into practical LLM workflows backed by concrete project evidence.`,
       sectionOrder: ["Summary", "Skills", "Projects", "Experience", "Education"],
       emphasis: args.context.strongEvidence
         .slice(0, 6)

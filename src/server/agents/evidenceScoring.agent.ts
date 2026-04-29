@@ -9,8 +9,8 @@ import { evidenceScoringPrompt } from "~/server/prompts/evidenceScoring.prompt";
 function confidenceFromSimilarity(
   similarityScore: number
 ): "high" | "medium" | "weak" {
-  if (similarityScore >= 0.78) return "high";
-  if (similarityScore >= 0.45) return "medium";
+  if (similarityScore >= 0.7) return "high";
+  if (similarityScore >= 0.35) return "medium";
   return "weak";
 }
 

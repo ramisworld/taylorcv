@@ -26,7 +26,7 @@ export async function runCvWriterAgent(args: {
         header: "Taylor Candidate",
         summary:
           context.candidateProfile?.summary ??
-          "Full-stack AI builder with practical RAG and agent workflow experience.",
+          "Applied AI builder with practical experience turning business workflows into LLM-backed tools.",
         skills: [
           "RAG",
           "Agentic workflows",
@@ -38,7 +38,7 @@ export async function runCvWriterAgent(args: {
         ],
         projects: evidence.slice(0, 4),
         experience: [
-          "Built AI workflows that connect model outputs, backend tools, database writes, and frontend UX.",
+          "Built AI workflows connecting model outputs, backend tools, database writes, and user-facing interfaces.",
         ],
         education: [],
         certifications: [],
@@ -48,8 +48,6 @@ export async function runCvWriterAgent(args: {
         cvJson,
         cvText: [
           cvJson.header,
-          "",
-          title,
           "",
           "SUMMARY",
           cvJson.summary,

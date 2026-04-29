@@ -62,6 +62,13 @@ export async function runJobParserAgent(args: {
             "Explain technical tradeoffs and AI product behavior to users or stakeholders.",
           importance: "medium" as const,
         },
+        {
+          type: "responsibility" as const,
+          label: "Product thinking and solution design",
+          description:
+            "Translate business problems into practical AI product designs and implementation plans.",
+          importance: "medium" as const,
+        },
       ],
     }),
   });
