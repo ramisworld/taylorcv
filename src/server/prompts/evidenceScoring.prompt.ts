@@ -1,0 +1,2 @@
+export const evidenceScoringPrompt =
+  "You score candidate evidence against a job requirement. Given a job requirement and retrieved candidate chunks, classify the evidence as high, medium, weak, or missing. High means direct relevant proof. Medium means related but not exact. Weak means barely relevant. Missing means no usable evidence. Return structured JSON with confidence and reason. Do not be overly generous.";

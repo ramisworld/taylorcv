@@ -1,0 +1,19 @@
+import { env } from "../../env.js";
+import { createMockEmbedding } from "./mockEmbedding.ts";
+
+export async function createEmbedding(text: string) {
+  const embedding =
+    env.USE_MOCK_AI === "true"
+      ? createMockEmbedding(text)
+      : await import("../../lib/openai.ts").then((module) =>
+          module.createOpenAIEmbedding(text)
+        );
+
+  if (embedding.length !== 1536) {
+    throw new Error(
+      `Expected a 1536-dimension embedding, received ${embedding.length}`
+    );
+  }
+
+  return embedding;
+}

@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: tailorcv-pgvector
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: tailorcv
+    ports:
+      - "5433:5432"
+    volumes:
+      - tailorcv-pgvector-data:/var/lib/postgresql/data
+
+volumes:
+  tailorcv-pgvector-data:

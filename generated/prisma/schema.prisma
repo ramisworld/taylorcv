@@ -1,0 +1,287 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ApplicationStatus {
+  started
+  job_added
+  candidate_added
+  evidence_ready
+  questions_ready
+  answers_added
+  strategy_ready
+  cv_ready
+}
+
+enum RequirementType {
+  skill
+  tool
+  responsibility
+  soft_skill
+  domain
+  keyword
+}
+
+enum Importance {
+  high
+  medium
+  low
+}
+
+enum SourceType {
+  profile
+  gap_answer
+  manual
+}
+
+enum ChunkType {
+  project
+  skill
+  certification
+  education
+  experience
+  gap_answer
+  achievement
+}
+
+enum EvidenceConfidence {
+  high
+  medium
+  weak
+  missing
+}
+
+enum GapQuestionStatus {
+  unanswered
+  answered
+  skipped
+}
+
+enum ButtonAnswer {
+  yes
+  kind_of
+  no
+  skip
+}
+
+enum AgentRunStatus {
+  success
+  error
+}
+
+model AnonymousSession {
+  id                String             @id @default(cuid())
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  applications      Application[]
+  candidateProfiles CandidateProfile[]
+  candidateChunks   CandidateChunk[]
+
+  @@map("anonymous_sessions")
+}
+
+model Application {
+  id                 String            @id @default(cuid())
+  anonymousSessionId String            @map("anonymous_session_id")
+  status             ApplicationStatus @default(started)
+  currentStep        String            @default("started") @map("current_step")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  anonymousSession AnonymousSession  @relation(fields: [anonymousSessionId], references: [id], onDelete: Cascade)
+  job              Job?
+  candidateProfile CandidateProfile?
+  candidateChunks  CandidateChunk[]
+  evidenceMatches  EvidenceMatch[]
+  gapQuestions     GapQuestion[]
+  gapAnswers       GapAnswer[]
+  cvStrategies     CvStrategy[]
+  cvDrafts         CvDraft[]
+  agentRuns        AgentRun[]
+
+  @@index([anonymousSessionId])
+  @@map("applications")
+}
+
+model Job {
+  id            String           @id @default(cuid())
+  applicationId String           @unique @map("application_id")
+  rawText       String           @map("raw_text") @db.Text
+  title         String
+  company       String?
+  seniority     String?
+  summary       String           @db.Text
+  createdAt     DateTime         @default(now()) @map("created_at")
+  application   Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  requirements  JobRequirement[]
+
+  @@map("jobs")
+}
+
+model JobRequirement {
+  id              String          @id @default(cuid())
+  jobId           String          @map("job_id")
+  type            RequirementType
+  label           String
+  description     String          @db.Text
+  importance      Importance
+  job             Job             @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  evidenceMatches EvidenceMatch[]
+  gapQuestions    GapQuestion[]
+
+  @@index([jobId])
+  @@map("job_requirements")
+}
+
+model CandidateProfile {
+  id                 String           @id @default(cuid())
+  anonymousSessionId String           @map("anonymous_session_id")
+  applicationId      String           @unique @map("application_id")
+  rawCvText          String?          @map("raw_cv_text") @db.Text
+  rawBackgroundText  String?          @map("raw_background_text") @db.Text
+  summary            String           @db.Text
+  skillsJson         Json             @map("skills_json")
+  projectsJson       Json             @map("projects_json")
+  educationJson      Json             @map("education_json")
+  certificationsJson Json             @map("certifications_json")
+  experienceJson     Json             @map("experience_json")
+  toolsJson          Json             @map("tools_json")
+  achievementsJson   Json             @map("achievements_json")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  anonymousSession   AnonymousSession @relation(fields: [anonymousSessionId], references: [id], onDelete: Cascade)
+  application        Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  candidateChunks    CandidateChunk[]
+
+  @@index([anonymousSessionId])
+  @@map("candidate_profiles")
+}
+
+model CandidateChunk {
+  id                 String                       @id @default(cuid())
+  anonymousSessionId String                       @map("anonymous_session_id")
+  applicationId      String                       @map("application_id")
+  candidateProfileId String?                      @map("candidate_profile_id")
+  sourceType         SourceType                   @map("source_type")
+  sourceId           String?                      @map("source_id")
+  chunkType          ChunkType                    @map("chunk_type")
+  content            String                       @db.Text
+  embedding          Unsupported("vector(1536)")?
+  tagsJson           Json                         @map("tags_json")
+  metadataJson       Json                         @map("metadata_json")
+  createdAt          DateTime                     @default(now()) @map("created_at")
+  anonymousSession   AnonymousSession             @relation(fields: [anonymousSessionId], references: [id], onDelete: Cascade)
+  application        Application                  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  candidateProfile   CandidateProfile?            @relation(fields: [candidateProfileId], references: [id], onDelete: SetNull)
+  evidenceMatches    EvidenceMatch[]
+
+  @@index([anonymousSessionId, applicationId])
+  @@index([candidateProfileId])
+  @@map("candidate_chunks")
+}
+
+model EvidenceMatch {
+  id               String             @id @default(cuid())
+  applicationId    String             @map("application_id")
+  jobRequirementId String             @map("job_requirement_id")
+  candidateChunkId String?            @map("candidate_chunk_id")
+  similarityScore  Float?             @map("similarity_score")
+  confidence       EvidenceConfidence
+  reason           String             @db.Text
+  createdAt        DateTime           @default(now()) @map("created_at")
+  application      Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  jobRequirement   JobRequirement     @relation(fields: [jobRequirementId], references: [id], onDelete: Cascade)
+  candidateChunk   CandidateChunk?    @relation(fields: [candidateChunkId], references: [id], onDelete: SetNull)
+
+  @@index([applicationId])
+  @@index([jobRequirementId])
+  @@index([candidateChunkId])
+  @@map("evidence_matches")
+}
+
+model GapQuestion {
+  id                  String            @id @default(cuid())
+  applicationId       String            @map("application_id")
+  targetRequirementId String?           @map("target_requirement_id")
+  question            String            @db.Text
+  reason              String            @db.Text
+  status              GapQuestionStatus @default(unanswered)
+  createdAt           DateTime          @default(now()) @map("created_at")
+  application         Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  targetRequirement   JobRequirement?   @relation(fields: [targetRequirementId], references: [id], onDelete: SetNull)
+  answers             GapAnswer[]
+
+  @@index([applicationId])
+  @@index([targetRequirementId])
+  @@map("gap_questions")
+}
+
+model GapAnswer {
+  id            String       @id @default(cuid())
+  gapQuestionId String       @map("gap_question_id")
+  applicationId String       @map("application_id")
+  buttonAnswer  ButtonAnswer @map("button_answer")
+  elaboration   String?      @db.Text
+  createdAt     DateTime     @default(now()) @map("created_at")
+  gapQuestion   GapQuestion  @relation(fields: [gapQuestionId], references: [id], onDelete: Cascade)
+  application   Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([gapQuestionId])
+  @@map("gap_answers")
+}
+
+model CvStrategy {
+  id                String      @id @default(cuid())
+  applicationId     String      @map("application_id")
+  strategySummary   String      @map("strategy_summary") @db.Text
+  targetPositioning String      @map("target_positioning") @db.Text
+  sectionOrderJson  Json        @map("section_order_json")
+  emphasisJson      Json        @map("emphasis_json")
+  deEmphasisJson    Json        @map("de_emphasis_json")
+  evidenceToUseJson Json        @map("evidence_to_use_json")
+  warningsJson      Json        @map("warnings_json")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  application       Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  cvDrafts          CvDraft[]
+
+  @@index([applicationId])
+  @@map("cv_strategies")
+}
+
+model CvDraft {
+  id            String      @id @default(cuid())
+  applicationId String      @map("application_id")
+  strategyId    String?     @map("strategy_id")
+  version       Int         @default(1)
+  cvJson        Json        @map("cv_json")
+  cvText        String      @map("cv_text") @db.Text
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  strategy      CvStrategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+
+  @@index([applicationId])
+  @@index([strategyId])
+  @@map("cv_drafts")
+}
+
+model AgentRun {
+  id            String         @id @default(cuid())
+  applicationId String         @map("application_id")
+  agentName     String         @map("agent_name")
+  inputSummary  String         @map("input_summary") @db.Text
+  outputSummary String         @map("output_summary") @db.Text
+  status        AgentRunStatus
+  error         String?        @db.Text
+  createdAt     DateTime       @default(now()) @map("created_at")
+  application   Application    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@map("agent_runs")
+}
