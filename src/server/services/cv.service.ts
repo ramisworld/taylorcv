@@ -2,13 +2,7 @@ import "server-only";
 
 import { db } from "~/server/db";
 import type { CvStrategyContext } from "~/server/agents/cvStrategy.agent";
-
-const confidenceRank = {
-  missing: 0,
-  weak: 1,
-  medium: 2,
-  high: 3,
-} as const;
+import { buildRequirementEvidenceMap } from "~/server/services/rag.service";
 
 export async function buildCvStrategyContext(applicationId: string) {
   const job = await db.job.findUnique({
@@ -23,51 +17,30 @@ export async function buildCvStrategyContext(applicationId: string) {
     throw new Error("Job and candidate profile are required for CV strategy");
   }
 
-  const matches = await db.evidenceMatch.findMany({
-    where: { applicationId },
-    include: {
-      jobRequirement: true,
-      candidateChunk: true,
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  const evidenceMap = await buildRequirementEvidenceMap(applicationId);
 
-  const bestConfidenceByRequirement = new Map<string, number>();
-  for (const match of matches) {
-    bestConfidenceByRequirement.set(
-      match.jobRequirementId,
-      Math.max(
-        bestConfidenceByRequirement.get(match.jobRequirementId) ?? 0,
-        confidenceRank[match.confidence]
-      )
-    );
-  }
+  const strongEvidence = evidenceMap.flatMap((row) =>
+    row.bestEvidence.map((evidence) => ({
+      requirementId: row.requirementId,
+      requirementLabel: row.requirementLabel,
+      chunkId: evidence.chunkId,
+      content: evidence.contentPreview,
+      confidence: evidence.confidence,
+    }))
+  );
 
-  const strongEvidence = matches
+  const weakOrMissingRequirements = evidenceMap
     .filter(
-      (match) =>
-        (match.confidence === "high" || match.confidence === "medium") &&
-        match.candidateChunk
+      (row) =>
+        row.overallConfidence === "weak" || row.overallConfidence === "missing"
     )
-    .map((match) => ({
-      requirementId: match.jobRequirementId,
-      requirementLabel: match.jobRequirement.label,
-      chunkId: match.candidateChunkId!,
-      content: match.candidateChunk!.content,
-      confidence: match.confidence,
-    }));
-
-  const weakOrMissingRequirements = job.requirements
-    .filter(
-      (requirement) =>
-        (bestConfidenceByRequirement.get(requirement.id) ?? 0) <
-        confidenceRank.medium
-    )
-    .map((requirement) => ({
-      id: requirement.id,
-      label: requirement.label,
-      description: requirement.description,
-      importance: requirement.importance,
+    .map((row) => ({
+      id: row.requirementId,
+      label: row.requirementLabel,
+      description:
+        job.requirements.find((requirement) => requirement.id === row.requirementId)
+          ?.description ?? "",
+      importance: row.requirementImportance,
     }));
 
   return {
@@ -85,6 +58,7 @@ export async function buildCvStrategyContext(applicationId: string) {
       type: requirement.type,
     })),
     candidateProfileSummary: candidateProfile.summary,
+    evidenceMap,
     strongEvidence,
     weakOrMissingRequirements,
   } satisfies CvStrategyContext;

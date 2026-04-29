@@ -20,7 +20,7 @@ export function EvidenceMapView(props: {
             Evidence matching
           </h2>
           <p className="text-sm text-zinc-600">
-            Vector retrieval plus evidence scoring.
+            Requirement-level fit from retrieval and evidence scoring.
           </p>
         </div>
         <button
@@ -34,25 +34,43 @@ export function EvidenceMapView(props: {
       </div>
       {props.matches.length > 0 ? (
         <div className="space-y-2">
-          {props.matches.map((match) => (
-            <div className="rounded-md border border-zinc-200 p-3" key={match.id}>
+          {props.matches.map((row) => (
+            <div
+              className="rounded-md border border-zinc-200 bg-white p-3"
+              key={row.requirementId}
+            >
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-medium text-zinc-950">
-                  {match.jobRequirement.label}
+                  {row.requirementLabel}
                 </span>
                 <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-700">
-                  {match.confidence}
+                  {row.overallConfidence}
                 </span>
-                {typeof match.similarityScore === "number" ? (
-                  <span className="text-xs text-zinc-500">
-                    {match.similarityScore.toFixed(2)}
-                  </span>
-                ) : null}
+                <span className="rounded bg-zinc-50 px-2 py-0.5 text-xs text-zinc-500">
+                  {row.requirementImportance}
+                </span>
               </div>
-              <p className="mt-1 text-sm text-zinc-700">{match.reason}</p>
-              {match.candidateChunk ? (
-                <p className="mt-2 text-sm text-zinc-600">
-                  {match.candidateChunk.content}
+              <p className="mt-1 text-sm text-zinc-700">{row.reason}</p>
+              {row.bestEvidence.length > 0 ? (
+                <div className="mt-2 space-y-2">
+                  {row.bestEvidence.map((evidence) => (
+                    <div
+                      className="rounded border border-zinc-100 bg-zinc-50 p-2"
+                      key={evidence.chunkId}
+                    >
+                      <div className="mb-1 text-xs font-medium text-zinc-600">
+                        {evidence.confidence} evidence
+                      </div>
+                      <p className="text-sm text-zinc-700">
+                        {evidence.contentPreview}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : row.weakEvidence.length > 0 ? (
+                <p className="mt-2 text-sm text-zinc-500">
+                  Weak backup evidence found, but no strong proof for this
+                  requirement.
                 </p>
               ) : null}
             </div>

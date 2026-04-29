@@ -1,4 +1,5 @@
 import { AgentJsonSchemas, CvStrategyOutputSchema } from "~/lib/schemas";
+import type { RequirementEvidenceMapRow } from "~/server/services/rag.service";
 import { runJsonAgent } from "~/server/agents/agentRunner";
 import { cvStrategyPrompt } from "~/server/prompts/cvStrategy.prompt";
 
@@ -17,6 +18,7 @@ export type CvStrategyContext = {
     type: string;
   }>;
   candidateProfileSummary: string;
+  evidenceMap: RequirementEvidenceMapRow[];
   strongEvidence: Array<{
     requirementId: string;
     requirementLabel: string;

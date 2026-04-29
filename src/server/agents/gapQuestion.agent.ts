@@ -1,20 +1,11 @@
 import { AgentJsonSchemas, GapQuestionOutputSchema } from "~/lib/schemas";
+import type { RequirementEvidenceMapRow } from "~/server/services/rag.service";
 import { runJsonAgent } from "~/server/agents/agentRunner";
 import { gapQuestionPrompt } from "~/server/prompts/gapQuestion.prompt";
 
 export async function runGapQuestionAgent(args: {
   applicationId: string;
-  requirements: Array<{
-    id: string;
-    label: string;
-    description: string;
-    importance: string;
-  }>;
-  evidenceMatches: Array<{
-    jobRequirementId: string;
-    confidence: string;
-    reason: string;
-  }>;
+  evidenceMap: RequirementEvidenceMapRow[];
   candidateProfileSummary: string;
 }) {
   return runJsonAgent({
@@ -26,28 +17,20 @@ export async function runGapQuestionAgent(args: {
     schema: GapQuestionOutputSchema,
     jsonSchema: AgentJsonSchemas.gapQuestion,
     mockOutput: () => {
-      const coveredRequirementIds = new Set(
-        args.evidenceMatches
-          .filter(
-            (match) =>
-              match.confidence === "high" || match.confidence === "medium"
-          )
-          .map((match) => match.jobRequirementId)
-      );
-
-      const weakImportantRequirements = args.requirements
+      const weakImportantRequirements = args.evidenceMap
         .filter(
-          (requirement) =>
-            requirement.importance !== "low" &&
-            !coveredRequirementIds.has(requirement.id)
+          (row) =>
+            row.requirementImportance !== "low" &&
+            (row.overallConfidence === "weak" ||
+              row.overallConfidence === "missing")
         )
         .slice(0, 5);
 
       return {
-        questions: weakImportantRequirements.map((requirement) => ({
-          targetRequirementId: requirement.id,
-          question: `Do you have concrete experience with ${requirement.label}?`,
-          reason: `The job calls for ${requirement.label}, but current evidence is weak or missing.`,
+        questions: weakImportantRequirements.map((row) => ({
+          targetRequirementId: row.requirementId,
+          question: `Do you have concrete experience with ${row.requirementLabel}?`,
+          reason: `The job calls for ${row.requirementLabel}, but current evidence is ${row.overallConfidence}.`,
         })),
       };
     },

@@ -23,42 +23,43 @@ export async function runJobParserAgent(args: {
       requirements: [
         {
           type: "skill" as const,
-          label: "RAG",
+          label: "RAG and retrieval systems",
           description:
             "Build retrieval augmented generation workflows using searchable evidence.",
           importance: "high" as const,
         },
         {
           type: "skill" as const,
-          label: "Agents",
+          label: "Agentic workflows and tool calling",
           description:
             "Design agentic AI workflows where model outputs drive backend tools.",
           importance: "high" as const,
         },
         {
           type: "tool" as const,
-          label: "OpenAI API",
+          label: "LLM APIs and structured outputs",
           description: "Use OpenAI models and embeddings in production apps.",
           importance: "high" as const,
         },
         {
-          type: "tool" as const,
-          label: "PostgreSQL and pgvector",
+          type: "responsibility" as const,
+          label: "Backend integrations and deployment",
           description:
-            "Store and search vector embeddings in PostgreSQL using pgvector.",
-          importance: "medium" as const,
-        },
-        {
-          type: "tool" as const,
-          label: "Next.js and TypeScript",
-          description:
-            "Build full-stack product workflows with Next.js and TypeScript.",
+            "Connect AI workflows to backend services, databases, and deployed product surfaces.",
           importance: "medium" as const,
         },
         {
           type: "responsibility" as const,
-          label: "Deployment",
-          description: "Deploy AI applications and connect them to frontends.",
+          label: "AI evaluation and reliability",
+          description:
+            "Evaluate model outputs and improve reliability of AI application behavior.",
+          importance: "medium" as const,
+        },
+        {
+          type: "soft_skill" as const,
+          label: "Customer-facing technical communication",
+          description:
+            "Explain technical tradeoffs and AI product behavior to users or stakeholders.",
           importance: "medium" as const,
         },
       ],

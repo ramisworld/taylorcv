@@ -8,11 +8,10 @@ import { evidenceScoringPrompt } from "~/server/prompts/evidenceScoring.prompt";
 
 function confidenceFromSimilarity(
   similarityScore: number
-): "high" | "medium" | "weak" | "missing" {
+): "high" | "medium" | "weak" {
   if (similarityScore >= 0.78) return "high";
   if (similarityScore >= 0.45) return "medium";
-  if (similarityScore >= 0.15) return "weak";
-  return "missing";
+  return "weak";
 }
 
 export async function runEvidenceScoringAgent(args: {
@@ -55,12 +54,9 @@ export async function runEvidenceScoringAgent(args: {
           const confidence = confidenceFromSimilarity(chunk.similarityScore);
           return {
             jobRequirementId: args.requirement.id,
-            candidateChunkId: confidence === "missing" ? null : chunk.id,
+            candidateChunkId: chunk.id,
             confidence,
-            reason:
-              confidence === "missing"
-                ? "Retrieved chunks were not usable evidence for this requirement."
-                : `${confidence} evidence based on semantic overlap with: ${chunk.content.slice(0, 160)}`,
+            reason: `${confidence} evidence based on semantic overlap with: ${chunk.content.slice(0, 160)}`,
           };
         }),
       };

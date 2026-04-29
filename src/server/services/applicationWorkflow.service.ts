@@ -16,6 +16,7 @@ import {
   buildCvWriterContext,
 } from "~/server/services/cv.service";
 import {
+  buildRequirementEvidenceMap,
   replaceWithScoredEvidenceMatches,
   retrieveCandidateEvidenceForRequirement,
 } from "~/server/services/rag.service";
@@ -82,25 +83,6 @@ async function loadCandidateChunks(args: {
       AND anonymous_session_id = ${args.anonymousSessionId}
     ORDER BY created_at ASC
   `;
-}
-
-async function loadEvidenceMap(applicationId: string) {
-  return db.evidenceMatch.findMany({
-    where: { applicationId },
-    include: {
-      jobRequirement: true,
-      candidateChunk: {
-        select: {
-          id: true,
-          content: true,
-          chunkType: true,
-          sourceType: true,
-          tagsJson: true,
-        },
-      },
-    },
-    orderBy: { createdAt: "asc" },
-  });
 }
 
 async function scoreRequirement(args: {
@@ -348,7 +330,7 @@ export async function runEvidenceMatching(args: {
     data: { status: "evidence_ready", currentStep: "evidence_ready" },
   });
 
-  return { evidenceMap: await loadEvidenceMap(args.applicationId) };
+  return { evidenceMap: await buildRequirementEvidenceMap(args.applicationId) };
 }
 
 export async function generateGapQuestions(args: {
@@ -357,25 +339,22 @@ export async function generateGapQuestions(args: {
 }) {
   await assertApplicationForSession(args);
 
-  const evidenceMatches = await db.evidenceMatch.findMany({
+  const evidenceMatchCount = await db.evidenceMatch.count({
     where: { applicationId: args.applicationId },
   });
-  if (evidenceMatches.length === 0) {
+  if (evidenceMatchCount === 0) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "Gap questions require evidence matches",
     });
   }
 
-  const job = await db.job.findUnique({
-    where: { applicationId: args.applicationId },
-    include: { requirements: true },
-  });
   const candidateProfile = await db.candidateProfile.findUnique({
     where: { applicationId: args.applicationId },
   });
+  const evidenceMap = await buildRequirementEvidenceMap(args.applicationId);
 
-  if (!job || !candidateProfile) {
+  if (evidenceMap.length === 0 || !candidateProfile) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "Gap questions require a job and candidate profile",
@@ -384,8 +363,7 @@ export async function generateGapQuestions(args: {
 
   const questionOutput = await runGapQuestionAgent({
     applicationId: args.applicationId,
-    requirements: job.requirements,
-    evidenceMatches,
+    evidenceMap,
     candidateProfileSummary: candidateProfile.summary,
   });
 
@@ -538,7 +516,7 @@ export async function answerGapQuestions(args: {
   });
 
   return {
-    updatedEvidenceMap: await loadEvidenceMap(args.applicationId),
+    updatedEvidenceMap: await buildRequirementEvidenceMap(args.applicationId),
     newCandidateChunks,
   };
 }
@@ -715,7 +693,7 @@ export async function getApplicationState(args: {
       where: { applicationId: args.applicationId },
     }),
     loadCandidateChunks(args),
-    loadEvidenceMap(args.applicationId),
+    buildRequirementEvidenceMap(args.applicationId),
     db.gapQuestion.findMany({
       where: { applicationId: args.applicationId },
       orderBy: { createdAt: "asc" },
