@@ -1,17 +1,27 @@
 import { z } from "zod";
 
-import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
+import { CandidateProfilerOutputSchema } from "~/lib/schemas";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  publicProcedure,
+} from "~/server/api/trpc";
 import {
   answerGapQuestions,
+  claimApplication,
   createApplication,
+  confirmCandidateProfile,
   generateCv,
   generateCvStrategy,
   generateGapQuestions,
+  getApplicationExportData,
   getApplicationState,
+  listUserApplications,
   resetApplication,
   rewriteCvSection,
   runEvidenceMatching,
   setDreamRole,
+  submitCandidateProfileSource,
   submitCandidateInfo,
   submitJob,
   updateCvSection,
@@ -23,7 +33,10 @@ const applicationIdSchema = z.object({
 
 export const applicationRouter = createTRPCRouter({
   createApplication: publicProcedure.mutation(({ ctx }) =>
-    createApplication({ anonymousSessionId: ctx.anonymousSessionId })
+    createApplication({
+      anonymousSessionId: ctx.anonymousSessionId,
+      clerkUserId: ctx.clerkUserId,
+    })
   ),
 
   setDreamRole: publicProcedure
@@ -36,6 +49,7 @@ export const applicationRouter = createTRPCRouter({
       setDreamRole({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
+        clerkUserId: ctx.clerkUserId,
         dreamRole: input.dreamRole,
       })
     ),
@@ -46,6 +60,7 @@ export const applicationRouter = createTRPCRouter({
       resetApplication({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
+        clerkUserId: ctx.clerkUserId,
       })
     ),
 
@@ -59,6 +74,7 @@ export const applicationRouter = createTRPCRouter({
       submitJob({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
+        clerkUserId: ctx.clerkUserId,
         rawJobText: input.rawJobText,
       })
     ),
@@ -82,8 +98,60 @@ export const applicationRouter = createTRPCRouter({
       submitCandidateInfo({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
+        clerkUserId: ctx.clerkUserId,
         rawCvText: input.rawCvText,
         rawBackgroundText: input.rawBackgroundText,
+      })
+    ),
+
+  submitCandidateProfileSource: publicProcedure
+    .input(
+      applicationIdSchema
+        .extend({
+          source: z.enum([
+            "cv_upload",
+            "linkedin_url",
+            "linkedin_paste",
+            "manual",
+          ]),
+          rawCvText: z.string().nullable().optional(),
+          rawBackgroundText: z.string().nullable().optional(),
+          sourceUrl: z.string().nullable().optional(),
+          manualProfile: CandidateProfilerOutputSchema.nullable().optional(),
+        })
+        .refine(
+          (input) =>
+            (input.rawCvText?.length ?? 0) +
+              (input.rawBackgroundText?.length ?? 0) <=
+            30_000,
+          "Candidate background must be 30,000 characters or fewer"
+        )
+    )
+    .mutation(({ ctx, input }) =>
+      submitCandidateProfileSource({
+        anonymousSessionId: ctx.anonymousSessionId,
+        applicationId: input.applicationId,
+        clerkUserId: ctx.clerkUserId,
+        source: input.source,
+        rawCvText: input.rawCvText,
+        rawBackgroundText: input.rawBackgroundText,
+        sourceUrl: input.sourceUrl,
+        manualProfile: input.manualProfile,
+      })
+    ),
+
+  confirmCandidateProfile: publicProcedure
+    .input(
+      applicationIdSchema.extend({
+        profile: CandidateProfilerOutputSchema,
+      })
+    )
+    .mutation(({ ctx, input }) =>
+      confirmCandidateProfile({
+        anonymousSessionId: ctx.anonymousSessionId,
+        applicationId: input.applicationId,
+        clerkUserId: ctx.clerkUserId,
+        profile: input.profile,
       })
     ),
 
@@ -93,6 +161,7 @@ export const applicationRouter = createTRPCRouter({
       runEvidenceMatching({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
+        clerkUserId: ctx.clerkUserId,
       })
     ),
 
@@ -102,6 +171,7 @@ export const applicationRouter = createTRPCRouter({
       generateGapQuestions({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
+        clerkUserId: ctx.clerkUserId,
       })
     ),
 
@@ -121,6 +191,7 @@ export const applicationRouter = createTRPCRouter({
       answerGapQuestions({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
+        clerkUserId: ctx.clerkUserId,
         answers: input.answers,
       })
     ),
@@ -131,6 +202,7 @@ export const applicationRouter = createTRPCRouter({
       generateCvStrategy({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
+        clerkUserId: ctx.clerkUserId,
       })
     ),
 
@@ -144,6 +216,7 @@ export const applicationRouter = createTRPCRouter({
       generateCv({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
+        clerkUserId: ctx.clerkUserId,
         strategyId: input.strategyId,
       })
     ),
@@ -160,6 +233,7 @@ export const applicationRouter = createTRPCRouter({
       rewriteCvSection({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
+        clerkUserId: ctx.clerkUserId,
         cvDraftId: input.cvDraftId,
         sectionId: input.sectionId,
         instruction: input.instruction,
@@ -178,6 +252,7 @@ export const applicationRouter = createTRPCRouter({
       updateCvSection({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
+        clerkUserId: ctx.clerkUserId,
         cvDraftId: input.cvDraftId,
         sectionId: input.sectionId,
         content: input.content,
@@ -189,6 +264,30 @@ export const applicationRouter = createTRPCRouter({
     .query(({ ctx, input }) =>
       getApplicationState({
         anonymousSessionId: ctx.anonymousSessionId,
+        applicationId: input.applicationId,
+        clerkUserId: ctx.clerkUserId,
+      })
+    ),
+
+  claimApplication: protectedProcedure
+    .input(applicationIdSchema)
+    .mutation(({ ctx, input }) =>
+      claimApplication({
+        anonymousSessionId: ctx.anonymousSessionId,
+        applicationId: input.applicationId,
+        clerkUserId: ctx.clerkUserId,
+      })
+    ),
+
+  listUserApplications: protectedProcedure.query(({ ctx }) =>
+    listUserApplications({ clerkUserId: ctx.clerkUserId })
+  ),
+
+  getApplicationExportData: protectedProcedure
+    .input(applicationIdSchema)
+    .mutation(({ ctx, input }) =>
+      getApplicationExportData({
+        clerkUserId: ctx.clerkUserId,
         applicationId: input.applicationId,
       })
     ),

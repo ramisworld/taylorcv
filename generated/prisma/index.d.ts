@@ -19,6 +19,11 @@ export type PrismaPromise<T> = $Public.PrismaPromise<T>
  */
 export type AnonymousSession = $Result.DefaultSelection<Prisma.$AnonymousSessionPayload>
 /**
+ * Model User
+ * 
+ */
+export type User = $Result.DefaultSelection<Prisma.$UserPayload>
+/**
  * Model Application
  * 
  */
@@ -346,6 +351,16 @@ export class PrismaClient<
     * ```
     */
   get anonymousSession(): Prisma.AnonymousSessionDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.user`: Exposes CRUD operations for the **User** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Users
+    * const users = await prisma.user.findMany()
+    * ```
+    */
+  get user(): Prisma.UserDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.application`: Exposes CRUD operations for the **Application** model.
@@ -918,6 +933,7 @@ export namespace Prisma {
 
   export const ModelName: {
     AnonymousSession: 'AnonymousSession',
+    User: 'User',
     Application: 'Application',
     Job: 'Job',
     JobRequirement: 'JobRequirement',
@@ -949,7 +965,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "anonymousSession" | "application" | "job" | "jobRequirement" | "candidateProfile" | "candidateChunk" | "evidenceMatch" | "requirementFitScore" | "gapQuestion" | "gapCoachInsight" | "gapAnswer" | "cvStrategy" | "cvDraft" | "agentRun"
+      modelProps: "anonymousSession" | "user" | "application" | "job" | "jobRequirement" | "candidateProfile" | "candidateChunk" | "evidenceMatch" | "requirementFitScore" | "gapQuestion" | "gapCoachInsight" | "gapAnswer" | "cvStrategy" | "cvDraft" | "agentRun"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1024,6 +1040,80 @@ export namespace Prisma {
           count: {
             args: Prisma.AnonymousSessionCountArgs<ExtArgs>
             result: $Utils.Optional<AnonymousSessionCountAggregateOutputType> | number
+          }
+        }
+      }
+      User: {
+        payload: Prisma.$UserPayload<ExtArgs>
+        fields: Prisma.UserFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.UserFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.UserFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>
+          }
+          findFirst: {
+            args: Prisma.UserFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.UserFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>
+          }
+          findMany: {
+            args: Prisma.UserFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>[]
+          }
+          create: {
+            args: Prisma.UserCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>
+          }
+          createMany: {
+            args: Prisma.UserCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.UserCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>[]
+          }
+          delete: {
+            args: Prisma.UserDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>
+          }
+          update: {
+            args: Prisma.UserUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>
+          }
+          deleteMany: {
+            args: Prisma.UserDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.UserUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.UserUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>[]
+          }
+          upsert: {
+            args: Prisma.UserUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$UserPayload>
+          }
+          aggregate: {
+            args: Prisma.UserAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateUser>
+          }
+          groupBy: {
+            args: Prisma.UserGroupByArgs<ExtArgs>
+            result: $Utils.Optional<UserGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.UserCountArgs<ExtArgs>
+            result: $Utils.Optional<UserCountAggregateOutputType> | number
           }
         }
       }
@@ -2086,6 +2176,7 @@ export namespace Prisma {
   }
   export type GlobalOmitConfig = {
     anonymousSession?: AnonymousSessionOmit
+    user?: UserOmit
     application?: ApplicationOmit
     job?: JobOmit
     jobRequirement?: JobRequirementOmit
@@ -2220,6 +2311,37 @@ export namespace Prisma {
    */
   export type AnonymousSessionCountOutputTypeCountCandidateChunksArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: CandidateChunkWhereInput
+  }
+
+
+  /**
+   * Count Type UserCountOutputType
+   */
+
+  export type UserCountOutputType = {
+    applications: number
+  }
+
+  export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    applications?: boolean | UserCountOutputTypeCountApplicationsArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the UserCountOutputType
+     */
+    select?: UserCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountApplicationsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ApplicationWhereInput
   }
 
 
@@ -3635,6 +3757,1089 @@ export namespace Prisma {
 
 
   /**
+   * Model User
+   */
+
+  export type AggregateUser = {
+    _count: UserCountAggregateOutputType | null
+    _min: UserMinAggregateOutputType | null
+    _max: UserMaxAggregateOutputType | null
+  }
+
+  export type UserMinAggregateOutputType = {
+    id: string | null
+    clerkUserId: string | null
+    email: string | null
+    name: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type UserMaxAggregateOutputType = {
+    id: string | null
+    clerkUserId: string | null
+    email: string | null
+    name: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type UserCountAggregateOutputType = {
+    id: number
+    clerkUserId: number
+    email: number
+    name: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type UserMinAggregateInputType = {
+    id?: true
+    clerkUserId?: true
+    email?: true
+    name?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type UserMaxAggregateInputType = {
+    id?: true
+    clerkUserId?: true
+    email?: true
+    name?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type UserCountAggregateInputType = {
+    id?: true
+    clerkUserId?: true
+    email?: true
+    name?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type UserAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which User to aggregate.
+     */
+    where?: UserWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Users to fetch.
+     */
+    orderBy?: UserOrderByWithRelationInput | UserOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: UserWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Users from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Users.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Users
+    **/
+    _count?: true | UserCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: UserMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: UserMaxAggregateInputType
+  }
+
+  export type GetUserAggregateType<T extends UserAggregateArgs> = {
+        [P in keyof T & keyof AggregateUser]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateUser[P]>
+      : GetScalarType<T[P], AggregateUser[P]>
+  }
+
+
+
+
+  export type UserGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: UserWhereInput
+    orderBy?: UserOrderByWithAggregationInput | UserOrderByWithAggregationInput[]
+    by: UserScalarFieldEnum[] | UserScalarFieldEnum
+    having?: UserScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: UserCountAggregateInputType | true
+    _min?: UserMinAggregateInputType
+    _max?: UserMaxAggregateInputType
+  }
+
+  export type UserGroupByOutputType = {
+    id: string
+    clerkUserId: string
+    email: string | null
+    name: string | null
+    createdAt: Date
+    updatedAt: Date
+    _count: UserCountAggregateOutputType | null
+    _min: UserMinAggregateOutputType | null
+    _max: UserMaxAggregateOutputType | null
+  }
+
+  type GetUserGroupByPayload<T extends UserGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<UserGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof UserGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], UserGroupByOutputType[P]>
+            : GetScalarType<T[P], UserGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type UserSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    clerkUserId?: boolean
+    email?: boolean
+    name?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    applications?: boolean | User$applicationsArgs<ExtArgs>
+    _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["user"]>
+
+  export type UserSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    clerkUserId?: boolean
+    email?: boolean
+    name?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["user"]>
+
+  export type UserSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    clerkUserId?: boolean
+    email?: boolean
+    name?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["user"]>
+
+  export type UserSelectScalar = {
+    id?: boolean
+    clerkUserId?: boolean
+    email?: boolean
+    name?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "clerkUserId" | "email" | "name" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+  export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    applications?: boolean | User$applicationsArgs<ExtArgs>
+    _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+  export type UserIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+
+  export type $UserPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "User"
+    objects: {
+      applications: Prisma.$ApplicationPayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      clerkUserId: string
+      email: string | null
+      name: string | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["user"]>
+    composites: {}
+  }
+
+  type UserGetPayload<S extends boolean | null | undefined | UserDefaultArgs> = $Result.GetResult<Prisma.$UserPayload, S>
+
+  type UserCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<UserFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: UserCountAggregateInputType | true
+    }
+
+  export interface UserDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['User'], meta: { name: 'User' } }
+    /**
+     * Find zero or one User that matches the filter.
+     * @param {UserFindUniqueArgs} args - Arguments to find a User
+     * @example
+     * // Get one User
+     * const user = await prisma.user.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends UserFindUniqueArgs>(args: SelectSubset<T, UserFindUniqueArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one User that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {UserFindUniqueOrThrowArgs} args - Arguments to find a User
+     * @example
+     * // Get one User
+     * const user = await prisma.user.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends UserFindUniqueOrThrowArgs>(args: SelectSubset<T, UserFindUniqueOrThrowArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first User that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserFindFirstArgs} args - Arguments to find a User
+     * @example
+     * // Get one User
+     * const user = await prisma.user.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends UserFindFirstArgs>(args?: SelectSubset<T, UserFindFirstArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first User that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserFindFirstOrThrowArgs} args - Arguments to find a User
+     * @example
+     * // Get one User
+     * const user = await prisma.user.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends UserFindFirstOrThrowArgs>(args?: SelectSubset<T, UserFindFirstOrThrowArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more Users that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Users
+     * const users = await prisma.user.findMany()
+     * 
+     * // Get first 10 Users
+     * const users = await prisma.user.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const userWithIdOnly = await prisma.user.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends UserFindManyArgs>(args?: SelectSubset<T, UserFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a User.
+     * @param {UserCreateArgs} args - Arguments to create a User.
+     * @example
+     * // Create one User
+     * const User = await prisma.user.create({
+     *   data: {
+     *     // ... data to create a User
+     *   }
+     * })
+     * 
+     */
+    create<T extends UserCreateArgs>(args: SelectSubset<T, UserCreateArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many Users.
+     * @param {UserCreateManyArgs} args - Arguments to create many Users.
+     * @example
+     * // Create many Users
+     * const user = await prisma.user.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends UserCreateManyArgs>(args?: SelectSubset<T, UserCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Users and returns the data saved in the database.
+     * @param {UserCreateManyAndReturnArgs} args - Arguments to create many Users.
+     * @example
+     * // Create many Users
+     * const user = await prisma.user.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Users and only return the `id`
+     * const userWithIdOnly = await prisma.user.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends UserCreateManyAndReturnArgs>(args?: SelectSubset<T, UserCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a User.
+     * @param {UserDeleteArgs} args - Arguments to delete one User.
+     * @example
+     * // Delete one User
+     * const User = await prisma.user.delete({
+     *   where: {
+     *     // ... filter to delete one User
+     *   }
+     * })
+     * 
+     */
+    delete<T extends UserDeleteArgs>(args: SelectSubset<T, UserDeleteArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one User.
+     * @param {UserUpdateArgs} args - Arguments to update one User.
+     * @example
+     * // Update one User
+     * const user = await prisma.user.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends UserUpdateArgs>(args: SelectSubset<T, UserUpdateArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more Users.
+     * @param {UserDeleteManyArgs} args - Arguments to filter Users to delete.
+     * @example
+     * // Delete a few Users
+     * const { count } = await prisma.user.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends UserDeleteManyArgs>(args?: SelectSubset<T, UserDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Users.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Users
+     * const user = await prisma.user.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends UserUpdateManyArgs>(args: SelectSubset<T, UserUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Users and returns the data updated in the database.
+     * @param {UserUpdateManyAndReturnArgs} args - Arguments to update many Users.
+     * @example
+     * // Update many Users
+     * const user = await prisma.user.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more Users and only return the `id`
+     * const userWithIdOnly = await prisma.user.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends UserUpdateManyAndReturnArgs>(args: SelectSubset<T, UserUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one User.
+     * @param {UserUpsertArgs} args - Arguments to update or create a User.
+     * @example
+     * // Update or create a User
+     * const user = await prisma.user.upsert({
+     *   create: {
+     *     // ... data to create a User
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the User we want to update
+     *   }
+     * })
+     */
+    upsert<T extends UserUpsertArgs>(args: SelectSubset<T, UserUpsertArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of Users.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserCountArgs} args - Arguments to filter Users to count.
+     * @example
+     * // Count the number of Users
+     * const count = await prisma.user.count({
+     *   where: {
+     *     // ... the filter for the Users we want to count
+     *   }
+     * })
+    **/
+    count<T extends UserCountArgs>(
+      args?: Subset<T, UserCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], UserCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a User.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends UserAggregateArgs>(args: Subset<T, UserAggregateArgs>): Prisma.PrismaPromise<GetUserAggregateType<T>>
+
+    /**
+     * Group by User.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {UserGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends UserGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: UserGroupByArgs['orderBy'] }
+        : { orderBy?: UserGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, UserGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetUserGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the User model
+   */
+  readonly fields: UserFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for User.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__UserClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    applications<T extends User$applicationsArgs<ExtArgs> = {}>(args?: Subset<T, User$applicationsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ApplicationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the User model
+   */
+  interface UserFieldRefs {
+    readonly id: FieldRef<"User", 'String'>
+    readonly clerkUserId: FieldRef<"User", 'String'>
+    readonly email: FieldRef<"User", 'String'>
+    readonly name: FieldRef<"User", 'String'>
+    readonly createdAt: FieldRef<"User", 'DateTime'>
+    readonly updatedAt: FieldRef<"User", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * User findUnique
+   */
+  export type UserFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * Filter, which User to fetch.
+     */
+    where: UserWhereUniqueInput
+  }
+
+  /**
+   * User findUniqueOrThrow
+   */
+  export type UserFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * Filter, which User to fetch.
+     */
+    where: UserWhereUniqueInput
+  }
+
+  /**
+   * User findFirst
+   */
+  export type UserFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * Filter, which User to fetch.
+     */
+    where?: UserWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Users to fetch.
+     */
+    orderBy?: UserOrderByWithRelationInput | UserOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Users.
+     */
+    cursor?: UserWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Users from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Users.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Users.
+     */
+    distinct?: UserScalarFieldEnum | UserScalarFieldEnum[]
+  }
+
+  /**
+   * User findFirstOrThrow
+   */
+  export type UserFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * Filter, which User to fetch.
+     */
+    where?: UserWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Users to fetch.
+     */
+    orderBy?: UserOrderByWithRelationInput | UserOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Users.
+     */
+    cursor?: UserWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Users from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Users.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Users.
+     */
+    distinct?: UserScalarFieldEnum | UserScalarFieldEnum[]
+  }
+
+  /**
+   * User findMany
+   */
+  export type UserFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * Filter, which Users to fetch.
+     */
+    where?: UserWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Users to fetch.
+     */
+    orderBy?: UserOrderByWithRelationInput | UserOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Users.
+     */
+    cursor?: UserWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Users from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Users.
+     */
+    skip?: number
+    distinct?: UserScalarFieldEnum | UserScalarFieldEnum[]
+  }
+
+  /**
+   * User create
+   */
+  export type UserCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * The data needed to create a User.
+     */
+    data: XOR<UserCreateInput, UserUncheckedCreateInput>
+  }
+
+  /**
+   * User createMany
+   */
+  export type UserCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Users.
+     */
+    data: UserCreateManyInput | UserCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * User createManyAndReturn
+   */
+  export type UserCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * The data used to create many Users.
+     */
+    data: UserCreateManyInput | UserCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * User update
+   */
+  export type UserUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * The data needed to update a User.
+     */
+    data: XOR<UserUpdateInput, UserUncheckedUpdateInput>
+    /**
+     * Choose, which User to update.
+     */
+    where: UserWhereUniqueInput
+  }
+
+  /**
+   * User updateMany
+   */
+  export type UserUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Users.
+     */
+    data: XOR<UserUpdateManyMutationInput, UserUncheckedUpdateManyInput>
+    /**
+     * Filter which Users to update
+     */
+    where?: UserWhereInput
+    /**
+     * Limit how many Users to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * User updateManyAndReturn
+   */
+  export type UserUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * The data used to update Users.
+     */
+    data: XOR<UserUpdateManyMutationInput, UserUncheckedUpdateManyInput>
+    /**
+     * Filter which Users to update
+     */
+    where?: UserWhereInput
+    /**
+     * Limit how many Users to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * User upsert
+   */
+  export type UserUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * The filter to search for the User to update in case it exists.
+     */
+    where: UserWhereUniqueInput
+    /**
+     * In case the User found by the `where` argument doesn't exist, create a new User with this data.
+     */
+    create: XOR<UserCreateInput, UserUncheckedCreateInput>
+    /**
+     * In case the User was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<UserUpdateInput, UserUncheckedUpdateInput>
+  }
+
+  /**
+   * User delete
+   */
+  export type UserDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    /**
+     * Filter which User to delete.
+     */
+    where: UserWhereUniqueInput
+  }
+
+  /**
+   * User deleteMany
+   */
+  export type UserDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Users to delete
+     */
+    where?: UserWhereInput
+    /**
+     * Limit how many Users to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * User.applications
+   */
+  export type User$applicationsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Application
+     */
+    select?: ApplicationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Application
+     */
+    omit?: ApplicationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ApplicationInclude<ExtArgs> | null
+    where?: ApplicationWhereInput
+    orderBy?: ApplicationOrderByWithRelationInput | ApplicationOrderByWithRelationInput[]
+    cursor?: ApplicationWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ApplicationScalarFieldEnum | ApplicationScalarFieldEnum[]
+  }
+
+  /**
+   * User without action
+   */
+  export type UserDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Model Application
    */
 
@@ -3659,6 +4864,7 @@ export namespace Prisma {
   export type ApplicationMinAggregateOutputType = {
     id: string | null
     anonymousSessionId: string | null
+    userId: string | null
     status: $Enums.ApplicationStatus | null
     currentStep: string | null
     dreamRole: string | null
@@ -3671,6 +4877,7 @@ export namespace Prisma {
   export type ApplicationMaxAggregateOutputType = {
     id: string | null
     anonymousSessionId: string | null
+    userId: string | null
     status: $Enums.ApplicationStatus | null
     currentStep: string | null
     dreamRole: string | null
@@ -3683,6 +4890,7 @@ export namespace Prisma {
   export type ApplicationCountAggregateOutputType = {
     id: number
     anonymousSessionId: number
+    userId: number
     status: number
     currentStep: number
     dreamRole: number
@@ -3707,6 +4915,7 @@ export namespace Prisma {
   export type ApplicationMinAggregateInputType = {
     id?: true
     anonymousSessionId?: true
+    userId?: true
     status?: true
     currentStep?: true
     dreamRole?: true
@@ -3719,6 +4928,7 @@ export namespace Prisma {
   export type ApplicationMaxAggregateInputType = {
     id?: true
     anonymousSessionId?: true
+    userId?: true
     status?: true
     currentStep?: true
     dreamRole?: true
@@ -3731,6 +4941,7 @@ export namespace Prisma {
   export type ApplicationCountAggregateInputType = {
     id?: true
     anonymousSessionId?: true
+    userId?: true
     status?: true
     currentStep?: true
     dreamRole?: true
@@ -3830,6 +5041,7 @@ export namespace Prisma {
   export type ApplicationGroupByOutputType = {
     id: string
     anonymousSessionId: string
+    userId: string | null
     status: $Enums.ApplicationStatus
     currentStep: string
     dreamRole: string | null
@@ -3861,6 +5073,7 @@ export namespace Prisma {
   export type ApplicationSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     anonymousSessionId?: boolean
+    userId?: boolean
     status?: boolean
     currentStep?: boolean
     dreamRole?: boolean
@@ -3869,6 +5082,7 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     anonymousSession?: boolean | AnonymousSessionDefaultArgs<ExtArgs>
+    user?: boolean | Application$userArgs<ExtArgs>
     job?: boolean | Application$jobArgs<ExtArgs>
     candidateProfile?: boolean | Application$candidateProfileArgs<ExtArgs>
     candidateChunks?: boolean | Application$candidateChunksArgs<ExtArgs>
@@ -3886,6 +5100,7 @@ export namespace Prisma {
   export type ApplicationSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     anonymousSessionId?: boolean
+    userId?: boolean
     status?: boolean
     currentStep?: boolean
     dreamRole?: boolean
@@ -3894,11 +5109,13 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     anonymousSession?: boolean | AnonymousSessionDefaultArgs<ExtArgs>
+    user?: boolean | Application$userArgs<ExtArgs>
   }, ExtArgs["result"]["application"]>
 
   export type ApplicationSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     anonymousSessionId?: boolean
+    userId?: boolean
     status?: boolean
     currentStep?: boolean
     dreamRole?: boolean
@@ -3907,11 +5124,13 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     anonymousSession?: boolean | AnonymousSessionDefaultArgs<ExtArgs>
+    user?: boolean | Application$userArgs<ExtArgs>
   }, ExtArgs["result"]["application"]>
 
   export type ApplicationSelectScalar = {
     id?: boolean
     anonymousSessionId?: boolean
+    userId?: boolean
     status?: boolean
     currentStep?: boolean
     dreamRole?: boolean
@@ -3921,9 +5140,10 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type ApplicationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "anonymousSessionId" | "status" | "currentStep" | "dreamRole" | "originalEvidenceMatchScore" | "updatedEvidenceMatchScore" | "createdAt" | "updatedAt", ExtArgs["result"]["application"]>
+  export type ApplicationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "anonymousSessionId" | "userId" | "status" | "currentStep" | "dreamRole" | "originalEvidenceMatchScore" | "updatedEvidenceMatchScore" | "createdAt" | "updatedAt", ExtArgs["result"]["application"]>
   export type ApplicationInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     anonymousSession?: boolean | AnonymousSessionDefaultArgs<ExtArgs>
+    user?: boolean | Application$userArgs<ExtArgs>
     job?: boolean | Application$jobArgs<ExtArgs>
     candidateProfile?: boolean | Application$candidateProfileArgs<ExtArgs>
     candidateChunks?: boolean | Application$candidateChunksArgs<ExtArgs>
@@ -3939,15 +5159,18 @@ export namespace Prisma {
   }
   export type ApplicationIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     anonymousSession?: boolean | AnonymousSessionDefaultArgs<ExtArgs>
+    user?: boolean | Application$userArgs<ExtArgs>
   }
   export type ApplicationIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     anonymousSession?: boolean | AnonymousSessionDefaultArgs<ExtArgs>
+    user?: boolean | Application$userArgs<ExtArgs>
   }
 
   export type $ApplicationPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "Application"
     objects: {
       anonymousSession: Prisma.$AnonymousSessionPayload<ExtArgs>
+      user: Prisma.$UserPayload<ExtArgs> | null
       job: Prisma.$JobPayload<ExtArgs> | null
       candidateProfile: Prisma.$CandidateProfilePayload<ExtArgs> | null
       candidateChunks: Prisma.$CandidateChunkPayload<ExtArgs>[]
@@ -3963,6 +5186,7 @@ export namespace Prisma {
     scalars: $Extensions.GetPayloadResult<{
       id: string
       anonymousSessionId: string
+      userId: string | null
       status: $Enums.ApplicationStatus
       currentStep: string
       dreamRole: string | null
@@ -4365,6 +5589,7 @@ export namespace Prisma {
   export interface Prisma__ApplicationClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     anonymousSession<T extends AnonymousSessionDefaultArgs<ExtArgs> = {}>(args?: Subset<T, AnonymousSessionDefaultArgs<ExtArgs>>): Prisma__AnonymousSessionClient<$Result.GetResult<Prisma.$AnonymousSessionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    user<T extends Application$userArgs<ExtArgs> = {}>(args?: Subset<T, Application$userArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     job<T extends Application$jobArgs<ExtArgs> = {}>(args?: Subset<T, Application$jobArgs<ExtArgs>>): Prisma__JobClient<$Result.GetResult<Prisma.$JobPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     candidateProfile<T extends Application$candidateProfileArgs<ExtArgs> = {}>(args?: Subset<T, Application$candidateProfileArgs<ExtArgs>>): Prisma__CandidateProfileClient<$Result.GetResult<Prisma.$CandidateProfilePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     candidateChunks<T extends Application$candidateChunksArgs<ExtArgs> = {}>(args?: Subset<T, Application$candidateChunksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CandidateChunkPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -4407,6 +5632,7 @@ export namespace Prisma {
   interface ApplicationFieldRefs {
     readonly id: FieldRef<"Application", 'String'>
     readonly anonymousSessionId: FieldRef<"Application", 'String'>
+    readonly userId: FieldRef<"Application", 'String'>
     readonly status: FieldRef<"Application", 'ApplicationStatus'>
     readonly currentStep: FieldRef<"Application", 'String'>
     readonly dreamRole: FieldRef<"Application", 'String'>
@@ -4807,6 +6033,25 @@ export namespace Prisma {
      * Limit how many Applications to delete.
      */
     limit?: number
+  }
+
+  /**
+   * Application.user
+   */
+  export type Application$userArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    where?: UserWhereInput
   }
 
   /**
@@ -7377,6 +8622,10 @@ export namespace Prisma {
     applicationId: string | null
     rawCvText: string | null
     rawBackgroundText: string | null
+    profileSource: string | null
+    sourceSummary: string | null
+    sourceUrl: string | null
+    profileConfirmedAt: Date | null
     summary: string | null
     createdAt: Date | null
   }
@@ -7387,6 +8636,10 @@ export namespace Prisma {
     applicationId: string | null
     rawCvText: string | null
     rawBackgroundText: string | null
+    profileSource: string | null
+    sourceSummary: string | null
+    sourceUrl: string | null
+    profileConfirmedAt: Date | null
     summary: string | null
     createdAt: Date | null
   }
@@ -7397,6 +8650,12 @@ export namespace Prisma {
     applicationId: number
     rawCvText: number
     rawBackgroundText: number
+    contactInfoJson: number
+    linksJson: number
+    profileSource: number
+    sourceSummary: number
+    sourceUrl: number
+    profileConfirmedAt: number
     summary: number
     skillsJson: number
     projectsJson: number
@@ -7416,6 +8675,10 @@ export namespace Prisma {
     applicationId?: true
     rawCvText?: true
     rawBackgroundText?: true
+    profileSource?: true
+    sourceSummary?: true
+    sourceUrl?: true
+    profileConfirmedAt?: true
     summary?: true
     createdAt?: true
   }
@@ -7426,6 +8689,10 @@ export namespace Prisma {
     applicationId?: true
     rawCvText?: true
     rawBackgroundText?: true
+    profileSource?: true
+    sourceSummary?: true
+    sourceUrl?: true
+    profileConfirmedAt?: true
     summary?: true
     createdAt?: true
   }
@@ -7436,6 +8703,12 @@ export namespace Prisma {
     applicationId?: true
     rawCvText?: true
     rawBackgroundText?: true
+    contactInfoJson?: true
+    linksJson?: true
+    profileSource?: true
+    sourceSummary?: true
+    sourceUrl?: true
+    profileConfirmedAt?: true
     summary?: true
     skillsJson?: true
     projectsJson?: true
@@ -7526,6 +8799,12 @@ export namespace Prisma {
     applicationId: string
     rawCvText: string | null
     rawBackgroundText: string | null
+    contactInfoJson: JsonValue | null
+    linksJson: JsonValue | null
+    profileSource: string | null
+    sourceSummary: string | null
+    sourceUrl: string | null
+    profileConfirmedAt: Date | null
     summary: string
     skillsJson: JsonValue
     projectsJson: JsonValue
@@ -7560,6 +8839,12 @@ export namespace Prisma {
     applicationId?: boolean
     rawCvText?: boolean
     rawBackgroundText?: boolean
+    contactInfoJson?: boolean
+    linksJson?: boolean
+    profileSource?: boolean
+    sourceSummary?: boolean
+    sourceUrl?: boolean
+    profileConfirmedAt?: boolean
     summary?: boolean
     skillsJson?: boolean
     projectsJson?: boolean
@@ -7581,6 +8866,12 @@ export namespace Prisma {
     applicationId?: boolean
     rawCvText?: boolean
     rawBackgroundText?: boolean
+    contactInfoJson?: boolean
+    linksJson?: boolean
+    profileSource?: boolean
+    sourceSummary?: boolean
+    sourceUrl?: boolean
+    profileConfirmedAt?: boolean
     summary?: boolean
     skillsJson?: boolean
     projectsJson?: boolean
@@ -7600,6 +8891,12 @@ export namespace Prisma {
     applicationId?: boolean
     rawCvText?: boolean
     rawBackgroundText?: boolean
+    contactInfoJson?: boolean
+    linksJson?: boolean
+    profileSource?: boolean
+    sourceSummary?: boolean
+    sourceUrl?: boolean
+    profileConfirmedAt?: boolean
     summary?: boolean
     skillsJson?: boolean
     projectsJson?: boolean
@@ -7619,6 +8916,12 @@ export namespace Prisma {
     applicationId?: boolean
     rawCvText?: boolean
     rawBackgroundText?: boolean
+    contactInfoJson?: boolean
+    linksJson?: boolean
+    profileSource?: boolean
+    sourceSummary?: boolean
+    sourceUrl?: boolean
+    profileConfirmedAt?: boolean
     summary?: boolean
     skillsJson?: boolean
     projectsJson?: boolean
@@ -7630,7 +8933,7 @@ export namespace Prisma {
     createdAt?: boolean
   }
 
-  export type CandidateProfileOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "anonymousSessionId" | "applicationId" | "rawCvText" | "rawBackgroundText" | "summary" | "skillsJson" | "projectsJson" | "educationJson" | "certificationsJson" | "experienceJson" | "toolsJson" | "achievementsJson" | "createdAt", ExtArgs["result"]["candidateProfile"]>
+  export type CandidateProfileOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "anonymousSessionId" | "applicationId" | "rawCvText" | "rawBackgroundText" | "contactInfoJson" | "linksJson" | "profileSource" | "sourceSummary" | "sourceUrl" | "profileConfirmedAt" | "summary" | "skillsJson" | "projectsJson" | "educationJson" | "certificationsJson" | "experienceJson" | "toolsJson" | "achievementsJson" | "createdAt", ExtArgs["result"]["candidateProfile"]>
   export type CandidateProfileInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     anonymousSession?: boolean | AnonymousSessionDefaultArgs<ExtArgs>
     application?: boolean | ApplicationDefaultArgs<ExtArgs>
@@ -7659,6 +8962,12 @@ export namespace Prisma {
       applicationId: string
       rawCvText: string | null
       rawBackgroundText: string | null
+      contactInfoJson: Prisma.JsonValue | null
+      linksJson: Prisma.JsonValue | null
+      profileSource: string | null
+      sourceSummary: string | null
+      sourceUrl: string | null
+      profileConfirmedAt: Date | null
       summary: string
       skillsJson: Prisma.JsonValue
       projectsJson: Prisma.JsonValue
@@ -8099,6 +9408,12 @@ export namespace Prisma {
     readonly applicationId: FieldRef<"CandidateProfile", 'String'>
     readonly rawCvText: FieldRef<"CandidateProfile", 'String'>
     readonly rawBackgroundText: FieldRef<"CandidateProfile", 'String'>
+    readonly contactInfoJson: FieldRef<"CandidateProfile", 'Json'>
+    readonly linksJson: FieldRef<"CandidateProfile", 'Json'>
+    readonly profileSource: FieldRef<"CandidateProfile", 'String'>
+    readonly sourceSummary: FieldRef<"CandidateProfile", 'String'>
+    readonly sourceUrl: FieldRef<"CandidateProfile", 'String'>
+    readonly profileConfirmedAt: FieldRef<"CandidateProfile", 'DateTime'>
     readonly summary: FieldRef<"CandidateProfile", 'String'>
     readonly skillsJson: FieldRef<"CandidateProfile", 'Json'>
     readonly projectsJson: FieldRef<"CandidateProfile", 'Json'>
@@ -18923,9 +20238,22 @@ export namespace Prisma {
   export type AnonymousSessionScalarFieldEnum = (typeof AnonymousSessionScalarFieldEnum)[keyof typeof AnonymousSessionScalarFieldEnum]
 
 
+  export const UserScalarFieldEnum: {
+    id: 'id',
+    clerkUserId: 'clerkUserId',
+    email: 'email',
+    name: 'name',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
   export const ApplicationScalarFieldEnum: {
     id: 'id',
     anonymousSessionId: 'anonymousSessionId',
+    userId: 'userId',
     status: 'status',
     currentStep: 'currentStep',
     dreamRole: 'dreamRole',
@@ -18970,6 +20298,12 @@ export namespace Prisma {
     applicationId: 'applicationId',
     rawCvText: 'rawCvText',
     rawBackgroundText: 'rawBackgroundText',
+    contactInfoJson: 'contactInfoJson',
+    linksJson: 'linksJson',
+    profileSource: 'profileSource',
+    sourceSummary: 'sourceSummary',
+    sourceUrl: 'sourceUrl',
+    profileConfirmedAt: 'profileConfirmedAt',
     summary: 'summary',
     skillsJson: 'skillsJson',
     projectsJson: 'projectsJson',
@@ -19128,19 +20462,19 @@ export namespace Prisma {
   export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
 
 
-  export const JsonNullValueInput: {
-    JsonNull: typeof JsonNull
-  };
-
-  export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
-
-
   export const NullableJsonNullValueInput: {
     DbNull: typeof DbNull,
     JsonNull: typeof JsonNull
   };
 
   export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
+
+
+  export const JsonNullValueInput: {
+    JsonNull: typeof JsonNull
+  };
+
+  export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
   export const QueryMode: {
@@ -19423,12 +20757,73 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"AnonymousSession"> | Date | string
   }
 
+  export type UserWhereInput = {
+    AND?: UserWhereInput | UserWhereInput[]
+    OR?: UserWhereInput[]
+    NOT?: UserWhereInput | UserWhereInput[]
+    id?: StringFilter<"User"> | string
+    clerkUserId?: StringFilter<"User"> | string
+    email?: StringNullableFilter<"User"> | string | null
+    name?: StringNullableFilter<"User"> | string | null
+    createdAt?: DateTimeFilter<"User"> | Date | string
+    updatedAt?: DateTimeFilter<"User"> | Date | string
+    applications?: ApplicationListRelationFilter
+  }
+
+  export type UserOrderByWithRelationInput = {
+    id?: SortOrder
+    clerkUserId?: SortOrder
+    email?: SortOrderInput | SortOrder
+    name?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    applications?: ApplicationOrderByRelationAggregateInput
+  }
+
+  export type UserWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    clerkUserId?: string
+    AND?: UserWhereInput | UserWhereInput[]
+    OR?: UserWhereInput[]
+    NOT?: UserWhereInput | UserWhereInput[]
+    email?: StringNullableFilter<"User"> | string | null
+    name?: StringNullableFilter<"User"> | string | null
+    createdAt?: DateTimeFilter<"User"> | Date | string
+    updatedAt?: DateTimeFilter<"User"> | Date | string
+    applications?: ApplicationListRelationFilter
+  }, "id" | "clerkUserId">
+
+  export type UserOrderByWithAggregationInput = {
+    id?: SortOrder
+    clerkUserId?: SortOrder
+    email?: SortOrderInput | SortOrder
+    name?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: UserCountOrderByAggregateInput
+    _max?: UserMaxOrderByAggregateInput
+    _min?: UserMinOrderByAggregateInput
+  }
+
+  export type UserScalarWhereWithAggregatesInput = {
+    AND?: UserScalarWhereWithAggregatesInput | UserScalarWhereWithAggregatesInput[]
+    OR?: UserScalarWhereWithAggregatesInput[]
+    NOT?: UserScalarWhereWithAggregatesInput | UserScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"User"> | string
+    clerkUserId?: StringWithAggregatesFilter<"User"> | string
+    email?: StringNullableWithAggregatesFilter<"User"> | string | null
+    name?: StringNullableWithAggregatesFilter<"User"> | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
+  }
+
   export type ApplicationWhereInput = {
     AND?: ApplicationWhereInput | ApplicationWhereInput[]
     OR?: ApplicationWhereInput[]
     NOT?: ApplicationWhereInput | ApplicationWhereInput[]
     id?: StringFilter<"Application"> | string
     anonymousSessionId?: StringFilter<"Application"> | string
+    userId?: StringNullableFilter<"Application"> | string | null
     status?: EnumApplicationStatusFilter<"Application"> | $Enums.ApplicationStatus
     currentStep?: StringFilter<"Application"> | string
     dreamRole?: StringNullableFilter<"Application"> | string | null
@@ -19437,6 +20832,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Application"> | Date | string
     updatedAt?: DateTimeFilter<"Application"> | Date | string
     anonymousSession?: XOR<AnonymousSessionScalarRelationFilter, AnonymousSessionWhereInput>
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
     job?: XOR<JobNullableScalarRelationFilter, JobWhereInput> | null
     candidateProfile?: XOR<CandidateProfileNullableScalarRelationFilter, CandidateProfileWhereInput> | null
     candidateChunks?: CandidateChunkListRelationFilter
@@ -19453,6 +20849,7 @@ export namespace Prisma {
   export type ApplicationOrderByWithRelationInput = {
     id?: SortOrder
     anonymousSessionId?: SortOrder
+    userId?: SortOrderInput | SortOrder
     status?: SortOrder
     currentStep?: SortOrder
     dreamRole?: SortOrderInput | SortOrder
@@ -19461,6 +20858,7 @@ export namespace Prisma {
     createdAt?: SortOrder
     updatedAt?: SortOrder
     anonymousSession?: AnonymousSessionOrderByWithRelationInput
+    user?: UserOrderByWithRelationInput
     job?: JobOrderByWithRelationInput
     candidateProfile?: CandidateProfileOrderByWithRelationInput
     candidateChunks?: CandidateChunkOrderByRelationAggregateInput
@@ -19480,6 +20878,7 @@ export namespace Prisma {
     OR?: ApplicationWhereInput[]
     NOT?: ApplicationWhereInput | ApplicationWhereInput[]
     anonymousSessionId?: StringFilter<"Application"> | string
+    userId?: StringNullableFilter<"Application"> | string | null
     status?: EnumApplicationStatusFilter<"Application"> | $Enums.ApplicationStatus
     currentStep?: StringFilter<"Application"> | string
     dreamRole?: StringNullableFilter<"Application"> | string | null
@@ -19488,6 +20887,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Application"> | Date | string
     updatedAt?: DateTimeFilter<"Application"> | Date | string
     anonymousSession?: XOR<AnonymousSessionScalarRelationFilter, AnonymousSessionWhereInput>
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
     job?: XOR<JobNullableScalarRelationFilter, JobWhereInput> | null
     candidateProfile?: XOR<CandidateProfileNullableScalarRelationFilter, CandidateProfileWhereInput> | null
     candidateChunks?: CandidateChunkListRelationFilter
@@ -19504,6 +20904,7 @@ export namespace Prisma {
   export type ApplicationOrderByWithAggregationInput = {
     id?: SortOrder
     anonymousSessionId?: SortOrder
+    userId?: SortOrderInput | SortOrder
     status?: SortOrder
     currentStep?: SortOrder
     dreamRole?: SortOrderInput | SortOrder
@@ -19524,6 +20925,7 @@ export namespace Prisma {
     NOT?: ApplicationScalarWhereWithAggregatesInput | ApplicationScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"Application"> | string
     anonymousSessionId?: StringWithAggregatesFilter<"Application"> | string
+    userId?: StringNullableWithAggregatesFilter<"Application"> | string | null
     status?: EnumApplicationStatusWithAggregatesFilter<"Application"> | $Enums.ApplicationStatus
     currentStep?: StringWithAggregatesFilter<"Application"> | string
     dreamRole?: StringNullableWithAggregatesFilter<"Application"> | string | null
@@ -19684,6 +21086,12 @@ export namespace Prisma {
     applicationId?: StringFilter<"CandidateProfile"> | string
     rawCvText?: StringNullableFilter<"CandidateProfile"> | string | null
     rawBackgroundText?: StringNullableFilter<"CandidateProfile"> | string | null
+    contactInfoJson?: JsonNullableFilter<"CandidateProfile">
+    linksJson?: JsonNullableFilter<"CandidateProfile">
+    profileSource?: StringNullableFilter<"CandidateProfile"> | string | null
+    sourceSummary?: StringNullableFilter<"CandidateProfile"> | string | null
+    sourceUrl?: StringNullableFilter<"CandidateProfile"> | string | null
+    profileConfirmedAt?: DateTimeNullableFilter<"CandidateProfile"> | Date | string | null
     summary?: StringFilter<"CandidateProfile"> | string
     skillsJson?: JsonFilter<"CandidateProfile">
     projectsJson?: JsonFilter<"CandidateProfile">
@@ -19704,6 +21112,12 @@ export namespace Prisma {
     applicationId?: SortOrder
     rawCvText?: SortOrderInput | SortOrder
     rawBackgroundText?: SortOrderInput | SortOrder
+    contactInfoJson?: SortOrderInput | SortOrder
+    linksJson?: SortOrderInput | SortOrder
+    profileSource?: SortOrderInput | SortOrder
+    sourceSummary?: SortOrderInput | SortOrder
+    sourceUrl?: SortOrderInput | SortOrder
+    profileConfirmedAt?: SortOrderInput | SortOrder
     summary?: SortOrder
     skillsJson?: SortOrder
     projectsJson?: SortOrder
@@ -19727,6 +21141,12 @@ export namespace Prisma {
     anonymousSessionId?: StringFilter<"CandidateProfile"> | string
     rawCvText?: StringNullableFilter<"CandidateProfile"> | string | null
     rawBackgroundText?: StringNullableFilter<"CandidateProfile"> | string | null
+    contactInfoJson?: JsonNullableFilter<"CandidateProfile">
+    linksJson?: JsonNullableFilter<"CandidateProfile">
+    profileSource?: StringNullableFilter<"CandidateProfile"> | string | null
+    sourceSummary?: StringNullableFilter<"CandidateProfile"> | string | null
+    sourceUrl?: StringNullableFilter<"CandidateProfile"> | string | null
+    profileConfirmedAt?: DateTimeNullableFilter<"CandidateProfile"> | Date | string | null
     summary?: StringFilter<"CandidateProfile"> | string
     skillsJson?: JsonFilter<"CandidateProfile">
     projectsJson?: JsonFilter<"CandidateProfile">
@@ -19747,6 +21167,12 @@ export namespace Prisma {
     applicationId?: SortOrder
     rawCvText?: SortOrderInput | SortOrder
     rawBackgroundText?: SortOrderInput | SortOrder
+    contactInfoJson?: SortOrderInput | SortOrder
+    linksJson?: SortOrderInput | SortOrder
+    profileSource?: SortOrderInput | SortOrder
+    sourceSummary?: SortOrderInput | SortOrder
+    sourceUrl?: SortOrderInput | SortOrder
+    profileConfirmedAt?: SortOrderInput | SortOrder
     summary?: SortOrder
     skillsJson?: SortOrder
     projectsJson?: SortOrder
@@ -19770,6 +21196,12 @@ export namespace Prisma {
     applicationId?: StringWithAggregatesFilter<"CandidateProfile"> | string
     rawCvText?: StringNullableWithAggregatesFilter<"CandidateProfile"> | string | null
     rawBackgroundText?: StringNullableWithAggregatesFilter<"CandidateProfile"> | string | null
+    contactInfoJson?: JsonNullableWithAggregatesFilter<"CandidateProfile">
+    linksJson?: JsonNullableWithAggregatesFilter<"CandidateProfile">
+    profileSource?: StringNullableWithAggregatesFilter<"CandidateProfile"> | string | null
+    sourceSummary?: StringNullableWithAggregatesFilter<"CandidateProfile"> | string | null
+    sourceUrl?: StringNullableWithAggregatesFilter<"CandidateProfile"> | string | null
+    profileConfirmedAt?: DateTimeNullableWithAggregatesFilter<"CandidateProfile"> | Date | string | null
     summary?: StringWithAggregatesFilter<"CandidateProfile"> | string
     skillsJson?: JsonWithAggregatesFilter<"CandidateProfile">
     projectsJson?: JsonWithAggregatesFilter<"CandidateProfile">
@@ -20561,6 +21993,73 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type UserCreateInput = {
+    id?: string
+    clerkUserId: string
+    email?: string | null
+    name?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    applications?: ApplicationCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateInput = {
+    id?: string
+    clerkUserId: string
+    email?: string | null
+    name?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    applications?: ApplicationUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    clerkUserId?: StringFieldUpdateOperationsInput | string
+    email?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    applications?: ApplicationUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    clerkUserId?: StringFieldUpdateOperationsInput | string
+    email?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    applications?: ApplicationUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserCreateManyInput = {
+    id?: string
+    clerkUserId: string
+    email?: string | null
+    name?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type UserUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    clerkUserId?: StringFieldUpdateOperationsInput | string
+    email?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type UserUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    clerkUserId?: StringFieldUpdateOperationsInput | string
+    email?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type ApplicationCreateInput = {
     id?: string
     status?: $Enums.ApplicationStatus
@@ -20571,6 +22070,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     anonymousSession: AnonymousSessionCreateNestedOneWithoutApplicationsInput
+    user?: UserCreateNestedOneWithoutApplicationsInput
     job?: JobCreateNestedOneWithoutApplicationInput
     candidateProfile?: CandidateProfileCreateNestedOneWithoutApplicationInput
     candidateChunks?: CandidateChunkCreateNestedManyWithoutApplicationInput
@@ -20587,6 +22087,7 @@ export namespace Prisma {
   export type ApplicationUncheckedCreateInput = {
     id?: string
     anonymousSessionId: string
+    userId?: string | null
     status?: $Enums.ApplicationStatus
     currentStep?: string
     dreamRole?: string | null
@@ -20617,6 +22118,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     anonymousSession?: AnonymousSessionUpdateOneRequiredWithoutApplicationsNestedInput
+    user?: UserUpdateOneWithoutApplicationsNestedInput
     job?: JobUpdateOneWithoutApplicationNestedInput
     candidateProfile?: CandidateProfileUpdateOneWithoutApplicationNestedInput
     candidateChunks?: CandidateChunkUpdateManyWithoutApplicationNestedInput
@@ -20633,6 +22135,7 @@ export namespace Prisma {
   export type ApplicationUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     anonymousSessionId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
     currentStep?: StringFieldUpdateOperationsInput | string
     dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
@@ -20656,6 +22159,7 @@ export namespace Prisma {
   export type ApplicationCreateManyInput = {
     id?: string
     anonymousSessionId: string
+    userId?: string | null
     status?: $Enums.ApplicationStatus
     currentStep?: string
     dreamRole?: string | null
@@ -20679,6 +22183,7 @@ export namespace Prisma {
   export type ApplicationUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
     anonymousSessionId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
     currentStep?: StringFieldUpdateOperationsInput | string
     dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
@@ -20846,6 +22351,12 @@ export namespace Prisma {
     id?: string
     rawCvText?: string | null
     rawBackgroundText?: string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: string | null
+    sourceSummary?: string | null
+    sourceUrl?: string | null
+    profileConfirmedAt?: Date | string | null
     summary: string
     skillsJson: JsonNullValueInput | InputJsonValue
     projectsJson: JsonNullValueInput | InputJsonValue
@@ -20866,6 +22377,12 @@ export namespace Prisma {
     applicationId: string
     rawCvText?: string | null
     rawBackgroundText?: string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: string | null
+    sourceSummary?: string | null
+    sourceUrl?: string | null
+    profileConfirmedAt?: Date | string | null
     summary: string
     skillsJson: JsonNullValueInput | InputJsonValue
     projectsJson: JsonNullValueInput | InputJsonValue
@@ -20882,6 +22399,12 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     rawCvText?: NullableStringFieldUpdateOperationsInput | string | null
     rawBackgroundText?: NullableStringFieldUpdateOperationsInput | string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    profileConfirmedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     summary?: StringFieldUpdateOperationsInput | string
     skillsJson?: JsonNullValueInput | InputJsonValue
     projectsJson?: JsonNullValueInput | InputJsonValue
@@ -20902,6 +22425,12 @@ export namespace Prisma {
     applicationId?: StringFieldUpdateOperationsInput | string
     rawCvText?: NullableStringFieldUpdateOperationsInput | string | null
     rawBackgroundText?: NullableStringFieldUpdateOperationsInput | string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    profileConfirmedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     summary?: StringFieldUpdateOperationsInput | string
     skillsJson?: JsonNullValueInput | InputJsonValue
     projectsJson?: JsonNullValueInput | InputJsonValue
@@ -20920,6 +22449,12 @@ export namespace Prisma {
     applicationId: string
     rawCvText?: string | null
     rawBackgroundText?: string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: string | null
+    sourceSummary?: string | null
+    sourceUrl?: string | null
+    profileConfirmedAt?: Date | string | null
     summary: string
     skillsJson: JsonNullValueInput | InputJsonValue
     projectsJson: JsonNullValueInput | InputJsonValue
@@ -20935,6 +22470,12 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     rawCvText?: NullableStringFieldUpdateOperationsInput | string | null
     rawBackgroundText?: NullableStringFieldUpdateOperationsInput | string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    profileConfirmedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     summary?: StringFieldUpdateOperationsInput | string
     skillsJson?: JsonNullValueInput | InputJsonValue
     projectsJson?: JsonNullValueInput | InputJsonValue
@@ -20952,6 +22493,12 @@ export namespace Prisma {
     applicationId?: StringFieldUpdateOperationsInput | string
     rawCvText?: NullableStringFieldUpdateOperationsInput | string | null
     rawBackgroundText?: NullableStringFieldUpdateOperationsInput | string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    profileConfirmedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     summary?: StringFieldUpdateOperationsInput | string
     skillsJson?: JsonNullValueInput | InputJsonValue
     projectsJson?: JsonNullValueInput | InputJsonValue
@@ -21830,13 +23377,6 @@ export namespace Prisma {
     _max?: NestedDateTimeFilter<$PrismaModel>
   }
 
-  export type EnumApplicationStatusFilter<$PrismaModel = never> = {
-    equals?: $Enums.ApplicationStatus | EnumApplicationStatusFieldRefInput<$PrismaModel>
-    in?: $Enums.ApplicationStatus[] | ListEnumApplicationStatusFieldRefInput<$PrismaModel>
-    notIn?: $Enums.ApplicationStatus[] | ListEnumApplicationStatusFieldRefInput<$PrismaModel>
-    not?: NestedEnumApplicationStatusFilter<$PrismaModel> | $Enums.ApplicationStatus
-  }
-
   export type StringNullableFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel> | null
     in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
@@ -21850,6 +23390,63 @@ export namespace Prisma {
     endsWith?: string | StringFieldRefInput<$PrismaModel>
     mode?: QueryMode
     not?: NestedStringNullableFilter<$PrismaModel> | string | null
+  }
+
+  export type SortOrderInput = {
+    sort: SortOrder
+    nulls?: NullsOrder
+  }
+
+  export type UserCountOrderByAggregateInput = {
+    id?: SortOrder
+    clerkUserId?: SortOrder
+    email?: SortOrder
+    name?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type UserMaxOrderByAggregateInput = {
+    id?: SortOrder
+    clerkUserId?: SortOrder
+    email?: SortOrder
+    name?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type UserMinOrderByAggregateInput = {
+    id?: SortOrder
+    clerkUserId?: SortOrder
+    email?: SortOrder
+    name?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type StringNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel> | null
+    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    mode?: QueryMode
+    not?: NestedStringNullableWithAggregatesFilter<$PrismaModel> | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedStringNullableFilter<$PrismaModel>
+    _max?: NestedStringNullableFilter<$PrismaModel>
+  }
+
+  export type EnumApplicationStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.ApplicationStatus | EnumApplicationStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.ApplicationStatus[] | ListEnumApplicationStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ApplicationStatus[] | ListEnumApplicationStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumApplicationStatusFilter<$PrismaModel> | $Enums.ApplicationStatus
   }
 
   export type FloatNullableFilter<$PrismaModel = never> = {
@@ -21866,6 +23463,11 @@ export namespace Prisma {
   export type AnonymousSessionScalarRelationFilter = {
     is?: AnonymousSessionWhereInput
     isNot?: AnonymousSessionWhereInput
+  }
+
+  export type UserNullableScalarRelationFilter = {
+    is?: UserWhereInput | null
+    isNot?: UserWhereInput | null
   }
 
   export type JobNullableScalarRelationFilter = {
@@ -21925,11 +23527,6 @@ export namespace Prisma {
     none?: AgentRunWhereInput
   }
 
-  export type SortOrderInput = {
-    sort: SortOrder
-    nulls?: NullsOrder
-  }
-
   export type EvidenceMatchOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
@@ -21961,6 +23558,7 @@ export namespace Prisma {
   export type ApplicationCountOrderByAggregateInput = {
     id?: SortOrder
     anonymousSessionId?: SortOrder
+    userId?: SortOrder
     status?: SortOrder
     currentStep?: SortOrder
     dreamRole?: SortOrder
@@ -21978,6 +23576,7 @@ export namespace Prisma {
   export type ApplicationMaxOrderByAggregateInput = {
     id?: SortOrder
     anonymousSessionId?: SortOrder
+    userId?: SortOrder
     status?: SortOrder
     currentStep?: SortOrder
     dreamRole?: SortOrder
@@ -21990,6 +23589,7 @@ export namespace Prisma {
   export type ApplicationMinOrderByAggregateInput = {
     id?: SortOrder
     anonymousSessionId?: SortOrder
+    userId?: SortOrder
     status?: SortOrder
     currentStep?: SortOrder
     dreamRole?: SortOrder
@@ -22012,24 +23612,6 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumApplicationStatusFilter<$PrismaModel>
     _max?: NestedEnumApplicationStatusFilter<$PrismaModel>
-  }
-
-  export type StringNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: string | StringFieldRefInput<$PrismaModel> | null
-    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    lt?: string | StringFieldRefInput<$PrismaModel>
-    lte?: string | StringFieldRefInput<$PrismaModel>
-    gt?: string | StringFieldRefInput<$PrismaModel>
-    gte?: string | StringFieldRefInput<$PrismaModel>
-    contains?: string | StringFieldRefInput<$PrismaModel>
-    startsWith?: string | StringFieldRefInput<$PrismaModel>
-    endsWith?: string | StringFieldRefInput<$PrismaModel>
-    mode?: QueryMode
-    not?: NestedStringNullableWithAggregatesFilter<$PrismaModel> | string | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedStringNullableFilter<$PrismaModel>
-    _max?: NestedStringNullableFilter<$PrismaModel>
   }
 
   export type FloatNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -22161,6 +23743,40 @@ export namespace Prisma {
     _min?: NestedEnumImportanceFilter<$PrismaModel>
     _max?: NestedEnumImportanceFilter<$PrismaModel>
   }
+  export type JsonNullableFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<JsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonNullableFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonNullableFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
+
+  export type DateTimeNullableFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
+  }
   export type JsonFilter<$PrismaModel = never> =
     | PatchUndefined<
         Either<Required<JsonFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonFilterBase<$PrismaModel>>, 'path'>>,
@@ -22191,6 +23807,12 @@ export namespace Prisma {
     applicationId?: SortOrder
     rawCvText?: SortOrder
     rawBackgroundText?: SortOrder
+    contactInfoJson?: SortOrder
+    linksJson?: SortOrder
+    profileSource?: SortOrder
+    sourceSummary?: SortOrder
+    sourceUrl?: SortOrder
+    profileConfirmedAt?: SortOrder
     summary?: SortOrder
     skillsJson?: SortOrder
     projectsJson?: SortOrder
@@ -22208,6 +23830,10 @@ export namespace Prisma {
     applicationId?: SortOrder
     rawCvText?: SortOrder
     rawBackgroundText?: SortOrder
+    profileSource?: SortOrder
+    sourceSummary?: SortOrder
+    sourceUrl?: SortOrder
+    profileConfirmedAt?: SortOrder
     summary?: SortOrder
     createdAt?: SortOrder
   }
@@ -22218,8 +23844,52 @@ export namespace Prisma {
     applicationId?: SortOrder
     rawCvText?: SortOrder
     rawBackgroundText?: SortOrder
+    profileSource?: SortOrder
+    sourceSummary?: SortOrder
+    sourceUrl?: SortOrder
+    profileConfirmedAt?: SortOrder
     summary?: SortOrder
     createdAt?: SortOrder
+  }
+  export type JsonNullableWithAggregatesFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonNullableWithAggregatesFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedJsonNullableFilter<$PrismaModel>
+    _max?: NestedJsonNullableFilter<$PrismaModel>
+  }
+
+  export type DateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableWithAggregatesFilter<$PrismaModel> | Date | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedDateTimeNullableFilter<$PrismaModel>
+    _max?: NestedDateTimeNullableFilter<$PrismaModel>
   }
   export type JsonWithAggregatesFilter<$PrismaModel = never> =
     | PatchUndefined<
@@ -22478,29 +24148,6 @@ export namespace Prisma {
     _min?: NestedFloatFilter<$PrismaModel>
     _max?: NestedFloatFilter<$PrismaModel>
   }
-  export type JsonNullableFilter<$PrismaModel = never> =
-    | PatchUndefined<
-        Either<Required<JsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>,
-        Required<JsonNullableFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>
-
-  export type JsonNullableFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-  }
 
   export type EnumGapQuestionStatusFilter<$PrismaModel = never> = {
     equals?: $Enums.GapQuestionStatus | EnumGapQuestionStatusFieldRefInput<$PrismaModel>
@@ -22549,32 +24196,6 @@ export namespace Prisma {
     answerGuidance?: SortOrder
     status?: SortOrder
     createdAt?: SortOrder
-  }
-  export type JsonNullableWithAggregatesFilter<$PrismaModel = never> =
-    | PatchUndefined<
-        Either<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
-        Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
-
-  export type JsonNullableWithAggregatesFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedJsonNullableFilter<$PrismaModel>
-    _max?: NestedJsonNullableFilter<$PrismaModel>
   }
 
   export type EnumGapQuestionStatusWithAggregatesFilter<$PrismaModel = never> = {
@@ -22950,10 +24571,62 @@ export namespace Prisma {
     deleteMany?: CandidateChunkScalarWhereInput | CandidateChunkScalarWhereInput[]
   }
 
+  export type ApplicationCreateNestedManyWithoutUserInput = {
+    create?: XOR<ApplicationCreateWithoutUserInput, ApplicationUncheckedCreateWithoutUserInput> | ApplicationCreateWithoutUserInput[] | ApplicationUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: ApplicationCreateOrConnectWithoutUserInput | ApplicationCreateOrConnectWithoutUserInput[]
+    createMany?: ApplicationCreateManyUserInputEnvelope
+    connect?: ApplicationWhereUniqueInput | ApplicationWhereUniqueInput[]
+  }
+
+  export type ApplicationUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<ApplicationCreateWithoutUserInput, ApplicationUncheckedCreateWithoutUserInput> | ApplicationCreateWithoutUserInput[] | ApplicationUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: ApplicationCreateOrConnectWithoutUserInput | ApplicationCreateOrConnectWithoutUserInput[]
+    createMany?: ApplicationCreateManyUserInputEnvelope
+    connect?: ApplicationWhereUniqueInput | ApplicationWhereUniqueInput[]
+  }
+
+  export type NullableStringFieldUpdateOperationsInput = {
+    set?: string | null
+  }
+
+  export type ApplicationUpdateManyWithoutUserNestedInput = {
+    create?: XOR<ApplicationCreateWithoutUserInput, ApplicationUncheckedCreateWithoutUserInput> | ApplicationCreateWithoutUserInput[] | ApplicationUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: ApplicationCreateOrConnectWithoutUserInput | ApplicationCreateOrConnectWithoutUserInput[]
+    upsert?: ApplicationUpsertWithWhereUniqueWithoutUserInput | ApplicationUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: ApplicationCreateManyUserInputEnvelope
+    set?: ApplicationWhereUniqueInput | ApplicationWhereUniqueInput[]
+    disconnect?: ApplicationWhereUniqueInput | ApplicationWhereUniqueInput[]
+    delete?: ApplicationWhereUniqueInput | ApplicationWhereUniqueInput[]
+    connect?: ApplicationWhereUniqueInput | ApplicationWhereUniqueInput[]
+    update?: ApplicationUpdateWithWhereUniqueWithoutUserInput | ApplicationUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: ApplicationUpdateManyWithWhereWithoutUserInput | ApplicationUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: ApplicationScalarWhereInput | ApplicationScalarWhereInput[]
+  }
+
+  export type ApplicationUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<ApplicationCreateWithoutUserInput, ApplicationUncheckedCreateWithoutUserInput> | ApplicationCreateWithoutUserInput[] | ApplicationUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: ApplicationCreateOrConnectWithoutUserInput | ApplicationCreateOrConnectWithoutUserInput[]
+    upsert?: ApplicationUpsertWithWhereUniqueWithoutUserInput | ApplicationUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: ApplicationCreateManyUserInputEnvelope
+    set?: ApplicationWhereUniqueInput | ApplicationWhereUniqueInput[]
+    disconnect?: ApplicationWhereUniqueInput | ApplicationWhereUniqueInput[]
+    delete?: ApplicationWhereUniqueInput | ApplicationWhereUniqueInput[]
+    connect?: ApplicationWhereUniqueInput | ApplicationWhereUniqueInput[]
+    update?: ApplicationUpdateWithWhereUniqueWithoutUserInput | ApplicationUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: ApplicationUpdateManyWithWhereWithoutUserInput | ApplicationUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: ApplicationScalarWhereInput | ApplicationScalarWhereInput[]
+  }
+
   export type AnonymousSessionCreateNestedOneWithoutApplicationsInput = {
     create?: XOR<AnonymousSessionCreateWithoutApplicationsInput, AnonymousSessionUncheckedCreateWithoutApplicationsInput>
     connectOrCreate?: AnonymousSessionCreateOrConnectWithoutApplicationsInput
     connect?: AnonymousSessionWhereUniqueInput
+  }
+
+  export type UserCreateNestedOneWithoutApplicationsInput = {
+    create?: XOR<UserCreateWithoutApplicationsInput, UserUncheckedCreateWithoutApplicationsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutApplicationsInput
+    connect?: UserWhereUniqueInput
   }
 
   export type JobCreateNestedOneWithoutApplicationInput = {
@@ -23108,10 +24781,6 @@ export namespace Prisma {
     set?: $Enums.ApplicationStatus
   }
 
-  export type NullableStringFieldUpdateOperationsInput = {
-    set?: string | null
-  }
-
   export type NullableFloatFieldUpdateOperationsInput = {
     set?: number | null
     increment?: number
@@ -23126,6 +24795,16 @@ export namespace Prisma {
     upsert?: AnonymousSessionUpsertWithoutApplicationsInput
     connect?: AnonymousSessionWhereUniqueInput
     update?: XOR<XOR<AnonymousSessionUpdateToOneWithWhereWithoutApplicationsInput, AnonymousSessionUpdateWithoutApplicationsInput>, AnonymousSessionUncheckedUpdateWithoutApplicationsInput>
+  }
+
+  export type UserUpdateOneWithoutApplicationsNestedInput = {
+    create?: XOR<UserCreateWithoutApplicationsInput, UserUncheckedCreateWithoutApplicationsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutApplicationsInput
+    upsert?: UserUpsertWithoutApplicationsInput
+    disconnect?: UserWhereInput | boolean
+    delete?: UserWhereInput | boolean
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutApplicationsInput, UserUpdateWithoutApplicationsInput>, UserUncheckedUpdateWithoutApplicationsInput>
   }
 
   export type JobUpdateOneWithoutApplicationNestedInput = {
@@ -23640,6 +25319,10 @@ export namespace Prisma {
     connectOrCreate?: CandidateChunkCreateOrConnectWithoutCandidateProfileInput | CandidateChunkCreateOrConnectWithoutCandidateProfileInput[]
     createMany?: CandidateChunkCreateManyCandidateProfileInputEnvelope
     connect?: CandidateChunkWhereUniqueInput | CandidateChunkWhereUniqueInput[]
+  }
+
+  export type NullableDateTimeFieldUpdateOperationsInput = {
+    set?: Date | string | null
   }
 
   export type AnonymousSessionUpdateOneRequiredWithoutCandidateProfilesNestedInput = {
@@ -24223,13 +25906,6 @@ export namespace Prisma {
     _max?: NestedDateTimeFilter<$PrismaModel>
   }
 
-  export type NestedEnumApplicationStatusFilter<$PrismaModel = never> = {
-    equals?: $Enums.ApplicationStatus | EnumApplicationStatusFieldRefInput<$PrismaModel>
-    in?: $Enums.ApplicationStatus[] | ListEnumApplicationStatusFieldRefInput<$PrismaModel>
-    notIn?: $Enums.ApplicationStatus[] | ListEnumApplicationStatusFieldRefInput<$PrismaModel>
-    not?: NestedEnumApplicationStatusFilter<$PrismaModel> | $Enums.ApplicationStatus
-  }
-
   export type NestedStringNullableFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel> | null
     in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
@@ -24242,27 +25918,6 @@ export namespace Prisma {
     startsWith?: string | StringFieldRefInput<$PrismaModel>
     endsWith?: string | StringFieldRefInput<$PrismaModel>
     not?: NestedStringNullableFilter<$PrismaModel> | string | null
-  }
-
-  export type NestedFloatNullableFilter<$PrismaModel = never> = {
-    equals?: number | FloatFieldRefInput<$PrismaModel> | null
-    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
-    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
-    lt?: number | FloatFieldRefInput<$PrismaModel>
-    lte?: number | FloatFieldRefInput<$PrismaModel>
-    gt?: number | FloatFieldRefInput<$PrismaModel>
-    gte?: number | FloatFieldRefInput<$PrismaModel>
-    not?: NestedFloatNullableFilter<$PrismaModel> | number | null
-  }
-
-  export type NestedEnumApplicationStatusWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: $Enums.ApplicationStatus | EnumApplicationStatusFieldRefInput<$PrismaModel>
-    in?: $Enums.ApplicationStatus[] | ListEnumApplicationStatusFieldRefInput<$PrismaModel>
-    notIn?: $Enums.ApplicationStatus[] | ListEnumApplicationStatusFieldRefInput<$PrismaModel>
-    not?: NestedEnumApplicationStatusWithAggregatesFilter<$PrismaModel> | $Enums.ApplicationStatus
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedEnumApplicationStatusFilter<$PrismaModel>
-    _max?: NestedEnumApplicationStatusFilter<$PrismaModel>
   }
 
   export type NestedStringNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -24291,6 +25946,34 @@ export namespace Prisma {
     gt?: number | IntFieldRefInput<$PrismaModel>
     gte?: number | IntFieldRefInput<$PrismaModel>
     not?: NestedIntNullableFilter<$PrismaModel> | number | null
+  }
+
+  export type NestedEnumApplicationStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.ApplicationStatus | EnumApplicationStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.ApplicationStatus[] | ListEnumApplicationStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ApplicationStatus[] | ListEnumApplicationStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumApplicationStatusFilter<$PrismaModel> | $Enums.ApplicationStatus
+  }
+
+  export type NestedFloatNullableFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel> | null
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatNullableFilter<$PrismaModel> | number | null
+  }
+
+  export type NestedEnumApplicationStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.ApplicationStatus | EnumApplicationStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.ApplicationStatus[] | ListEnumApplicationStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.ApplicationStatus[] | ListEnumApplicationStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumApplicationStatusWithAggregatesFilter<$PrismaModel> | $Enums.ApplicationStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumApplicationStatusFilter<$PrismaModel>
+    _max?: NestedEnumApplicationStatusFilter<$PrismaModel>
   }
 
   export type NestedFloatNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -24341,6 +26024,54 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumImportanceFilter<$PrismaModel>
     _max?: NestedEnumImportanceFilter<$PrismaModel>
+  }
+
+  export type NestedDateTimeNullableFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
+  }
+  export type NestedJsonNullableFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<NestedJsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>,
+        Required<NestedJsonNullableFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>
+
+  export type NestedJsonNullableFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
+
+  export type NestedDateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableWithAggregatesFilter<$PrismaModel> | Date | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedDateTimeNullableFilter<$PrismaModel>
+    _max?: NestedDateTimeNullableFilter<$PrismaModel>
   }
   export type NestedJsonFilter<$PrismaModel = never> =
     | PatchUndefined<
@@ -24450,29 +26181,6 @@ export namespace Prisma {
     notIn?: $Enums.GapQuestionStatus[] | ListEnumGapQuestionStatusFieldRefInput<$PrismaModel>
     not?: NestedEnumGapQuestionStatusFilter<$PrismaModel> | $Enums.GapQuestionStatus
   }
-  export type NestedJsonNullableFilter<$PrismaModel = never> =
-    | PatchUndefined<
-        Either<Required<NestedJsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>,
-        Required<NestedJsonNullableFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<NestedJsonNullableFilterBase<$PrismaModel>>, 'path'>>
-
-  export type NestedJsonNullableFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-  }
 
   export type NestedEnumGapQuestionStatusWithAggregatesFilter<$PrismaModel = never> = {
     equals?: $Enums.GapQuestionStatus | EnumGapQuestionStatusFieldRefInput<$PrismaModel>
@@ -24543,6 +26251,7 @@ export namespace Prisma {
     updatedEvidenceMatchScore?: number | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    user?: UserCreateNestedOneWithoutApplicationsInput
     job?: JobCreateNestedOneWithoutApplicationInput
     candidateProfile?: CandidateProfileCreateNestedOneWithoutApplicationInput
     candidateChunks?: CandidateChunkCreateNestedManyWithoutApplicationInput
@@ -24558,6 +26267,7 @@ export namespace Prisma {
 
   export type ApplicationUncheckedCreateWithoutAnonymousSessionInput = {
     id?: string
+    userId?: string | null
     status?: $Enums.ApplicationStatus
     currentStep?: string
     dreamRole?: string | null
@@ -24592,6 +26302,12 @@ export namespace Prisma {
     id?: string
     rawCvText?: string | null
     rawBackgroundText?: string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: string | null
+    sourceSummary?: string | null
+    sourceUrl?: string | null
+    profileConfirmedAt?: Date | string | null
     summary: string
     skillsJson: JsonNullValueInput | InputJsonValue
     projectsJson: JsonNullValueInput | InputJsonValue
@@ -24610,6 +26326,12 @@ export namespace Prisma {
     applicationId: string
     rawCvText?: string | null
     rawBackgroundText?: string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: string | null
+    sourceSummary?: string | null
+    sourceUrl?: string | null
+    profileConfirmedAt?: Date | string | null
     summary: string
     skillsJson: JsonNullValueInput | InputJsonValue
     projectsJson: JsonNullValueInput | InputJsonValue
@@ -24694,6 +26416,7 @@ export namespace Prisma {
     NOT?: ApplicationScalarWhereInput | ApplicationScalarWhereInput[]
     id?: StringFilter<"Application"> | string
     anonymousSessionId?: StringFilter<"Application"> | string
+    userId?: StringNullableFilter<"Application"> | string | null
     status?: EnumApplicationStatusFilter<"Application"> | $Enums.ApplicationStatus
     currentStep?: StringFilter<"Application"> | string
     dreamRole?: StringNullableFilter<"Application"> | string | null
@@ -24728,6 +26451,12 @@ export namespace Prisma {
     applicationId?: StringFilter<"CandidateProfile"> | string
     rawCvText?: StringNullableFilter<"CandidateProfile"> | string | null
     rawBackgroundText?: StringNullableFilter<"CandidateProfile"> | string | null
+    contactInfoJson?: JsonNullableFilter<"CandidateProfile">
+    linksJson?: JsonNullableFilter<"CandidateProfile">
+    profileSource?: StringNullableFilter<"CandidateProfile"> | string | null
+    sourceSummary?: StringNullableFilter<"CandidateProfile"> | string | null
+    sourceUrl?: StringNullableFilter<"CandidateProfile"> | string | null
+    profileConfirmedAt?: DateTimeNullableFilter<"CandidateProfile"> | Date | string | null
     summary?: StringFilter<"CandidateProfile"> | string
     skillsJson?: JsonFilter<"CandidateProfile">
     projectsJson?: JsonFilter<"CandidateProfile">
@@ -24772,6 +26501,78 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"CandidateChunk"> | Date | string
   }
 
+  export type ApplicationCreateWithoutUserInput = {
+    id?: string
+    status?: $Enums.ApplicationStatus
+    currentStep?: string
+    dreamRole?: string | null
+    originalEvidenceMatchScore?: number | null
+    updatedEvidenceMatchScore?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    anonymousSession: AnonymousSessionCreateNestedOneWithoutApplicationsInput
+    job?: JobCreateNestedOneWithoutApplicationInput
+    candidateProfile?: CandidateProfileCreateNestedOneWithoutApplicationInput
+    candidateChunks?: CandidateChunkCreateNestedManyWithoutApplicationInput
+    evidenceMatches?: EvidenceMatchCreateNestedManyWithoutApplicationInput
+    requirementFitScores?: RequirementFitScoreCreateNestedManyWithoutApplicationInput
+    gapQuestions?: GapQuestionCreateNestedManyWithoutApplicationInput
+    gapAnswers?: GapAnswerCreateNestedManyWithoutApplicationInput
+    gapCoachInsight?: GapCoachInsightCreateNestedOneWithoutApplicationInput
+    cvStrategies?: CvStrategyCreateNestedManyWithoutApplicationInput
+    cvDrafts?: CvDraftCreateNestedManyWithoutApplicationInput
+    agentRuns?: AgentRunCreateNestedManyWithoutApplicationInput
+  }
+
+  export type ApplicationUncheckedCreateWithoutUserInput = {
+    id?: string
+    anonymousSessionId: string
+    status?: $Enums.ApplicationStatus
+    currentStep?: string
+    dreamRole?: string | null
+    originalEvidenceMatchScore?: number | null
+    updatedEvidenceMatchScore?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    job?: JobUncheckedCreateNestedOneWithoutApplicationInput
+    candidateProfile?: CandidateProfileUncheckedCreateNestedOneWithoutApplicationInput
+    candidateChunks?: CandidateChunkUncheckedCreateNestedManyWithoutApplicationInput
+    evidenceMatches?: EvidenceMatchUncheckedCreateNestedManyWithoutApplicationInput
+    requirementFitScores?: RequirementFitScoreUncheckedCreateNestedManyWithoutApplicationInput
+    gapQuestions?: GapQuestionUncheckedCreateNestedManyWithoutApplicationInput
+    gapAnswers?: GapAnswerUncheckedCreateNestedManyWithoutApplicationInput
+    gapCoachInsight?: GapCoachInsightUncheckedCreateNestedOneWithoutApplicationInput
+    cvStrategies?: CvStrategyUncheckedCreateNestedManyWithoutApplicationInput
+    cvDrafts?: CvDraftUncheckedCreateNestedManyWithoutApplicationInput
+    agentRuns?: AgentRunUncheckedCreateNestedManyWithoutApplicationInput
+  }
+
+  export type ApplicationCreateOrConnectWithoutUserInput = {
+    where: ApplicationWhereUniqueInput
+    create: XOR<ApplicationCreateWithoutUserInput, ApplicationUncheckedCreateWithoutUserInput>
+  }
+
+  export type ApplicationCreateManyUserInputEnvelope = {
+    data: ApplicationCreateManyUserInput | ApplicationCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type ApplicationUpsertWithWhereUniqueWithoutUserInput = {
+    where: ApplicationWhereUniqueInput
+    update: XOR<ApplicationUpdateWithoutUserInput, ApplicationUncheckedUpdateWithoutUserInput>
+    create: XOR<ApplicationCreateWithoutUserInput, ApplicationUncheckedCreateWithoutUserInput>
+  }
+
+  export type ApplicationUpdateWithWhereUniqueWithoutUserInput = {
+    where: ApplicationWhereUniqueInput
+    data: XOR<ApplicationUpdateWithoutUserInput, ApplicationUncheckedUpdateWithoutUserInput>
+  }
+
+  export type ApplicationUpdateManyWithWhereWithoutUserInput = {
+    where: ApplicationScalarWhereInput
+    data: XOR<ApplicationUpdateManyMutationInput, ApplicationUncheckedUpdateManyWithoutUserInput>
+  }
+
   export type AnonymousSessionCreateWithoutApplicationsInput = {
     id?: string
     createdAt?: Date | string
@@ -24791,6 +26592,29 @@ export namespace Prisma {
   export type AnonymousSessionCreateOrConnectWithoutApplicationsInput = {
     where: AnonymousSessionWhereUniqueInput
     create: XOR<AnonymousSessionCreateWithoutApplicationsInput, AnonymousSessionUncheckedCreateWithoutApplicationsInput>
+  }
+
+  export type UserCreateWithoutApplicationsInput = {
+    id?: string
+    clerkUserId: string
+    email?: string | null
+    name?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type UserUncheckedCreateWithoutApplicationsInput = {
+    id?: string
+    clerkUserId: string
+    email?: string | null
+    name?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type UserCreateOrConnectWithoutApplicationsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutApplicationsInput, UserUncheckedCreateWithoutApplicationsInput>
   }
 
   export type JobCreateWithoutApplicationInput = {
@@ -24824,6 +26648,12 @@ export namespace Prisma {
     id?: string
     rawCvText?: string | null
     rawBackgroundText?: string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: string | null
+    sourceSummary?: string | null
+    sourceUrl?: string | null
+    profileConfirmedAt?: Date | string | null
     summary: string
     skillsJson: JsonNullValueInput | InputJsonValue
     projectsJson: JsonNullValueInput | InputJsonValue
@@ -24842,6 +26672,12 @@ export namespace Prisma {
     anonymousSessionId: string
     rawCvText?: string | null
     rawBackgroundText?: string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: string | null
+    sourceSummary?: string | null
+    sourceUrl?: string | null
+    profileConfirmedAt?: Date | string | null
     summary: string
     skillsJson: JsonNullValueInput | InputJsonValue
     projectsJson: JsonNullValueInput | InputJsonValue
@@ -25179,6 +27015,35 @@ export namespace Prisma {
     candidateChunks?: CandidateChunkUncheckedUpdateManyWithoutAnonymousSessionNestedInput
   }
 
+  export type UserUpsertWithoutApplicationsInput = {
+    update: XOR<UserUpdateWithoutApplicationsInput, UserUncheckedUpdateWithoutApplicationsInput>
+    create: XOR<UserCreateWithoutApplicationsInput, UserUncheckedCreateWithoutApplicationsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutApplicationsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutApplicationsInput, UserUncheckedUpdateWithoutApplicationsInput>
+  }
+
+  export type UserUpdateWithoutApplicationsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    clerkUserId?: StringFieldUpdateOperationsInput | string
+    email?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type UserUncheckedUpdateWithoutApplicationsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    clerkUserId?: StringFieldUpdateOperationsInput | string
+    email?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type JobUpsertWithoutApplicationInput = {
     update: XOR<JobUpdateWithoutApplicationInput, JobUncheckedUpdateWithoutApplicationInput>
     create: XOR<JobCreateWithoutApplicationInput, JobUncheckedCreateWithoutApplicationInput>
@@ -25227,6 +27092,12 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     rawCvText?: NullableStringFieldUpdateOperationsInput | string | null
     rawBackgroundText?: NullableStringFieldUpdateOperationsInput | string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    profileConfirmedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     summary?: StringFieldUpdateOperationsInput | string
     skillsJson?: JsonNullValueInput | InputJsonValue
     projectsJson?: JsonNullValueInput | InputJsonValue
@@ -25245,6 +27116,12 @@ export namespace Prisma {
     anonymousSessionId?: StringFieldUpdateOperationsInput | string
     rawCvText?: NullableStringFieldUpdateOperationsInput | string | null
     rawBackgroundText?: NullableStringFieldUpdateOperationsInput | string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    profileConfirmedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     summary?: StringFieldUpdateOperationsInput | string
     skillsJson?: JsonNullValueInput | InputJsonValue
     projectsJson?: JsonNullValueInput | InputJsonValue
@@ -25531,6 +27408,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     anonymousSession: AnonymousSessionCreateNestedOneWithoutApplicationsInput
+    user?: UserCreateNestedOneWithoutApplicationsInput
     candidateProfile?: CandidateProfileCreateNestedOneWithoutApplicationInput
     candidateChunks?: CandidateChunkCreateNestedManyWithoutApplicationInput
     evidenceMatches?: EvidenceMatchCreateNestedManyWithoutApplicationInput
@@ -25546,6 +27424,7 @@ export namespace Prisma {
   export type ApplicationUncheckedCreateWithoutJobInput = {
     id?: string
     anonymousSessionId: string
+    userId?: string | null
     status?: $Enums.ApplicationStatus
     currentStep?: string
     dreamRole?: string | null
@@ -25623,6 +27502,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     anonymousSession?: AnonymousSessionUpdateOneRequiredWithoutApplicationsNestedInput
+    user?: UserUpdateOneWithoutApplicationsNestedInput
     candidateProfile?: CandidateProfileUpdateOneWithoutApplicationNestedInput
     candidateChunks?: CandidateChunkUpdateManyWithoutApplicationNestedInput
     evidenceMatches?: EvidenceMatchUpdateManyWithoutApplicationNestedInput
@@ -25638,6 +27518,7 @@ export namespace Prisma {
   export type ApplicationUncheckedUpdateWithoutJobInput = {
     id?: StringFieldUpdateOperationsInput | string
     anonymousSessionId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
     currentStep?: StringFieldUpdateOperationsInput | string
     dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
@@ -25928,6 +27809,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     anonymousSession: AnonymousSessionCreateNestedOneWithoutApplicationsInput
+    user?: UserCreateNestedOneWithoutApplicationsInput
     job?: JobCreateNestedOneWithoutApplicationInput
     candidateChunks?: CandidateChunkCreateNestedManyWithoutApplicationInput
     evidenceMatches?: EvidenceMatchCreateNestedManyWithoutApplicationInput
@@ -25943,6 +27825,7 @@ export namespace Prisma {
   export type ApplicationUncheckedCreateWithoutCandidateProfileInput = {
     id?: string
     anonymousSessionId: string
+    userId?: string | null
     status?: $Enums.ApplicationStatus
     currentStep?: string
     dreamRole?: string | null
@@ -26055,6 +27938,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     anonymousSession?: AnonymousSessionUpdateOneRequiredWithoutApplicationsNestedInput
+    user?: UserUpdateOneWithoutApplicationsNestedInput
     job?: JobUpdateOneWithoutApplicationNestedInput
     candidateChunks?: CandidateChunkUpdateManyWithoutApplicationNestedInput
     evidenceMatches?: EvidenceMatchUpdateManyWithoutApplicationNestedInput
@@ -26070,6 +27954,7 @@ export namespace Prisma {
   export type ApplicationUncheckedUpdateWithoutCandidateProfileInput = {
     id?: StringFieldUpdateOperationsInput | string
     anonymousSessionId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
     currentStep?: StringFieldUpdateOperationsInput | string
     dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
@@ -26136,6 +28021,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     anonymousSession: AnonymousSessionCreateNestedOneWithoutApplicationsInput
+    user?: UserCreateNestedOneWithoutApplicationsInput
     job?: JobCreateNestedOneWithoutApplicationInput
     candidateProfile?: CandidateProfileCreateNestedOneWithoutApplicationInput
     evidenceMatches?: EvidenceMatchCreateNestedManyWithoutApplicationInput
@@ -26151,6 +28037,7 @@ export namespace Prisma {
   export type ApplicationUncheckedCreateWithoutCandidateChunksInput = {
     id?: string
     anonymousSessionId: string
+    userId?: string | null
     status?: $Enums.ApplicationStatus
     currentStep?: string
     dreamRole?: string | null
@@ -26179,6 +28066,12 @@ export namespace Prisma {
     id?: string
     rawCvText?: string | null
     rawBackgroundText?: string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: string | null
+    sourceSummary?: string | null
+    sourceUrl?: string | null
+    profileConfirmedAt?: Date | string | null
     summary: string
     skillsJson: JsonNullValueInput | InputJsonValue
     projectsJson: JsonNullValueInput | InputJsonValue
@@ -26198,6 +28091,12 @@ export namespace Prisma {
     applicationId: string
     rawCvText?: string | null
     rawBackgroundText?: string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: string | null
+    sourceSummary?: string | null
+    sourceUrl?: string | null
+    profileConfirmedAt?: Date | string | null
     summary: string
     skillsJson: JsonNullValueInput | InputJsonValue
     projectsJson: JsonNullValueInput | InputJsonValue
@@ -26330,6 +28229,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     anonymousSession?: AnonymousSessionUpdateOneRequiredWithoutApplicationsNestedInput
+    user?: UserUpdateOneWithoutApplicationsNestedInput
     job?: JobUpdateOneWithoutApplicationNestedInput
     candidateProfile?: CandidateProfileUpdateOneWithoutApplicationNestedInput
     evidenceMatches?: EvidenceMatchUpdateManyWithoutApplicationNestedInput
@@ -26345,6 +28245,7 @@ export namespace Prisma {
   export type ApplicationUncheckedUpdateWithoutCandidateChunksInput = {
     id?: StringFieldUpdateOperationsInput | string
     anonymousSessionId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
     currentStep?: StringFieldUpdateOperationsInput | string
     dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
@@ -26379,6 +28280,12 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     rawCvText?: NullableStringFieldUpdateOperationsInput | string | null
     rawBackgroundText?: NullableStringFieldUpdateOperationsInput | string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    profileConfirmedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     summary?: StringFieldUpdateOperationsInput | string
     skillsJson?: JsonNullValueInput | InputJsonValue
     projectsJson?: JsonNullValueInput | InputJsonValue
@@ -26398,6 +28305,12 @@ export namespace Prisma {
     applicationId?: StringFieldUpdateOperationsInput | string
     rawCvText?: NullableStringFieldUpdateOperationsInput | string | null
     rawBackgroundText?: NullableStringFieldUpdateOperationsInput | string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    profileConfirmedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     summary?: StringFieldUpdateOperationsInput | string
     skillsJson?: JsonNullValueInput | InputJsonValue
     projectsJson?: JsonNullValueInput | InputJsonValue
@@ -26451,6 +28364,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     anonymousSession: AnonymousSessionCreateNestedOneWithoutApplicationsInput
+    user?: UserCreateNestedOneWithoutApplicationsInput
     job?: JobCreateNestedOneWithoutApplicationInput
     candidateProfile?: CandidateProfileCreateNestedOneWithoutApplicationInput
     candidateChunks?: CandidateChunkCreateNestedManyWithoutApplicationInput
@@ -26466,6 +28380,7 @@ export namespace Prisma {
   export type ApplicationUncheckedCreateWithoutEvidenceMatchesInput = {
     id?: string
     anonymousSessionId: string
+    userId?: string | null
     status?: $Enums.ApplicationStatus
     currentStep?: string
     dreamRole?: string | null
@@ -26573,6 +28488,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     anonymousSession?: AnonymousSessionUpdateOneRequiredWithoutApplicationsNestedInput
+    user?: UserUpdateOneWithoutApplicationsNestedInput
     job?: JobUpdateOneWithoutApplicationNestedInput
     candidateProfile?: CandidateProfileUpdateOneWithoutApplicationNestedInput
     candidateChunks?: CandidateChunkUpdateManyWithoutApplicationNestedInput
@@ -26588,6 +28504,7 @@ export namespace Prisma {
   export type ApplicationUncheckedUpdateWithoutEvidenceMatchesInput = {
     id?: StringFieldUpdateOperationsInput | string
     anonymousSessionId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
     currentStep?: StringFieldUpdateOperationsInput | string
     dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
@@ -26691,6 +28608,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     anonymousSession: AnonymousSessionCreateNestedOneWithoutApplicationsInput
+    user?: UserCreateNestedOneWithoutApplicationsInput
     job?: JobCreateNestedOneWithoutApplicationInput
     candidateProfile?: CandidateProfileCreateNestedOneWithoutApplicationInput
     candidateChunks?: CandidateChunkCreateNestedManyWithoutApplicationInput
@@ -26706,6 +28624,7 @@ export namespace Prisma {
   export type ApplicationUncheckedCreateWithoutRequirementFitScoresInput = {
     id?: string
     anonymousSessionId: string
+    userId?: string | null
     status?: $Enums.ApplicationStatus
     currentStep?: string
     dreamRole?: string | null
@@ -26813,6 +28732,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     anonymousSession?: AnonymousSessionUpdateOneRequiredWithoutApplicationsNestedInput
+    user?: UserUpdateOneWithoutApplicationsNestedInput
     job?: JobUpdateOneWithoutApplicationNestedInput
     candidateProfile?: CandidateProfileUpdateOneWithoutApplicationNestedInput
     candidateChunks?: CandidateChunkUpdateManyWithoutApplicationNestedInput
@@ -26828,6 +28748,7 @@ export namespace Prisma {
   export type ApplicationUncheckedUpdateWithoutRequirementFitScoresInput = {
     id?: StringFieldUpdateOperationsInput | string
     anonymousSessionId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
     currentStep?: StringFieldUpdateOperationsInput | string
     dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
@@ -26931,6 +28852,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     anonymousSession: AnonymousSessionCreateNestedOneWithoutApplicationsInput
+    user?: UserCreateNestedOneWithoutApplicationsInput
     job?: JobCreateNestedOneWithoutApplicationInput
     candidateProfile?: CandidateProfileCreateNestedOneWithoutApplicationInput
     candidateChunks?: CandidateChunkCreateNestedManyWithoutApplicationInput
@@ -26946,6 +28868,7 @@ export namespace Prisma {
   export type ApplicationUncheckedCreateWithoutGapQuestionsInput = {
     id?: string
     anonymousSessionId: string
+    userId?: string | null
     status?: $Enums.ApplicationStatus
     currentStep?: string
     dreamRole?: string | null
@@ -27044,6 +28967,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     anonymousSession?: AnonymousSessionUpdateOneRequiredWithoutApplicationsNestedInput
+    user?: UserUpdateOneWithoutApplicationsNestedInput
     job?: JobUpdateOneWithoutApplicationNestedInput
     candidateProfile?: CandidateProfileUpdateOneWithoutApplicationNestedInput
     candidateChunks?: CandidateChunkUpdateManyWithoutApplicationNestedInput
@@ -27059,6 +28983,7 @@ export namespace Prisma {
   export type ApplicationUncheckedUpdateWithoutGapQuestionsInput = {
     id?: StringFieldUpdateOperationsInput | string
     anonymousSessionId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
     currentStep?: StringFieldUpdateOperationsInput | string
     dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
@@ -27137,6 +29062,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     anonymousSession: AnonymousSessionCreateNestedOneWithoutApplicationsInput
+    user?: UserCreateNestedOneWithoutApplicationsInput
     job?: JobCreateNestedOneWithoutApplicationInput
     candidateProfile?: CandidateProfileCreateNestedOneWithoutApplicationInput
     candidateChunks?: CandidateChunkCreateNestedManyWithoutApplicationInput
@@ -27152,6 +29078,7 @@ export namespace Prisma {
   export type ApplicationUncheckedCreateWithoutGapCoachInsightInput = {
     id?: string
     anonymousSessionId: string
+    userId?: string | null
     status?: $Enums.ApplicationStatus
     currentStep?: string
     dreamRole?: string | null
@@ -27197,6 +29124,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     anonymousSession?: AnonymousSessionUpdateOneRequiredWithoutApplicationsNestedInput
+    user?: UserUpdateOneWithoutApplicationsNestedInput
     job?: JobUpdateOneWithoutApplicationNestedInput
     candidateProfile?: CandidateProfileUpdateOneWithoutApplicationNestedInput
     candidateChunks?: CandidateChunkUpdateManyWithoutApplicationNestedInput
@@ -27212,6 +29140,7 @@ export namespace Prisma {
   export type ApplicationUncheckedUpdateWithoutGapCoachInsightInput = {
     id?: StringFieldUpdateOperationsInput | string
     anonymousSessionId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
     currentStep?: StringFieldUpdateOperationsInput | string
     dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
@@ -27272,6 +29201,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     anonymousSession: AnonymousSessionCreateNestedOneWithoutApplicationsInput
+    user?: UserCreateNestedOneWithoutApplicationsInput
     job?: JobCreateNestedOneWithoutApplicationInput
     candidateProfile?: CandidateProfileCreateNestedOneWithoutApplicationInput
     candidateChunks?: CandidateChunkCreateNestedManyWithoutApplicationInput
@@ -27287,6 +29217,7 @@ export namespace Prisma {
   export type ApplicationUncheckedCreateWithoutGapAnswersInput = {
     id?: string
     anonymousSessionId: string
+    userId?: string | null
     status?: $Enums.ApplicationStatus
     currentStep?: string
     dreamRole?: string | null
@@ -27369,6 +29300,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     anonymousSession?: AnonymousSessionUpdateOneRequiredWithoutApplicationsNestedInput
+    user?: UserUpdateOneWithoutApplicationsNestedInput
     job?: JobUpdateOneWithoutApplicationNestedInput
     candidateProfile?: CandidateProfileUpdateOneWithoutApplicationNestedInput
     candidateChunks?: CandidateChunkUpdateManyWithoutApplicationNestedInput
@@ -27384,6 +29316,7 @@ export namespace Prisma {
   export type ApplicationUncheckedUpdateWithoutGapAnswersInput = {
     id?: StringFieldUpdateOperationsInput | string
     anonymousSessionId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
     currentStep?: StringFieldUpdateOperationsInput | string
     dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
@@ -27413,6 +29346,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     anonymousSession: AnonymousSessionCreateNestedOneWithoutApplicationsInput
+    user?: UserCreateNestedOneWithoutApplicationsInput
     job?: JobCreateNestedOneWithoutApplicationInput
     candidateProfile?: CandidateProfileCreateNestedOneWithoutApplicationInput
     candidateChunks?: CandidateChunkCreateNestedManyWithoutApplicationInput
@@ -27428,6 +29362,7 @@ export namespace Prisma {
   export type ApplicationUncheckedCreateWithoutCvStrategiesInput = {
     id?: string
     anonymousSessionId: string
+    userId?: string | null
     status?: $Enums.ApplicationStatus
     currentStep?: string
     dreamRole?: string | null
@@ -27505,6 +29440,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     anonymousSession?: AnonymousSessionUpdateOneRequiredWithoutApplicationsNestedInput
+    user?: UserUpdateOneWithoutApplicationsNestedInput
     job?: JobUpdateOneWithoutApplicationNestedInput
     candidateProfile?: CandidateProfileUpdateOneWithoutApplicationNestedInput
     candidateChunks?: CandidateChunkUpdateManyWithoutApplicationNestedInput
@@ -27520,6 +29456,7 @@ export namespace Prisma {
   export type ApplicationUncheckedUpdateWithoutCvStrategiesInput = {
     id?: StringFieldUpdateOperationsInput | string
     anonymousSessionId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
     currentStep?: StringFieldUpdateOperationsInput | string
     dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
@@ -27565,6 +29502,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     anonymousSession: AnonymousSessionCreateNestedOneWithoutApplicationsInput
+    user?: UserCreateNestedOneWithoutApplicationsInput
     job?: JobCreateNestedOneWithoutApplicationInput
     candidateProfile?: CandidateProfileCreateNestedOneWithoutApplicationInput
     candidateChunks?: CandidateChunkCreateNestedManyWithoutApplicationInput
@@ -27580,6 +29518,7 @@ export namespace Prisma {
   export type ApplicationUncheckedCreateWithoutCvDraftsInput = {
     id?: string
     anonymousSessionId: string
+    userId?: string | null
     status?: $Enums.ApplicationStatus
     currentStep?: string
     dreamRole?: string | null
@@ -27656,6 +29595,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     anonymousSession?: AnonymousSessionUpdateOneRequiredWithoutApplicationsNestedInput
+    user?: UserUpdateOneWithoutApplicationsNestedInput
     job?: JobUpdateOneWithoutApplicationNestedInput
     candidateProfile?: CandidateProfileUpdateOneWithoutApplicationNestedInput
     candidateChunks?: CandidateChunkUpdateManyWithoutApplicationNestedInput
@@ -27671,6 +29611,7 @@ export namespace Prisma {
   export type ApplicationUncheckedUpdateWithoutCvDraftsInput = {
     id?: StringFieldUpdateOperationsInput | string
     anonymousSessionId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
     currentStep?: StringFieldUpdateOperationsInput | string
     dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
@@ -27737,6 +29678,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     anonymousSession: AnonymousSessionCreateNestedOneWithoutApplicationsInput
+    user?: UserCreateNestedOneWithoutApplicationsInput
     job?: JobCreateNestedOneWithoutApplicationInput
     candidateProfile?: CandidateProfileCreateNestedOneWithoutApplicationInput
     candidateChunks?: CandidateChunkCreateNestedManyWithoutApplicationInput
@@ -27752,6 +29694,7 @@ export namespace Prisma {
   export type ApplicationUncheckedCreateWithoutAgentRunsInput = {
     id?: string
     anonymousSessionId: string
+    userId?: string | null
     status?: $Enums.ApplicationStatus
     currentStep?: string
     dreamRole?: string | null
@@ -27797,6 +29740,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     anonymousSession?: AnonymousSessionUpdateOneRequiredWithoutApplicationsNestedInput
+    user?: UserUpdateOneWithoutApplicationsNestedInput
     job?: JobUpdateOneWithoutApplicationNestedInput
     candidateProfile?: CandidateProfileUpdateOneWithoutApplicationNestedInput
     candidateChunks?: CandidateChunkUpdateManyWithoutApplicationNestedInput
@@ -27812,6 +29756,7 @@ export namespace Prisma {
   export type ApplicationUncheckedUpdateWithoutAgentRunsInput = {
     id?: StringFieldUpdateOperationsInput | string
     anonymousSessionId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
     currentStep?: StringFieldUpdateOperationsInput | string
     dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
@@ -27833,6 +29778,7 @@ export namespace Prisma {
 
   export type ApplicationCreateManyAnonymousSessionInput = {
     id?: string
+    userId?: string | null
     status?: $Enums.ApplicationStatus
     currentStep?: string
     dreamRole?: string | null
@@ -27847,6 +29793,12 @@ export namespace Prisma {
     applicationId: string
     rawCvText?: string | null
     rawBackgroundText?: string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: string | null
+    sourceSummary?: string | null
+    sourceUrl?: string | null
+    profileConfirmedAt?: Date | string | null
     summary: string
     skillsJson: JsonNullValueInput | InputJsonValue
     projectsJson: JsonNullValueInput | InputJsonValue
@@ -27880,6 +29832,7 @@ export namespace Prisma {
     updatedEvidenceMatchScore?: NullableFloatFieldUpdateOperationsInput | number | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneWithoutApplicationsNestedInput
     job?: JobUpdateOneWithoutApplicationNestedInput
     candidateProfile?: CandidateProfileUpdateOneWithoutApplicationNestedInput
     candidateChunks?: CandidateChunkUpdateManyWithoutApplicationNestedInput
@@ -27895,6 +29848,7 @@ export namespace Prisma {
 
   export type ApplicationUncheckedUpdateWithoutAnonymousSessionInput = {
     id?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
     currentStep?: StringFieldUpdateOperationsInput | string
     dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
@@ -27917,6 +29871,7 @@ export namespace Prisma {
 
   export type ApplicationUncheckedUpdateManyWithoutAnonymousSessionInput = {
     id?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
     status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
     currentStep?: StringFieldUpdateOperationsInput | string
     dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
@@ -27930,6 +29885,12 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     rawCvText?: NullableStringFieldUpdateOperationsInput | string | null
     rawBackgroundText?: NullableStringFieldUpdateOperationsInput | string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    profileConfirmedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     summary?: StringFieldUpdateOperationsInput | string
     skillsJson?: JsonNullValueInput | InputJsonValue
     projectsJson?: JsonNullValueInput | InputJsonValue
@@ -27948,6 +29909,12 @@ export namespace Prisma {
     applicationId?: StringFieldUpdateOperationsInput | string
     rawCvText?: NullableStringFieldUpdateOperationsInput | string | null
     rawBackgroundText?: NullableStringFieldUpdateOperationsInput | string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    profileConfirmedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     summary?: StringFieldUpdateOperationsInput | string
     skillsJson?: JsonNullValueInput | InputJsonValue
     projectsJson?: JsonNullValueInput | InputJsonValue
@@ -27965,6 +29932,12 @@ export namespace Prisma {
     applicationId?: StringFieldUpdateOperationsInput | string
     rawCvText?: NullableStringFieldUpdateOperationsInput | string | null
     rawBackgroundText?: NullableStringFieldUpdateOperationsInput | string | null
+    contactInfoJson?: NullableJsonNullValueInput | InputJsonValue
+    linksJson?: NullableJsonNullValueInput | InputJsonValue
+    profileSource?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    profileConfirmedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     summary?: StringFieldUpdateOperationsInput | string
     skillsJson?: JsonNullValueInput | InputJsonValue
     projectsJson?: JsonNullValueInput | InputJsonValue
@@ -28017,6 +29990,76 @@ export namespace Prisma {
     tagsJson?: JsonNullValueInput | InputJsonValue
     metadataJson?: JsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ApplicationCreateManyUserInput = {
+    id?: string
+    anonymousSessionId: string
+    status?: $Enums.ApplicationStatus
+    currentStep?: string
+    dreamRole?: string | null
+    originalEvidenceMatchScore?: number | null
+    updatedEvidenceMatchScore?: number | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ApplicationUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
+    currentStep?: StringFieldUpdateOperationsInput | string
+    dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
+    originalEvidenceMatchScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    updatedEvidenceMatchScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    anonymousSession?: AnonymousSessionUpdateOneRequiredWithoutApplicationsNestedInput
+    job?: JobUpdateOneWithoutApplicationNestedInput
+    candidateProfile?: CandidateProfileUpdateOneWithoutApplicationNestedInput
+    candidateChunks?: CandidateChunkUpdateManyWithoutApplicationNestedInput
+    evidenceMatches?: EvidenceMatchUpdateManyWithoutApplicationNestedInput
+    requirementFitScores?: RequirementFitScoreUpdateManyWithoutApplicationNestedInput
+    gapQuestions?: GapQuestionUpdateManyWithoutApplicationNestedInput
+    gapAnswers?: GapAnswerUpdateManyWithoutApplicationNestedInput
+    gapCoachInsight?: GapCoachInsightUpdateOneWithoutApplicationNestedInput
+    cvStrategies?: CvStrategyUpdateManyWithoutApplicationNestedInput
+    cvDrafts?: CvDraftUpdateManyWithoutApplicationNestedInput
+    agentRuns?: AgentRunUpdateManyWithoutApplicationNestedInput
+  }
+
+  export type ApplicationUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    anonymousSessionId?: StringFieldUpdateOperationsInput | string
+    status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
+    currentStep?: StringFieldUpdateOperationsInput | string
+    dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
+    originalEvidenceMatchScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    updatedEvidenceMatchScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    job?: JobUncheckedUpdateOneWithoutApplicationNestedInput
+    candidateProfile?: CandidateProfileUncheckedUpdateOneWithoutApplicationNestedInput
+    candidateChunks?: CandidateChunkUncheckedUpdateManyWithoutApplicationNestedInput
+    evidenceMatches?: EvidenceMatchUncheckedUpdateManyWithoutApplicationNestedInput
+    requirementFitScores?: RequirementFitScoreUncheckedUpdateManyWithoutApplicationNestedInput
+    gapQuestions?: GapQuestionUncheckedUpdateManyWithoutApplicationNestedInput
+    gapAnswers?: GapAnswerUncheckedUpdateManyWithoutApplicationNestedInput
+    gapCoachInsight?: GapCoachInsightUncheckedUpdateOneWithoutApplicationNestedInput
+    cvStrategies?: CvStrategyUncheckedUpdateManyWithoutApplicationNestedInput
+    cvDrafts?: CvDraftUncheckedUpdateManyWithoutApplicationNestedInput
+    agentRuns?: AgentRunUncheckedUpdateManyWithoutApplicationNestedInput
+  }
+
+  export type ApplicationUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    anonymousSessionId?: StringFieldUpdateOperationsInput | string
+    status?: EnumApplicationStatusFieldUpdateOperationsInput | $Enums.ApplicationStatus
+    currentStep?: StringFieldUpdateOperationsInput | string
+    dreamRole?: NullableStringFieldUpdateOperationsInput | string | null
+    originalEvidenceMatchScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    updatedEvidenceMatchScore?: NullableFloatFieldUpdateOperationsInput | number | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type CandidateChunkCreateManyApplicationInput = {

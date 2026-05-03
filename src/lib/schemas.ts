@@ -66,34 +66,73 @@ export const JobParserOutputSchema = z.object({
   requirements: z.array(JobRequirementSchema).min(1),
 });
 
+export const CandidateContactInfoSchema = z.object({
+  fullName: z.string().nullable(),
+  professionalTitle: z.string().nullable(),
+  location: z.string().nullable(),
+  email: z.string().nullable(),
+  phone: z.string().nullable(),
+});
+
+export const CandidateLinksSchema = z.object({
+  linkedin: z.string().nullable(),
+  github: z.string().nullable(),
+  portfolio: z.string().nullable(),
+  other: z.array(
+    z.object({
+      label: z.string().nullable(),
+      url: z.string().min(1),
+    })
+  ),
+});
+
 export const CandidateProjectSchema = z.object({
   name: z.string().nullable(),
   description: z.string().min(1),
   tools: z.array(z.string()),
   outcomes: z.array(z.string()),
+  links: z.array(z.string()),
 });
 
 export const CandidateExperienceSchema = z.object({
   role: z.string().nullable(),
   organization: z.string().nullable(),
+  startDate: z.string().nullable(),
+  endDate: z.string().nullable(),
+  current: z.boolean(),
   description: z.string().min(1),
+  bullets: z.array(z.string()),
   technologies: z.array(z.string()),
+  tools: z.array(z.string()),
+  achievements: z.array(z.string()),
   outcomes: z.array(z.string()),
 });
 
 export const CandidateEducationSchema = z.object({
   institution: z.string().nullable(),
   credential: z.string().nullable(),
+  degree: z.string().nullable(),
+  startYear: z.string().nullable(),
+  endYear: z.string().nullable(),
+  current: z.boolean(),
+  expected: z.boolean(),
   details: z.string().nullable(),
+  coursework: z.array(z.string()),
+  notes: z.string().nullable(),
 });
 
 export const CandidateCertificationSchema = z.object({
   name: z.string().min(1),
   issuer: z.string().nullable(),
+  date: z.string().nullable(),
+  status: z.string().nullable(),
   details: z.string().nullable(),
 });
 
 export const CandidateProfilerOutputSchema = z.object({
+  contactInfo: CandidateContactInfoSchema,
+  links: CandidateLinksSchema,
+  sourceSummary: z.string().nullable(),
   summary: z.string().min(1),
   skills: z.array(z.string()),
   projects: z.array(CandidateProjectSchema),
@@ -390,6 +429,9 @@ export const AgentJsonSchemas = {
     type: "object",
     additionalProperties: false,
     required: [
+      "contactInfo",
+      "links",
+      "sourceSummary",
       "summary",
       "skills",
       "projects",
@@ -400,6 +442,47 @@ export const AgentJsonSchemas = {
       "achievements",
     ],
     properties: {
+      contactInfo: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "fullName",
+          "professionalTitle",
+          "location",
+          "email",
+          "phone",
+        ],
+        properties: {
+          fullName: { type: ["string", "null"] },
+          professionalTitle: { type: ["string", "null"] },
+          location: { type: ["string", "null"] },
+          email: { type: ["string", "null"] },
+          phone: { type: ["string", "null"] },
+        },
+      },
+      links: {
+        type: "object",
+        additionalProperties: false,
+        required: ["linkedin", "github", "portfolio", "other"],
+        properties: {
+          linkedin: { type: ["string", "null"] },
+          github: { type: ["string", "null"] },
+          portfolio: { type: ["string", "null"] },
+          other: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["label", "url"],
+              properties: {
+                label: { type: ["string", "null"] },
+                url: { type: "string" },
+              },
+            },
+          },
+        },
+      },
+      sourceSummary: { type: ["string", "null"] },
       summary: { type: "string" },
       skills: { type: "array", items: { type: "string" } },
       projects: {
@@ -407,12 +490,13 @@ export const AgentJsonSchemas = {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["name", "description", "tools", "outcomes"],
+          required: ["name", "description", "tools", "outcomes", "links"],
           properties: {
             name: { type: ["string", "null"] },
             description: { type: "string" },
             tools: { type: "array", items: { type: "string" } },
             outcomes: { type: "array", items: { type: "string" } },
+            links: { type: "array", items: { type: "string" } },
           },
         },
       },
@@ -424,15 +508,27 @@ export const AgentJsonSchemas = {
           required: [
             "role",
             "organization",
+            "startDate",
+            "endDate",
+            "current",
             "description",
+            "bullets",
             "technologies",
+            "tools",
+            "achievements",
             "outcomes",
           ],
           properties: {
             role: { type: ["string", "null"] },
             organization: { type: ["string", "null"] },
+            startDate: { type: ["string", "null"] },
+            endDate: { type: ["string", "null"] },
+            current: { type: "boolean" },
             description: { type: "string" },
+            bullets: { type: "array", items: { type: "string" } },
             technologies: { type: "array", items: { type: "string" } },
+            tools: { type: "array", items: { type: "string" } },
+            achievements: { type: "array", items: { type: "string" } },
             outcomes: { type: "array", items: { type: "string" } },
           },
         },
@@ -442,11 +538,29 @@ export const AgentJsonSchemas = {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["institution", "credential", "details"],
+          required: [
+            "institution",
+            "credential",
+            "degree",
+            "startYear",
+            "endYear",
+            "current",
+            "expected",
+            "details",
+            "coursework",
+            "notes",
+          ],
           properties: {
             institution: { type: ["string", "null"] },
             credential: { type: ["string", "null"] },
+            degree: { type: ["string", "null"] },
+            startYear: { type: ["string", "null"] },
+            endYear: { type: ["string", "null"] },
+            current: { type: "boolean" },
+            expected: { type: "boolean" },
             details: { type: ["string", "null"] },
+            coursework: { type: "array", items: { type: "string" } },
+            notes: { type: ["string", "null"] },
           },
         },
       },
@@ -455,10 +569,12 @@ export const AgentJsonSchemas = {
         items: {
           type: "object",
           additionalProperties: false,
-          required: ["name", "issuer", "details"],
+          required: ["name", "issuer", "date", "status", "details"],
           properties: {
             name: { type: "string" },
             issuer: { type: ["string", "null"] },
+            date: { type: ["string", "null"] },
+            status: { type: ["string", "null"] },
             details: { type: ["string", "null"] },
           },
         },

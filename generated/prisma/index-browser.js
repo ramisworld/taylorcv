@@ -127,9 +127,19 @@ exports.Prisma.AnonymousSessionScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.UserScalarFieldEnum = {
+  id: 'id',
+  clerkUserId: 'clerkUserId',
+  email: 'email',
+  name: 'name',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.ApplicationScalarFieldEnum = {
   id: 'id',
   anonymousSessionId: 'anonymousSessionId',
+  userId: 'userId',
   status: 'status',
   currentStep: 'currentStep',
   dreamRole: 'dreamRole',
@@ -165,6 +175,12 @@ exports.Prisma.CandidateProfileScalarFieldEnum = {
   applicationId: 'applicationId',
   rawCvText: 'rawCvText',
   rawBackgroundText: 'rawBackgroundText',
+  contactInfoJson: 'contactInfoJson',
+  linksJson: 'linksJson',
+  profileSource: 'profileSource',
+  sourceSummary: 'sourceSummary',
+  sourceUrl: 'sourceUrl',
+  profileConfirmedAt: 'profileConfirmedAt',
   summary: 'summary',
   skillsJson: 'skillsJson',
   projectsJson: 'projectsJson',
@@ -290,12 +306,12 @@ exports.Prisma.SortOrder = {
   desc: 'desc'
 };
 
-exports.Prisma.JsonNullValueInput = {
+exports.Prisma.NullableJsonNullValueInput = {
+  DbNull: Prisma.DbNull,
   JsonNull: Prisma.JsonNull
 };
 
-exports.Prisma.NullableJsonNullValueInput = {
-  DbNull: Prisma.DbNull,
+exports.Prisma.JsonNullValueInput = {
   JsonNull: Prisma.JsonNull
 };
 
@@ -383,6 +399,7 @@ exports.AgentRunStatus = exports.$Enums.AgentRunStatus = {
 
 exports.Prisma.ModelName = {
   AnonymousSession: 'AnonymousSession',
+  User: 'User',
   Application: 'Application',
   Job: 'Job',
   JobRequirement: 'JobRequirement',

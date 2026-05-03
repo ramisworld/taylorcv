@@ -7,6 +7,8 @@
  * need to use are documented accordingly near the end.
  */
 import { initTRPC } from "@trpc/server";
+import { TRPCError } from "@trpc/server";
+import { auth } from "@clerk/nextjs/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
@@ -33,10 +35,14 @@ export const createTRPCContext = async (opts: {
     headers: opts.headers,
     resHeaders: opts.resHeaders,
   });
+  const clerkUserId = await auth()
+    .then((authState) => authState.userId ?? null)
+    .catch(() => null);
 
   return {
     db,
     anonymousSessionId,
+    clerkUserId,
     ...opts,
   };
 };
@@ -114,3 +120,19 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
  * are logged in.
  */
 export const publicProcedure = t.procedure.use(timingMiddleware);
+
+export const protectedProcedure = publicProcedure.use(async ({ ctx, next }) => {
+  if (!ctx.clerkUserId) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Sign in to continue.",
+    });
+  }
+
+  return next({
+    ctx: {
+      ...ctx,
+      clerkUserId: ctx.clerkUserId,
+    },
+  });
+});

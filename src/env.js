@@ -12,6 +12,7 @@ const optionalWhenMock = z
 export const env = createEnv({
   server: {
     DATABASE_URL: z.string().url(),
+    CLERK_SECRET_KEY: z.string().min(1).optional(),
     OPENAI_API_KEY: optionalWhenMock,
     OPENAI_FAST_MODEL: optionalWhenMock,
     OPENAI_STRONG_MODEL: optionalWhenMock,
@@ -22,10 +23,15 @@ export const env = createEnv({
       .default("development"),
   },
 
-  client: {},
+  client: {
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1).optional(),
+  },
 
   runtimeEnv: {
     DATABASE_URL: process.env.DATABASE_URL,
+    CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     OPENAI_FAST_MODEL: process.env.OPENAI_FAST_MODEL,
     OPENAI_STRONG_MODEL: process.env.OPENAI_STRONG_MODEL,

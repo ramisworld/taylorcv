@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  SignInButton,
+  SignUpButton,
+  UserButton,
+  useAuth,
+} from "@clerk/nextjs";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -33,7 +39,7 @@ import {
   normalizeCvPresentation,
   presentationToRendererTokens,
 } from "~/lib/cvPresentation";
-import { api, type RouterOutputs } from "~/trpc/react";
+import { api, type RouterInputs, type RouterOutputs } from "~/trpc/react";
 
 const currentApplicationStorageKey = "currentApplicationId";
 const dreamRoleExamples = [
@@ -59,6 +65,7 @@ const stages = [
   "job_input",
   "job_result",
   "candidate_input",
+  "profile_confirmation",
   "match_strategy",
   "honest_read",
   "gap_questions",
@@ -81,6 +88,7 @@ type AppStage =
   | "job_result"
   | "candidate_input"
   | "candidate_scanning"
+  | "profile_confirmation"
   | "match_strategy"
   | "honest_read"
   | "gap_questions"
@@ -93,6 +101,8 @@ type GapAnswerDraft = {
   answerText: string;
   skipped?: boolean;
 };
+type CandidateProfileDraft =
+  RouterInputs["application"]["confirmCandidateProfile"]["profile"];
 type ChatMessage = {
   role: "agent" | "user";
   text: string;
@@ -106,7 +116,8 @@ function deriveStageFromState(state: ApplicationState | null): AppStage {
   if (!state?.application?.dreamRole) return "landing";
   if (!state.job) return "job_input";
   if (!state.candidateProfile) return "job_result";
-  if (!state.requirementFitScores.length) return "candidate_input";
+  if (!state.candidateProfile.profileConfirmedAt) return "profile_confirmation";
+  if (!state.requirementFitScores.length) return "profile_confirmation";
   if (state.cvDraft) return "cv_editor";
   if (state.gapQuestions.some((question) => question.status === "unanswered")) {
     return "match_strategy";
@@ -119,7 +130,13 @@ function stageProgress(stage: AppStage) {
   if (stage === "job_input" || stage === "job_scanning" || stage === "job_result") {
     return 1;
   }
-  if (stage === "candidate_input" || stage === "candidate_scanning") return 2;
+  if (
+    stage === "candidate_input" ||
+    stage === "candidate_scanning" ||
+    stage === "profile_confirmation"
+  ) {
+    return 2;
+  }
   if (stage === "match_strategy" || stage === "honest_read") return 3;
   if (stage === "gap_questions") return 4;
   return 5;
@@ -127,6 +144,12 @@ function stageProgress(stage: AppStage) {
 
 function firstString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function stringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
 }
 
 function answerQuality(answer: string) {
@@ -185,6 +208,336 @@ function uniqueItems(items: Array<string | null | undefined>, max = 6) {
   }
 
   return result;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function textFromRecord(value: unknown, key: string) {
+  return isRecord(value) ? firstString(value[key]) : null;
+}
+
+function arrayFromJson(value: unknown) {
+  return Array.isArray(value) ? value : [];
+}
+
+function emptyCandidateProfileDraft(): CandidateProfileDraft {
+  return {
+    contactInfo: {
+      fullName: null,
+      professionalTitle: null,
+      location: null,
+      email: null,
+      phone: null,
+    },
+    links: {
+      linkedin: null,
+      github: null,
+      portfolio: null,
+      other: [],
+    },
+    sourceSummary: null,
+    summary: "Candidate profile details confirmed by the user.",
+    skills: [],
+    projects: [],
+    experience: [],
+    education: [],
+    certifications: [],
+    tools: [],
+    achievements: [],
+  };
+}
+
+function initialManualProfileDraft(): CandidateProfileDraft {
+  return {
+    ...emptyCandidateProfileDraft(),
+    education: [
+      {
+        institution: null,
+        credential: null,
+        degree: null,
+        startYear: null,
+        endYear: null,
+        current: false,
+        expected: false,
+        details: null,
+        coursework: [],
+        notes: null,
+      },
+    ],
+    experience: [],
+    projects: [],
+    certifications: [],
+  };
+}
+
+function candidateProfileDraftFromState(
+  profile: ApplicationState["candidateProfile"] | null | undefined
+): CandidateProfileDraft {
+  const draft = emptyCandidateProfileDraft();
+  if (!profile) return draft;
+
+  const contactInfo = isRecord(profile.contactInfoJson)
+    ? profile.contactInfoJson
+    : {};
+  const links = isRecord(profile.linksJson) ? profile.linksJson : {};
+
+  return {
+    ...draft,
+    contactInfo: {
+      fullName: textFromRecord(contactInfo, "fullName"),
+      professionalTitle: textFromRecord(contactInfo, "professionalTitle"),
+      location: textFromRecord(contactInfo, "location"),
+      email: textFromRecord(contactInfo, "email"),
+      phone: textFromRecord(contactInfo, "phone"),
+    },
+    links: {
+      linkedin: textFromRecord(links, "linkedin"),
+      github: textFromRecord(links, "github"),
+      portfolio: textFromRecord(links, "portfolio"),
+      other: arrayFromJson(links.other)
+        .filter(isRecord)
+        .map((link) => ({
+          label: textFromRecord(link, "label"),
+          url: textFromRecord(link, "url") ?? "",
+        }))
+        .filter((link) => link.url),
+    },
+    sourceSummary: profile.sourceSummary,
+    summary: profile.summary || draft.summary,
+    skills: stringArray(profile.skillsJson),
+    projects: arrayFromJson(profile.projectsJson).filter(isRecord).map((project) => ({
+      name: textFromRecord(project, "name"),
+      description:
+        textFromRecord(project, "description") ?? "Project details provided by the candidate.",
+      tools: stringArray(project.tools),
+      outcomes: stringArray(project.outcomes),
+      links: stringArray(project.links),
+    })),
+    experience: arrayFromJson(profile.experienceJson).filter(isRecord).map((item) => ({
+      role: textFromRecord(item, "role"),
+      organization: textFromRecord(item, "organization"),
+      startDate: textFromRecord(item, "startDate"),
+      endDate: textFromRecord(item, "endDate"),
+      current: item.current === true,
+      description:
+        textFromRecord(item, "description") ??
+        stringArray(item.bullets).join(" ") ??
+        "Experience details provided by the candidate.",
+      bullets: stringArray(item.bullets),
+      technologies: stringArray(item.technologies),
+      tools: stringArray(item.tools),
+      achievements: stringArray(item.achievements),
+      outcomes: stringArray(item.outcomes),
+    })),
+    education: arrayFromJson(profile.educationJson).filter(isRecord).map((item) => ({
+      institution: textFromRecord(item, "institution"),
+      credential: textFromRecord(item, "credential"),
+      degree: textFromRecord(item, "degree") ?? textFromRecord(item, "credential"),
+      startYear: textFromRecord(item, "startYear"),
+      endYear: textFromRecord(item, "endYear"),
+      current: item.current === true,
+      expected: item.expected === true,
+      details: textFromRecord(item, "details"),
+      coursework: stringArray(item.coursework),
+      notes: textFromRecord(item, "notes"),
+    })),
+    certifications: arrayFromJson(profile.certificationsJson)
+      .filter(isRecord)
+      .map((item) => ({
+        name: textFromRecord(item, "name") ?? "Certification",
+        issuer: textFromRecord(item, "issuer"),
+        date: textFromRecord(item, "date"),
+        status: textFromRecord(item, "status"),
+        details: textFromRecord(item, "details"),
+      })),
+    tools: stringArray(profile.toolsJson),
+    achievements: stringArray(profile.achievementsJson),
+  };
+}
+
+function profileMissingEssentials(profile: CandidateProfileDraft) {
+  return [
+    ["Full name", profile.contactInfo.fullName],
+    ["Professional title / specialty", profile.contactInfo.professionalTitle],
+    ["Location", profile.contactInfo.location],
+    ["Preferred email", profile.contactInfo.email],
+  ]
+    .filter(([, value]) => !firstString(value))
+    .map(([label]) => label);
+}
+
+function hasTechSignals(profile: CandidateProfileDraft) {
+  const haystack = [
+    profile.contactInfo.professionalTitle,
+    profile.summary,
+    ...profile.skills,
+    ...profile.tools,
+    ...profile.projects.flatMap((project) => project.tools),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return /\b(software|developer|engineer|data|ai|ml|cloud|github|react|typescript|python|java|api|frontend|backend|full-stack|fullstack)\b/.test(
+    haystack
+  );
+}
+
+function manualProfileToText(profile: CandidateProfileDraft, extra: string) {
+  const lines = [
+    `Full name: ${profile.contactInfo.fullName ?? ""}`,
+    `Professional title: ${profile.contactInfo.professionalTitle ?? ""}`,
+    `Location: ${profile.contactInfo.location ?? ""}`,
+    `Email: ${profile.contactInfo.email ?? ""}`,
+    `Phone: ${profile.contactInfo.phone ?? ""}`,
+    `LinkedIn: ${profile.links.linkedin ?? ""}`,
+    `GitHub: ${profile.links.github ?? ""}`,
+    `Portfolio: ${profile.links.portfolio ?? ""}`,
+    "",
+    "Education:",
+    ...profile.education.map(
+      (item) =>
+        `${item.institution ?? ""} | ${item.degree ?? item.credential ?? ""} | ${item.startYear ?? ""}-${item.endYear ?? ""} | ${item.notes ?? item.details ?? ""}`
+    ),
+    "",
+    "Experience:",
+    ...profile.experience.map(
+      (item) =>
+        `${item.role ?? ""} at ${item.organization ?? ""} | ${item.startDate ?? ""}-${item.current ? "Current" : item.endDate ?? ""} | ${item.description} ${item.bullets.join(" ")}`
+    ),
+    "",
+    "Projects:",
+    ...profile.projects.map(
+      (item) =>
+        `${item.name ?? ""}: ${item.description}. Tools: ${item.tools.join(", ")}. Outcomes: ${item.outcomes.join(" ")}`
+    ),
+    "",
+    "Certifications:",
+    ...profile.certifications.map(
+      (item) =>
+        `${item.name} | ${item.issuer ?? ""} | ${item.date ?? item.status ?? ""}`
+    ),
+    "",
+    "Skills:",
+    profile.skills.join(", "),
+    "",
+    "Tools:",
+    profile.tools.join(", "),
+    "",
+    "Achievements:",
+    profile.achievements.join("\n"),
+    "",
+    "Anything else Taylor should know:",
+    extra,
+  ];
+
+  return lines.map((line) => line.trim()).filter(Boolean).join("\n");
+}
+
+function sanitizeProfileDraft(profile: CandidateProfileDraft): CandidateProfileDraft {
+  const clean = (value: string | null | undefined) => firstString(value);
+  const summary =
+    clean(profile.summary) ??
+    clean(
+      [
+        profile.contactInfo.professionalTitle,
+        profile.contactInfo.location,
+        ...profile.skills.slice(0, 4),
+      ]
+        .filter(Boolean)
+        .join(" ")
+    ) ??
+    "Candidate profile details confirmed by the user.";
+
+  return {
+    contactInfo: {
+      fullName: clean(profile.contactInfo.fullName),
+      professionalTitle: clean(profile.contactInfo.professionalTitle),
+      location: clean(profile.contactInfo.location),
+      email: clean(profile.contactInfo.email),
+      phone: clean(profile.contactInfo.phone),
+    },
+    links: {
+      linkedin: clean(profile.links.linkedin),
+      github: clean(profile.links.github),
+      portfolio: clean(profile.links.portfolio),
+      other: profile.links.other
+        .map((link) => ({ label: clean(link.label), url: clean(link.url) ?? "" }))
+        .filter((link) => link.url),
+    },
+    sourceSummary: clean(profile.sourceSummary),
+    summary,
+    skills: uniqueItems(profile.skills.map(clean), 40),
+    projects: profile.projects
+      .map((project) => ({
+        name: clean(project.name),
+        description:
+          clean(project.description) ??
+          clean(project.outcomes.join(" ")) ??
+          clean(project.name) ??
+          "Project details provided by the candidate.",
+        tools: uniqueItems(project.tools.map(clean), 30),
+        outcomes: uniqueItems(project.outcomes.map(clean), 20),
+        links: uniqueItems(project.links.map(clean), 10),
+      }))
+      .filter(
+        (project) =>
+          project.name ||
+          project.description !== "Project details provided by the candidate." ||
+          project.tools.length > 0 ||
+          project.outcomes.length > 0
+      ),
+    experience: profile.experience
+      .map((item) => ({
+        role: clean(item.role),
+        organization: clean(item.organization),
+        startDate: clean(item.startDate),
+        endDate: item.current ? null : clean(item.endDate),
+        current: item.current,
+        description:
+          clean(item.description) ??
+          clean(item.bullets.join(" ")) ??
+          "Experience details provided by the candidate.",
+        bullets: uniqueItems(item.bullets.map(clean), 20),
+        technologies: uniqueItems(item.technologies.map(clean), 30),
+        tools: uniqueItems(item.tools.map(clean), 30),
+        achievements: uniqueItems(item.achievements.map(clean), 20),
+        outcomes: uniqueItems(item.outcomes.map(clean), 20),
+      }))
+      .filter(
+        (item) =>
+          item.role ||
+          item.organization ||
+          item.description !== "Experience details provided by the candidate." ||
+          item.bullets.length > 0
+      ),
+    education: profile.education
+      .map((item) => ({
+        institution: clean(item.institution),
+        credential: clean(item.credential ?? item.degree),
+        degree: clean(item.degree ?? item.credential),
+        startYear: clean(item.startYear),
+        endYear: clean(item.endYear),
+        current: item.current,
+        expected: item.expected,
+        details: clean(item.details),
+        coursework: uniqueItems(item.coursework.map(clean), 20),
+        notes: clean(item.notes),
+      }))
+      .filter((item) => item.institution || item.degree || item.credential),
+    certifications: profile.certifications
+      .map((item) => ({
+        name: clean(item.name) ?? "Certification",
+        issuer: clean(item.issuer),
+        date: clean(item.date),
+        status: clean(item.status),
+        details: clean(item.details),
+      }))
+      .filter((item) => item.name !== "Certification" || item.issuer || item.date || item.status),
+    tools: uniqueItems(profile.tools.map(clean), 40),
+    achievements: uniqueItems(profile.achievements.map(clean), 30),
+  };
 }
 
 function SectionShell(props: {
@@ -272,6 +625,7 @@ function TopRail(props: {
   resetDisabled?: boolean;
 }) {
   const current = stageProgress(props.stage);
+  const { isSignedIn } = useAuth();
 
   return (
     <header className="relative z-20 flex h-16 items-center justify-between border-b border-white/10 px-5 backdrop-blur-xl">
@@ -326,6 +680,28 @@ function TopRail(props: {
         <RotateCcw className="h-3.5 w-3.5" />
         New CV
       </SecondaryButton>
+      <div className="hidden items-center gap-2 md:flex">
+        {isSignedIn ? (
+          <>
+          <a
+            className="rounded-lg border border-white/12 bg-white/[0.06] px-3 py-2 text-xs font-medium text-zinc-100 transition hover:bg-white/[0.1]"
+            href="/hub"
+          >
+            Hub
+          </a>
+          <UserButton />
+          </>
+        ) : (
+          <SignInButton mode="modal">
+            <button
+              className="rounded-lg border border-white/12 bg-white/[0.06] px-3 py-2 text-xs font-medium text-zinc-100 transition hover:bg-white/[0.1]"
+              type="button"
+            >
+              Sign in
+            </button>
+          </SignInButton>
+        )}
+      </div>
     </header>
   );
 }
@@ -481,6 +857,602 @@ function TextDropPanel(props: {
         </div>
       </div>
     </GlassPanel>
+  );
+}
+
+function FormField(props: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  required?: boolean;
+}) {
+  return (
+    <label className="block">
+      <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">
+        {props.label}
+        {props.required ? <span className="text-amber-200">missing if blank</span> : null}
+      </span>
+      <input
+        className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-cyan-200/60"
+        onChange={(event) => props.onChange(event.target.value)}
+        placeholder={props.placeholder}
+        value={props.value}
+      />
+    </label>
+  );
+}
+
+function CandidateSourceStage(props: {
+  candidateText: string;
+  candidateFileName: string | null;
+  linkedinUrl: string;
+  linkedinFallbackText: string;
+  showLinkedInFallback: boolean;
+  manualProfile: CandidateProfileDraft;
+  manualExtra: string;
+  error?: string | null;
+  isLoading: boolean;
+  isReadingFile: boolean;
+  onCandidateText: (value: string) => void;
+  onCandidateFile: (file: File) => void;
+  onLinkedInUrl: (value: string) => void;
+  onLinkedInFallbackText: (value: string) => void;
+  onManualProfile: (value: CandidateProfileDraft) => void;
+  onManualExtra: (value: string) => void;
+  onUploadSubmit: () => void;
+  onLinkedInSubmit: () => void;
+  onManualSubmit: () => void;
+}) {
+  const [mode, setMode] = useState<"upload" | "linkedin" | "manual">("upload");
+  const profile = props.manualProfile;
+  const updateProfile = (patch: Partial<CandidateProfileDraft>) =>
+    props.onManualProfile({ ...profile, ...patch });
+  const updateContact = (
+    key: keyof CandidateProfileDraft["contactInfo"],
+    value: string
+  ) =>
+    updateProfile({
+      contactInfo: { ...profile.contactInfo, [key]: value || null },
+    });
+  const updateLinks = (key: keyof CandidateProfileDraft["links"], value: string) =>
+    updateProfile({
+      links: { ...profile.links, [key]: value || null },
+    });
+  const updateEducation = (
+    index: number,
+    patch: Partial<CandidateProfileDraft["education"][number]>
+  ) =>
+    updateProfile({
+      education: profile.education.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...patch } : item
+      ),
+    });
+  const updateExperience = (
+    index: number,
+    patch: Partial<CandidateProfileDraft["experience"][number]>
+  ) =>
+    updateProfile({
+      experience: profile.experience.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...patch } : item
+      ),
+    });
+  const updateProject = (
+    index: number,
+    patch: Partial<CandidateProfileDraft["projects"][number]>
+  ) =>
+    updateProfile({
+      projects: profile.projects.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...patch } : item
+      ),
+    });
+  const updateCertification = (
+    index: number,
+    patch: Partial<CandidateProfileDraft["certifications"][number]>
+  ) =>
+    updateProfile({
+      certifications: profile.certifications.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...patch } : item
+      ),
+    });
+
+  return (
+    <SectionShell
+      eyebrow="Candidate profile"
+      title="Choose how Taylor should learn your background."
+      subtitle="Upload is fastest. LinkedIn is useful when it works. Manual start is there when you want full control."
+    >
+      <div className="grid max-h-[74vh] min-h-0 gap-4 overflow-hidden lg:grid-cols-[0.42fr_0.58fr]">
+        <div className="space-y-3 overflow-y-auto pr-1">
+          {[
+            {
+              id: "upload" as const,
+              title: "Upload current CV",
+              copy: "Recommended. PDF, DOCX, TXT, or pasted CV text.",
+              icon: Upload,
+            },
+            {
+              id: "linkedin" as const,
+              title: "Import LinkedIn URL",
+              copy: "Public profile only, with paste fallback if blocked.",
+              icon: FileText,
+            },
+            {
+              id: "manual" as const,
+              title: "Start from scratch",
+              copy: "Guided sections for contact, education, work, and projects.",
+              icon: MessageCircle,
+            },
+          ].map((option) => {
+            const Icon = option.icon;
+            const active = mode === option.id;
+            return (
+              <button
+                className={cn(
+                  "w-full rounded-lg border p-4 text-left transition",
+                  active
+                    ? "border-cyan-200/50 bg-cyan-200/12 shadow-[0_0_28px_rgba(103,232,249,0.12)]"
+                    : "border-white/10 bg-white/[0.05] hover:bg-white/[0.08]"
+                )}
+                key={option.id}
+                onClick={() => setMode(option.id)}
+                type="button"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-black/20 text-cyan-100">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span>
+                    <span className="block text-base font-semibold text-white">
+                      {option.title}
+                    </span>
+                    <span className="mt-1 block text-sm leading-5 text-zinc-400">
+                      {option.copy}
+                    </span>
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <GlassPanel className="min-h-0 overflow-y-auto p-5">
+          {mode === "upload" ? (
+            <div>
+              <h2 className="text-xl font-semibold text-white">Upload current CV</h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-300">
+                Taylor will extract profile details first, then you can confirm
+                what should appear on the final CV.
+              </p>
+              <label className="mt-5 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-cyan-200/30 bg-cyan-200/10 px-4 py-5 text-sm font-medium text-cyan-50 transition hover:bg-cyan-200/15">
+                {props.isReadingFile ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}
+                {props.isReadingFile
+                  ? "Reading file..."
+                  : props.candidateFileName ?? "Choose PDF, DOCX, TXT, or MD"}
+                <input
+                  accept=".txt,.md,.pdf,.doc,.docx"
+                  className="sr-only"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) props.onCandidateFile(file);
+                    event.currentTarget.value = "";
+                  }}
+                  type="file"
+                />
+              </label>
+              <textarea
+                className="mt-4 min-h-[300px] w-full resize-none rounded-lg border border-white/10 bg-black/30 p-4 text-sm leading-6 text-white outline-none placeholder:text-zinc-500 focus:border-cyan-200/60"
+                maxLength={30_000}
+                onChange={(event) => props.onCandidateText(event.target.value)}
+                placeholder="Or paste your current CV text here."
+                value={props.candidateText}
+              />
+              <div className="mt-4 flex items-center justify-between">
+                <p className="text-xs text-zinc-500">
+                  {props.candidateText.length.toLocaleString()} / 30,000
+                </p>
+                <PrimaryButton
+                  disabled={props.isLoading || props.isReadingFile || !props.candidateText.trim()}
+                  onClick={props.onUploadSubmit}
+                  type="button"
+                >
+                  {props.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Scan my CV
+                  <ArrowRight className="h-4 w-4" />
+                </PrimaryButton>
+              </div>
+            </div>
+          ) : null}
+
+          {mode === "linkedin" ? (
+            <div>
+              <h2 className="text-xl font-semibold text-white">LinkedIn public profile</h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-300">
+                Taylor will try the public URL without using your LinkedIn
+                credentials. If LinkedIn blocks it, paste the visible profile
+                text below.
+              </p>
+              <FormField
+                label="LinkedIn URL"
+                onChange={props.onLinkedInUrl}
+                placeholder="https://www.linkedin.com/in/..."
+                value={props.linkedinUrl}
+              />
+              {props.showLinkedInFallback ? (
+                <div className="mt-4 rounded-lg border border-amber-200/20 bg-amber-200/10 p-3 text-sm leading-6 text-amber-50">
+                  LinkedIn import did not work. Paste your LinkedIn
+                  About/Experience/Education text here instead.
+                </div>
+              ) : null}
+              <textarea
+                className="mt-4 min-h-[260px] w-full resize-none rounded-lg border border-white/10 bg-black/30 p-4 text-sm leading-6 text-white outline-none placeholder:text-zinc-500 focus:border-cyan-200/60"
+                maxLength={30_000}
+                onChange={(event) => props.onLinkedInFallbackText(event.target.value)}
+                placeholder="Paste LinkedIn About, Experience, Education, Projects, Certifications, or Skills text here if needed."
+                value={props.linkedinFallbackText}
+              />
+              <div className="mt-4 flex justify-end">
+                <PrimaryButton
+                  disabled={
+                    props.isLoading ||
+                    (!props.linkedinUrl.trim() && !props.linkedinFallbackText.trim())
+                  }
+                  onClick={props.onLinkedInSubmit}
+                  type="button"
+                >
+                  {props.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Import profile
+                  <ArrowRight className="h-4 w-4" />
+                </PrimaryButton>
+              </div>
+            </div>
+          ) : null}
+
+          {mode === "manual" ? (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold text-white">Start from scratch</h2>
+              <details className="rounded-lg border border-white/10 bg-black/20 p-4" open>
+                <summary className="cursor-pointer text-sm font-semibold text-cyan-100">
+                  Profile details
+                </summary>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <FormField label="Full name" onChange={(value) => updateContact("fullName", value)} required value={profile.contactInfo.fullName ?? ""} />
+                  <FormField label="Professional title" onChange={(value) => updateContact("professionalTitle", value)} required value={profile.contactInfo.professionalTitle ?? ""} />
+                  <FormField label="Location" onChange={(value) => updateContact("location", value)} required value={profile.contactInfo.location ?? ""} />
+                  <FormField label="Email" onChange={(value) => updateContact("email", value)} required value={profile.contactInfo.email ?? ""} />
+                  <FormField label="Phone" onChange={(value) => updateContact("phone", value)} value={profile.contactInfo.phone ?? ""} />
+                  <FormField label="LinkedIn" onChange={(value) => updateLinks("linkedin", value)} value={profile.links.linkedin ?? ""} />
+                  <FormField label="GitHub" onChange={(value) => updateLinks("github", value)} value={profile.links.github ?? ""} />
+                  <FormField label="Portfolio" onChange={(value) => updateLinks("portfolio", value)} value={profile.links.portfolio ?? ""} />
+                </div>
+              </details>
+
+              <details className="rounded-lg border border-white/10 bg-black/20 p-4">
+                <summary className="cursor-pointer text-sm font-semibold text-cyan-100">
+                  Education
+                </summary>
+                {(profile.education.length ? profile.education : [emptyCandidateProfileDraft().education[0]]).map((item, index) => (
+                  <div className="mt-4 grid gap-4 md:grid-cols-2" key={index}>
+                    <FormField label="Institution" onChange={(value) => updateEducation(index, { institution: value || null })} value={item?.institution ?? ""} />
+                    <FormField label="Degree / programme" onChange={(value) => updateEducation(index, { degree: value || null, credential: value || null })} value={item?.degree ?? item?.credential ?? ""} />
+                    <FormField label="Start year" onChange={(value) => updateEducation(index, { startYear: value || null })} value={item?.startYear ?? ""} />
+                    <FormField label="End / expected year" onChange={(value) => updateEducation(index, { endYear: value || null })} value={item?.endYear ?? ""} />
+                  </div>
+                ))}
+                <SecondaryButton
+                  className="mt-4"
+                  onClick={() =>
+                    updateProfile({
+                      education: [
+                        ...profile.education,
+                        {
+                          institution: null,
+                          credential: null,
+                          degree: null,
+                          startYear: null,
+                          endYear: null,
+                          current: false,
+                          expected: false,
+                          details: null,
+                          coursework: [],
+                          notes: null,
+                        },
+                      ],
+                    })
+                  }
+                  type="button"
+                >
+                  Add education
+                </SecondaryButton>
+              </details>
+
+              <details className="rounded-lg border border-white/10 bg-black/20 p-4">
+                <summary className="cursor-pointer text-sm font-semibold text-cyan-100">
+                  Experience
+                </summary>
+                {profile.experience.map((item, index) => (
+                  <div className="mt-4 grid gap-4 md:grid-cols-2" key={index}>
+                    <FormField label="Role" onChange={(value) => updateExperience(index, { role: value || null })} value={item.role ?? ""} />
+                    <FormField label="Company" onChange={(value) => updateExperience(index, { organization: value || null })} value={item.organization ?? ""} />
+                    <FormField label="Start" onChange={(value) => updateExperience(index, { startDate: value || null })} value={item.startDate ?? ""} />
+                    <FormField label="End / current" onChange={(value) => updateExperience(index, { endDate: value || null, current: /current/i.test(value) })} value={item.current ? "Current" : item.endDate ?? ""} />
+                    <label className="md:col-span-2">
+                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">Description / bullets</span>
+                      <textarea className="mt-2 min-h-28 w-full resize-none rounded-lg border border-white/10 bg-black/30 p-3 text-sm leading-6 text-white outline-none focus:border-cyan-200/60" onChange={(event) => updateExperience(index, { description: event.target.value || "Experience details provided by the candidate.", bullets: event.target.value.split("\n").map((line) => line.trim()).filter(Boolean) })} value={item.bullets.join("\n") || item.description} />
+                    </label>
+                  </div>
+                ))}
+                <SecondaryButton
+                  className="mt-4"
+                  onClick={() =>
+                    updateProfile({
+                      experience: [
+                        ...profile.experience,
+                        {
+                          role: null,
+                          organization: null,
+                          startDate: null,
+                          endDate: null,
+                          current: false,
+                          description: "Experience details provided by the candidate.",
+                          bullets: [],
+                          technologies: [],
+                          tools: [],
+                          achievements: [],
+                          outcomes: [],
+                        },
+                      ],
+                    })
+                  }
+                  type="button"
+                >
+                  Add experience
+                </SecondaryButton>
+              </details>
+
+              <details className="rounded-lg border border-white/10 bg-black/20 p-4">
+                <summary className="cursor-pointer text-sm font-semibold text-cyan-100">
+                  Projects and certifications
+                </summary>
+                {profile.projects.map((item, index) => (
+                  <div className="mt-4 grid gap-4 md:grid-cols-2" key={`project-${index}`}>
+                    <FormField label="Project name" onChange={(value) => updateProject(index, { name: value || null })} value={item.name ?? ""} />
+                    <FormField label="Tools" onChange={(value) => updateProject(index, { tools: value.split(",").map((tool) => tool.trim()).filter(Boolean) })} value={item.tools.join(", ")} />
+                    <label className="md:col-span-2">
+                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">Description / outcome</span>
+                      <textarea className="mt-2 min-h-24 w-full resize-none rounded-lg border border-white/10 bg-black/30 p-3 text-sm leading-6 text-white outline-none focus:border-cyan-200/60" onChange={(event) => updateProject(index, { description: event.target.value || "Project details provided by the candidate." })} value={item.description} />
+                    </label>
+                  </div>
+                ))}
+                <SecondaryButton
+                  className="mt-4"
+                  onClick={() =>
+                    updateProfile({
+                      projects: [
+                        ...profile.projects,
+                        {
+                          name: null,
+                          description: "Project details provided by the candidate.",
+                          tools: [],
+                          outcomes: [],
+                          links: [],
+                        },
+                      ],
+                    })
+                  }
+                  type="button"
+                >
+                  Add project
+                </SecondaryButton>
+                {profile.certifications.map((item, index) => (
+                  <div className="mt-4 grid gap-4 md:grid-cols-3" key={`cert-${index}`}>
+                    <FormField label="Certification" onChange={(value) => updateCertification(index, { name: value || "Certification" })} value={item.name} />
+                    <FormField label="Issuer" onChange={(value) => updateCertification(index, { issuer: value || null })} value={item.issuer ?? ""} />
+                    <FormField label="Date / status" onChange={(value) => updateCertification(index, { date: value || null, status: value || null })} value={item.date ?? item.status ?? ""} />
+                  </div>
+                ))}
+                <SecondaryButton
+                  className="mt-4"
+                  onClick={() =>
+                    updateProfile({
+                      certifications: [
+                        ...profile.certifications,
+                        {
+                          name: "Certification",
+                          issuer: null,
+                          date: null,
+                          status: null,
+                          details: null,
+                        },
+                      ],
+                    })
+                  }
+                  type="button"
+                >
+                  Add certification
+                </SecondaryButton>
+              </details>
+
+              <textarea
+                className="min-h-28 w-full resize-none rounded-lg border border-white/10 bg-black/30 p-4 text-sm leading-6 text-white outline-none placeholder:text-zinc-500 focus:border-cyan-200/60"
+                onChange={(event) => props.onManualExtra(event.target.value)}
+                placeholder="Anything else Taylor should know?"
+                value={props.manualExtra}
+              />
+              <PrimaryButton
+                disabled={props.isLoading}
+                onClick={props.onManualSubmit}
+                type="button"
+              >
+                {props.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Scan manual profile
+                <ArrowRight className="h-4 w-4" />
+              </PrimaryButton>
+            </div>
+          ) : null}
+
+          {props.error ? (
+            <p className="mt-4 rounded-lg border border-amber-300/20 bg-amber-300/10 p-3 text-sm text-amber-100">
+              {props.error}
+            </p>
+          ) : null}
+        </GlassPanel>
+      </div>
+    </SectionShell>
+  );
+}
+
+function ProfileConfirmationStage(props: {
+  profile: CandidateProfileDraft;
+  isAlreadyConfirmed: boolean;
+  isLoading: boolean;
+  onProfile: (profile: CandidateProfileDraft) => void;
+  onSubmit: () => void;
+}) {
+  const profile = props.profile;
+  const missing = profileMissingEssentials(profile);
+  const techSignals = hasTechSignals(profile);
+  const updateContact = (
+    key: keyof CandidateProfileDraft["contactInfo"],
+    value: string
+  ) =>
+    props.onProfile({
+      ...profile,
+      contactInfo: { ...profile.contactInfo, [key]: value || null },
+    });
+  const updateLinks = (key: keyof CandidateProfileDraft["links"], value: string) =>
+    props.onProfile({
+      ...profile,
+      links: { ...profile.links, [key]: value || null },
+    });
+
+  return (
+    <SectionShell
+      eyebrow="Profile confirmation"
+      title="Taylor found your profile details. Confirm what should appear on your CV."
+      subtitle="Missing essentials are required before CV generation. Recommended fields improve the final header but will not block you."
+    >
+      <div className="grid max-h-[74vh] min-h-0 gap-5 overflow-hidden lg:grid-cols-[0.62fr_0.38fr]">
+        <GlassPanel className="min-h-0 overflow-y-auto p-5">
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField label="Full name" onChange={(value) => updateContact("fullName", value)} required value={profile.contactInfo.fullName ?? ""} />
+            <FormField label="Professional title / specialty" onChange={(value) => updateContact("professionalTitle", value)} required value={profile.contactInfo.professionalTitle ?? ""} />
+            <FormField label="Location" onChange={(value) => updateContact("location", value)} required value={profile.contactInfo.location ?? ""} />
+            <FormField label="Preferred email" onChange={(value) => updateContact("email", value)} required value={profile.contactInfo.email ?? ""} />
+            <FormField label="Phone recommended" onChange={(value) => updateContact("phone", value)} value={profile.contactInfo.phone ?? ""} />
+            <FormField label="LinkedIn recommended" onChange={(value) => updateLinks("linkedin", value)} value={profile.links.linkedin ?? ""} />
+            {(techSignals || profile.links.github) ? (
+              <FormField label="GitHub" onChange={(value) => updateLinks("github", value)} value={profile.links.github ?? ""} />
+            ) : null}
+            <FormField label="Portfolio" onChange={(value) => updateLinks("portfolio", value)} value={profile.links.portfolio ?? ""} />
+          </div>
+
+          <details className="mt-5 rounded-lg border border-white/10 bg-black/20 p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-cyan-100">
+              Education
+            </summary>
+            {profile.education.length > 0 ? (
+              <div className="mt-4 space-y-3">
+                {profile.education.map((item, index) => (
+                  <div className="rounded-lg border border-white/10 bg-white/[0.04] p-3" key={index}>
+                    <p className="font-medium text-white">
+                      {[item.degree ?? item.credential, item.institution]
+                        .filter(Boolean)
+                        .join(" - ") || "Education"}
+                    </p>
+                    <p className="mt-1 text-sm text-zinc-400">
+                      {[item.startYear, item.endYear].filter(Boolean).join(" - ")}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-zinc-400">No education found yet.</p>
+            )}
+          </details>
+
+          <details className="mt-3 rounded-lg border border-white/10 bg-black/20 p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-cyan-100">
+              Experience, projects, certifications, and skills
+            </summary>
+            <div className="mt-4 space-y-4 text-sm leading-6 text-zinc-300">
+              {profile.experience.length > 0 ? (
+                <div>
+                  <p className="font-semibold text-white">Experience</p>
+                  {profile.experience.map((item, index) => (
+                    <p key={index}>
+                      {[item.role, item.organization].filter(Boolean).join(" - ") ||
+                        item.description}
+                    </p>
+                  ))}
+                </div>
+              ) : null}
+              {profile.projects.length > 0 ? (
+                <div>
+                  <p className="font-semibold text-white">Projects</p>
+                  {profile.projects.map((item, index) => (
+                    <p key={index}>{item.name ?? item.description}</p>
+                  ))}
+                </div>
+              ) : null}
+              {profile.certifications.length > 0 ? (
+                <div>
+                  <p className="font-semibold text-white">Certifications</p>
+                  <p>{profile.certifications.map((item) => item.name).join(", ")}</p>
+                </div>
+              ) : null}
+              <div>
+                <p className="font-semibold text-white">Skills/tools</p>
+                <p>{uniqueItems([...profile.skills, ...profile.tools], 18).join(", ") || "None found yet."}</p>
+              </div>
+            </div>
+          </details>
+        </GlassPanel>
+
+        <GlassPanel className="min-h-0 overflow-y-auto p-5">
+          <p className="text-sm font-semibold text-white">Profile readiness</p>
+          <div className="mt-4 space-y-3">
+            {["Full name", "Professional title / specialty", "Location", "Preferred email"].map((label) => {
+              const isMissing = missing.includes(label);
+              return (
+                <div
+                  className={cn(
+                    "flex items-center justify-between rounded-lg border p-3 text-sm",
+                    isMissing
+                      ? "border-amber-200/20 bg-amber-200/10 text-amber-50"
+                      : "border-emerald-200/20 bg-emerald-200/10 text-emerald-50"
+                  )}
+                  key={label}
+                >
+                  <span>{label}</span>
+                  <span>{isMissing ? "Missing" : "Ready"}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-5 rounded-lg border border-white/10 bg-black/20 p-4 text-sm leading-6 text-zinc-300">
+            Phone and LinkedIn are recommended for a more complete CV header.
+            GitHub is only suggested for technical profiles or when you provide it.
+          </div>
+          <PrimaryButton
+            className="mt-5 w-full"
+            disabled={props.isLoading || missing.length > 0}
+            onClick={props.onSubmit}
+            type="button"
+          >
+            {props.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {props.isAlreadyConfirmed
+              ? "Continue to evidence match"
+              : "Confirm profile details"}
+            <ArrowRight className="h-4 w-4" />
+          </PrimaryButton>
+        </GlassPanel>
+      </div>
+    </SectionShell>
   );
 }
 
@@ -1552,6 +2524,7 @@ function CvEditorStage(props: {
   onCopy: () => void;
   onPdf: () => void;
   onDocx: () => void;
+  onSave: () => void;
   onRegenerate: () => void;
   onSelectSection: (section: string) => void;
   onRewriteInstruction: (value: string) => void;
@@ -1587,6 +2560,10 @@ function CvEditorStage(props: {
               <SecondaryButton onClick={props.onCopy} type="button">
                 <Clipboard className="h-4 w-4" />
                 Copy CV
+              </SecondaryButton>
+              <SecondaryButton onClick={props.onSave} type="button">
+                <Check className="h-4 w-4" />
+                Save CV
               </SecondaryButton>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -1708,14 +2685,67 @@ function CvEditorStage(props: {
   );
 }
 
+function AccountGateModal(props: {
+  open: boolean;
+  claimUrl: string;
+  onClose: () => void;
+}) {
+  if (!props.open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
+      <GlassPanel className="w-full max-w-md p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xl font-semibold text-white">
+              Create an account to export, save this CV, and access it later.
+            </p>
+            <p className="mt-3 text-sm leading-6 text-zinc-300">
+              Taylor will save this application to your Application Hub after
+              sign-up or sign-in.
+            </p>
+          </div>
+          <button
+            className="rounded-full p-1 text-zinc-400 hover:bg-white/10 hover:text-white"
+            onClick={props.onClose}
+            type="button"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <SignUpButton forceRedirectUrl={props.claimUrl} mode="redirect">
+            <PrimaryButton type="button">Create account</PrimaryButton>
+          </SignUpButton>
+          <SignInButton forceRedirectUrl={props.claimUrl} mode="redirect">
+            <SecondaryButton type="button">Sign in</SecondaryButton>
+          </SignInButton>
+        </div>
+      </GlassPanel>
+    </div>
+  );
+}
+
 export default function Home() {
   const utils = api.useUtils();
+  const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const [applicationId, setApplicationId] = useState<string | null>(null);
   const [resumedApplicationId, setResumedApplicationId] = useState<string | null>(null);
   const [stage, setStage] = useState<AppStage>("landing");
   const [dreamRole, setDreamRoleValue] = useState("");
   const [jobText, setJobText] = useState("");
   const [candidateText, setCandidateText] = useState("");
+  const [candidateFileName, setCandidateFileName] = useState<string | null>(null);
+  const [isCandidateFileReading, setIsCandidateFileReading] = useState(false);
+  const [linkedinUrl, setLinkedinUrl] = useState("");
+  const [linkedinFallbackText, setLinkedinFallbackText] = useState("");
+  const [showLinkedInFallback, setShowLinkedInFallback] = useState(false);
+  const [manualProfile, setManualProfile] = useState<CandidateProfileDraft>(
+    initialManualProfileDraft
+  );
+  const [manualExtra, setManualExtra] = useState("");
+  const [confirmedProfile, setConfirmedProfile] =
+    useState<CandidateProfileDraft>(emptyCandidateProfileDraft);
   const [gapAnswers, setGapAnswers] = useState<Record<string, GapAnswerDraft>>({});
   const [error, setError] = useState<string | null>(null);
   const [gapQuestionError, setGapQuestionError] = useState<string | null>(null);
@@ -1732,6 +2762,7 @@ export default function Home() {
   const [rewriteInstruction, setRewriteInstruction] = useState("");
   const [editText, setEditText] = useState("");
   const [exportError, setExportError] = useState<string | null>(null);
+  const [isAccountGateOpen, setIsAccountGateOpen] = useState(false);
   const generationTimer = useRef<number | null>(null);
 
   const createApplication = api.application.createApplication.useMutation({
@@ -1744,6 +2775,14 @@ export default function Home() {
   });
 
   useEffect(() => {
+    const requestedApplicationId = new URLSearchParams(window.location.search).get(
+      "applicationId"
+    );
+    if (requestedApplicationId) {
+      localStorage.setItem(currentApplicationStorageKey, requestedApplicationId);
+      setApplicationId(requestedApplicationId);
+      return;
+    }
     const storedApplicationId = localStorage.getItem(currentApplicationStorageKey);
     if (storedApplicationId) {
       setApplicationId(storedApplicationId);
@@ -1783,6 +2822,8 @@ export default function Home() {
         state.candidateProfile?.rawCvText ??
         ""
     );
+    setConfirmedProfile(candidateProfileDraftFromState(state.candidateProfile));
+    setLinkedinUrl(state.candidateProfile?.sourceUrl ?? "");
   }, [applicationId, resumedApplicationId, state]);
 
   useEffect(() => {
@@ -1844,13 +2885,36 @@ export default function Home() {
     },
   });
 
-  const submitCandidate = api.application.submitCandidateInfo.useMutation({
-    onSuccess: () => {
+  const submitCandidate = api.application.submitCandidateProfileSource.useMutation({
+    onSuccess: async (data) => {
       if (!applicationId) return;
-      runMatching.mutate({ applicationId });
+      if (data.importStatus === "needs_paste") {
+        setShowLinkedInFallback(true);
+        setStage("candidate_input");
+        setError(data.message);
+        return;
+      }
+      await utils.application.getApplicationState.invalidate({ applicationId });
+      setConfirmedProfile(candidateProfileDraftFromState(data.candidateProfile));
+      setStage("profile_confirmation");
+      setError(null);
     },
     onError: (mutationError) => {
       setStage("candidate_input");
+      setError(mutationError.message);
+    },
+  });
+
+  const confirmProfile = api.application.confirmCandidateProfile.useMutation({
+    onSuccess: async () => {
+      if (applicationId) await utils.application.getApplicationState.invalidate({ applicationId });
+      if (!applicationId) return;
+      setStage("candidate_scanning");
+      runMatching.mutate({ applicationId });
+      setError(null);
+    },
+    onError: (mutationError) => {
+      setStage("profile_confirmation");
       setError(mutationError.message);
     },
   });
@@ -1912,6 +2976,13 @@ export default function Home() {
     onError: (mutationError) => setError(mutationError.message),
   });
 
+  const claimCurrentApplication = api.application.claimApplication.useMutation({
+    onSuccess: async () => {
+      if (applicationId) await utils.application.getApplicationState.invalidate({ applicationId });
+    },
+    onError: (mutationError) => setExportError(mutationError.message),
+  });
+
   const resetApplication = api.application.resetApplication.useMutation({
     onSuccess: (data) => {
       localStorage.setItem(currentApplicationStorageKey, data.applicationId);
@@ -1921,6 +2992,13 @@ export default function Home() {
       setDreamRoleValue("");
       setJobText("");
       setCandidateText("");
+      setCandidateFileName(null);
+      setLinkedinUrl("");
+      setLinkedinFallbackText("");
+      setShowLinkedInFallback(false);
+      setManualProfile(initialManualProfileDraft());
+      setManualExtra("");
+      setConfirmedProfile(emptyCandidateProfileDraft());
       setGapAnswers({});
       setChatMessages([
         {
@@ -1958,8 +3036,42 @@ export default function Home() {
 
   async function readCandidateFile(file: File) {
     setOcrError(null);
+    setIsCandidateFileReading(true);
+    setCandidateFileName(file.name);
     try {
-      const text = await file.text();
+      const name = file.name.toLowerCase();
+      let text = "";
+      if (file.type === "application/pdf" || name.endsWith(".pdf")) {
+        const pdfjs = await import("pdfjs-dist");
+        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+          "pdfjs-dist/build/pdf.worker.mjs",
+          import.meta.url
+        ).toString();
+        const data = new Uint8Array(await file.arrayBuffer());
+        const pdf = await pdfjs.getDocument({ data }).promise;
+        const pages: string[] = [];
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+          const page = await pdf.getPage(pageNumber);
+          const content = await page.getTextContent();
+          pages.push(
+            content.items
+              .map((item) => ("str" in item ? item.str : ""))
+              .join(" ")
+          );
+        }
+        text = pages.join("\n\n");
+      } else if (name.endsWith(".docx")) {
+        const mammoth = await import("mammoth");
+        const result = await mammoth.extractRawText({
+          arrayBuffer: await file.arrayBuffer(),
+        });
+        text = result.value;
+      } else if (name.endsWith(".doc")) {
+        setOcrError("Older .doc files are not reliable in-browser. Export as DOCX/PDF or paste your CV text here.");
+        return;
+      } else {
+        text = await file.text();
+      }
       if (!text.trim()) {
         setOcrError("I could not read text from that file. Paste your CV text instead.");
         return;
@@ -1967,7 +3079,28 @@ export default function Home() {
       setCandidateText(text);
     } catch {
       setOcrError("I could not read that file. Paste your CV or describe your background instead.");
+    } finally {
+      setIsCandidateFileReading(false);
     }
+  }
+
+  function claimUrl() {
+    const params = new URLSearchParams();
+    if (applicationId) params.set("applicationId", applicationId);
+    params.set("next", "/hub");
+    return `/auth/claim?${params.toString()}`;
+  }
+
+  async function ensureAccountThen(action: () => void | Promise<void>) {
+    if (!isAuthLoaded) return;
+    if (!isSignedIn) {
+      setIsAccountGateOpen(true);
+      return;
+    }
+    if (applicationId) {
+      await claimCurrentApplication.mutateAsync({ applicationId });
+    }
+    await action();
   }
 
   function startCvGeneration() {
@@ -1980,6 +3113,7 @@ export default function Home() {
     saveDreamRole.isPending ||
     submitJob.isPending ||
     submitCandidate.isPending ||
+    confirmProfile.isPending ||
     runMatching.isPending ||
     generateQuestions.isPending ||
     answerQuestions.isPending ||
@@ -1987,7 +3121,8 @@ export default function Home() {
     generateCv.isPending ||
     rewriteSection.isPending ||
     updateSection.isPending ||
-    resetApplication.isPending;
+    resetApplication.isPending ||
+    claimCurrentApplication.isPending;
   const unansweredQuestions =
     state?.gapQuestions.filter((question) => question.status === "unanswered") ?? [];
   const needsGapQuestionScan =
@@ -2108,43 +3243,91 @@ export default function Home() {
             ) : null}
 
             {stage === "candidate_input" ? (
-              <SectionShell
+              <CandidateSourceStage
+                candidateFileName={candidateFileName}
+                candidateText={candidateText}
+                error={ocrError}
+                isLoading={submitCandidate.isPending}
+                isReadingFile={isCandidateFileReading}
                 key="candidate_input"
-                title="Now send me your evidence."
-                subtitle="Upload your CV or just describe what you have done. Messy is fine - I will organize it."
-              >
-                <TextDropPanel
-                  accept=".txt,.md,.pdf,.doc,.docx"
-                  error={ocrError}
-                  isLoading={submitCandidate.isPending}
-                  maxLength={30_000}
-                  onChange={setCandidateText}
-                  onFile={(file) => void readCandidateFile(file)}
-                  onSubmit={() => {
-                    if (!applicationId) return;
-                    setError(null);
-                    setGapQuestionError(null);
+                linkedinFallbackText={linkedinFallbackText}
+                linkedinUrl={linkedinUrl}
+                manualExtra={manualExtra}
+                manualProfile={manualProfile}
+                onCandidateFile={(file) => void readCandidateFile(file)}
+                onCandidateText={setCandidateText}
+                onLinkedInFallbackText={setLinkedinFallbackText}
+                onLinkedInSubmit={() => {
+                  if (!applicationId) return;
+                  setError(null);
+                  setGapQuestionError(null);
+                  setStage("candidate_scanning");
+                  submitCandidate.mutate({
+                    applicationId,
+                    source: linkedinFallbackText.trim()
+                      ? "linkedin_paste"
+                      : "linkedin_url",
+                    sourceUrl: linkedinUrl || null,
+                    rawBackgroundText: linkedinFallbackText.trim() || null,
+                    rawCvText: null,
+                  });
+                }}
+                onLinkedInUrl={setLinkedinUrl}
+                onManualExtra={setManualExtra}
+                onManualProfile={setManualProfile}
+                onManualSubmit={() => {
+                  if (!applicationId) return;
+                  setError(null);
+                  setGapQuestionError(null);
+                  setStage("candidate_scanning");
+                  submitCandidate.mutate({
+                    applicationId,
+                    source: "manual",
+                    rawCvText: null,
+                    rawBackgroundText: manualProfileToText(
+                      sanitizeProfileDraft(manualProfile),
+                      manualExtra
+                    ),
+                    manualProfile: sanitizeProfileDraft(manualProfile),
+                    sourceUrl: null,
+                  });
+                }}
+                onUploadSubmit={() => {
+                  if (!applicationId) return;
+                  setError(null);
+                  setGapQuestionError(null);
+                  setStage("candidate_scanning");
+                  submitCandidate.mutate({
+                    applicationId,
+                    source: "cv_upload",
+                    rawCvText: candidateText,
+                    rawBackgroundText: null,
+                    sourceUrl: null,
+                  });
+                }}
+                showLinkedInFallback={showLinkedInFallback}
+              />
+            ) : null}
+
+            {stage === "profile_confirmation" && state?.candidateProfile ? (
+              <ProfileConfirmationStage
+                isAlreadyConfirmed={!!state.candidateProfile.profileConfirmedAt}
+                isLoading={confirmProfile.isPending || runMatching.isPending}
+                key="profile_confirmation"
+                onProfile={setConfirmedProfile}
+                onSubmit={() => {
+                  if (!applicationId) return;
+                  const cleaned = sanitizeProfileDraft(confirmedProfile);
+                  setConfirmedProfile(cleaned);
+                  if (state.candidateProfile?.profileConfirmedAt) {
                     setStage("candidate_scanning");
-                    submitCandidate.mutate({
-                      applicationId,
-                      rawCvText: candidateText,
-                      rawBackgroundText: null,
-                    });
-                  }}
-                  submitLabel="Scan my evidence"
-                  helperBullets={[
-                    "Projects, achievements, and practical examples",
-                    "Skills, tools, education, and certifications",
-                    "Evidence that lines up with the job requirements",
-                    "Gaps where a short clarification could help",
-                  ]}
-                  helperTitle="Taylor will look for"
-                  subtitle="Use your current CV or write a rough background dump."
-                  title="Candidate evidence"
-                  uploadLabel="Upload current CV"
-                  value={candidateText}
-                />
-              </SectionShell>
+                    runMatching.mutate({ applicationId });
+                    return;
+                  }
+                  confirmProfile.mutate({ applicationId, profile: cleaned });
+                }}
+                profile={confirmedProfile}
+              />
             ) : null}
 
             {stage === "candidate_scanning" ? (
@@ -2232,25 +3415,37 @@ export default function Home() {
                 isBusy={pending}
                 key="cv_editor"
                 onCopy={() => {
-                  void navigator.clipboard.writeText(state.cvDraft?.cvText ?? "");
+                  void ensureAccountThen(async () => {
+                    await navigator.clipboard.writeText(state.cvDraft?.cvText ?? "");
+                    setExportError("Copied and saved to your Application Hub.");
+                  });
                 }}
                 onDocx={() => {
                   if (!structuredCv) return;
                   setExportError(null);
-                  void exportCvDocx(structuredCv, cvPresentation).catch(() =>
-                    setExportError("DOCX export failed. Try again after the CV finishes loading.")
+                  void ensureAccountThen(() =>
+                    exportCvDocx(structuredCv, cvPresentation).catch(() =>
+                      setExportError("DOCX export failed. Try again after the CV finishes loading.")
+                    )
                   );
                 }}
                 onEditText={setEditText}
                 onPdf={() => {
                   if (!structuredCv) return;
                   setExportError(null);
-                  void exportCvPdf(structuredCv, cvPresentation).catch(() =>
-                    setExportError("PDF export failed. Try again after the CV finishes loading.")
+                  void ensureAccountThen(() =>
+                    exportCvPdf(structuredCv, cvPresentation).catch(() =>
+                      setExportError("PDF export failed. Try again after the CV finishes loading.")
+                    )
                   );
                 }}
                 presentation={cvPresentation}
                 onRegenerate={startCvGeneration}
+                onSave={() => {
+                  void ensureAccountThen(() => {
+                    setExportError("Saved to your Application Hub.");
+                  });
+                }}
                 onRewrite={() => {
                   if (!applicationId || !state.cvDraft) return;
                   setChatMessages((messages) => [
@@ -2283,6 +3478,12 @@ export default function Home() {
           </AnimatePresence>
         </div>
       </div>
+
+      <AccountGateModal
+        claimUrl={claimUrl()}
+        onClose={() => setIsAccountGateOpen(false)}
+        open={isAccountGateOpen}
+      />
 
       {showReset ? (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">

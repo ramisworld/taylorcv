@@ -18,10 +18,27 @@ export async function runCvWriterAgent(args: {
       const context = args.context as {
         job?: { title?: string; company?: string | null };
         candidateProfile?: { summary?: string };
+        confirmedProfile?: {
+          contactInfo?: {
+            fullName?: string | null;
+            professionalTitle?: string | null;
+            location?: string | null;
+            email?: string | null;
+            phone?: string | null;
+          } | null;
+          links?: {
+            linkedin?: string | null;
+            github?: string | null;
+            portfolio?: string | null;
+            other?: Array<{ label?: string | null; url?: string | null }>;
+          } | null;
+        };
         strategy?: { sectionOrderJson?: unknown };
         selectedEvidence?: Array<{ content: string }>;
       };
       const title = context.job?.title ?? "AI Application Engineer";
+      const contact = context.confirmedProfile?.contactInfo;
+      const links = context.confirmedProfile?.links;
       const evidence = context.selectedEvidence?.map((item) => item.content) ?? [];
       const strategySectionOrder = Array.isArray(context.strategy?.sectionOrderJson)
         ? context.strategy.sectionOrderJson.filter(
@@ -42,12 +59,21 @@ export async function runCvWriterAgent(args: {
       const cvJson = {
         sectionOrder,
         header: {
-          name: null,
-          targetTitle: title,
-          location: null,
-          phone: null,
-          email: null,
-          links: [],
+          name: contact?.fullName ?? null,
+          targetTitle: contact?.professionalTitle ?? title,
+          location: contact?.location ?? null,
+          phone: contact?.phone ?? null,
+          email: contact?.email ?? null,
+          links: [
+            links?.linkedin ? { label: "LinkedIn", url: links.linkedin } : null,
+            links?.github ? { label: "GitHub", url: links.github } : null,
+            links?.portfolio ? { label: "Portfolio", url: links.portfolio } : null,
+            ...(links?.other ?? []).map((link) =>
+              link.url ? { label: link.label ?? null, url: link.url } : null
+            ),
+          ].filter(
+            (link): link is { label: string | null; url: string } => !!link
+          ),
         },
         summary:
           context.candidateProfile?.summary ??

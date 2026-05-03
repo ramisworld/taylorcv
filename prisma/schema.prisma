@@ -86,9 +86,22 @@ model AnonymousSession {
   @@map("anonymous_sessions")
 }
 
+model User {
+  id            String        @id @default(cuid())
+  clerkUserId   String        @unique @map("clerk_user_id")
+  email         String?
+  name          String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  applications  Application[]
+
+  @@map("users")
+}
+
 model Application {
   id                 String            @id @default(cuid())
   anonymousSessionId String            @map("anonymous_session_id")
+  userId             String?           @map("user_id")
   status             ApplicationStatus @default(started)
   currentStep        String            @default("started") @map("current_step")
   dreamRole          String?           @map("dream_role")
@@ -98,6 +111,7 @@ model Application {
   updatedAt          DateTime          @updatedAt @map("updated_at")
 
   anonymousSession AnonymousSession  @relation(fields: [anonymousSessionId], references: [id], onDelete: Cascade)
+  user             User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
   job              Job?
   candidateProfile CandidateProfile?
   candidateChunks  CandidateChunk[]
@@ -111,6 +125,7 @@ model Application {
   agentRuns        AgentRun[]
 
   @@index([anonymousSessionId])
+  @@index([userId])
   @@map("applications")
 }
 
@@ -151,6 +166,12 @@ model CandidateProfile {
   applicationId      String           @unique @map("application_id")
   rawCvText          String?          @map("raw_cv_text") @db.Text
   rawBackgroundText  String?          @map("raw_background_text") @db.Text
+  contactInfoJson    Json?            @map("contact_info_json")
+  linksJson          Json?            @map("links_json")
+  profileSource      String?          @map("profile_source")
+  sourceSummary      String?          @map("source_summary") @db.Text
+  sourceUrl          String?          @map("source_url")
+  profileConfirmedAt DateTime?        @map("profile_confirmed_at")
   summary            String           @db.Text
   skillsJson         Json             @map("skills_json")
   projectsJson       Json             @map("projects_json")

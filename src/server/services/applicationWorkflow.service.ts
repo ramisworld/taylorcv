@@ -3,6 +3,7 @@ import "server-only";
 import { TRPCError } from "@trpc/server";
 import type { Prisma } from "../../../generated/prisma/index.js";
 
+import type { CandidateProfilerOutput } from "~/lib/types";
 import { runCandidateProfilerAgent } from "~/server/agents/candidateProfiler.agent";
 import { runCvLayoutStyleAgent } from "~/server/agents/cvLayoutStyle.agent";
 import { runCvRewriteAgent } from "~/server/agents/cvRewrite.agent";
@@ -49,6 +50,27 @@ function stringArray(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
+}
+
+function optionalText(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function inputJson(value: unknown) {
+  return value as Prisma.InputJsonValue;
+}
+
+function profileMissingEssentials(profile: CandidateProfilerOutput) {
+  const contact = profile.contactInfo;
+  return [
+    ["full name", contact.fullName],
+    ["professional title", contact.professionalTitle],
+    ["location", contact.location],
+    ["preferred email", contact.email],
+  ]
+    .filter(([, value]) => !optionalText(value as string | null | undefined))
+    .map(([label]) => label as string);
 }
 
 function jsonArrayLength(value: unknown) {
@@ -251,11 +273,18 @@ function prepareGapQuestionsForInsert(args: {
 export async function assertApplicationForSession(args: {
   applicationId: string;
   anonymousSessionId: string;
+  clerkUserId?: string | null;
 }) {
+  const user = args.clerkUserId
+    ? await db.user.findUnique({ where: { clerkUserId: args.clerkUserId } })
+    : null;
   const application = await db.application.findFirst({
     where: {
       id: args.applicationId,
-      anonymousSessionId: args.anonymousSessionId,
+      OR: [
+        { anonymousSessionId: args.anonymousSessionId },
+        ...(user ? [{ userId: user.id }] : []),
+      ],
     },
   });
 
@@ -267,6 +296,25 @@ export async function assertApplicationForSession(args: {
   }
 
   return application;
+}
+
+async function getOrCreateUser(args: {
+  clerkUserId: string;
+  email?: string | null;
+  name?: string | null;
+}) {
+  return db.user.upsert({
+    where: { clerkUserId: args.clerkUserId },
+    update: {
+      email: optionalText(args.email),
+      name: optionalText(args.name),
+    },
+    create: {
+      clerkUserId: args.clerkUserId,
+      email: optionalText(args.email),
+      name: optionalText(args.name),
+    },
+  });
 }
 
 async function loadCandidateChunks(args: {
@@ -745,6 +793,7 @@ async function scoreRequirement(args: {
 export async function setDreamRole(args: {
   anonymousSessionId: string;
   applicationId: string;
+  clerkUserId?: string | null;
   dreamRole: string;
 }) {
   await assertApplicationForSession(args);
@@ -772,18 +821,29 @@ export async function setDreamRole(args: {
 export async function resetApplication(args: {
   anonymousSessionId: string;
   applicationId: string;
+  clerkUserId?: string | null;
 }) {
   await assertApplicationForSession(args);
 
   await db.application.delete({ where: { id: args.applicationId } });
 
-  return createApplication({ anonymousSessionId: args.anonymousSessionId });
+  return createApplication({
+    anonymousSessionId: args.anonymousSessionId,
+    clerkUserId: args.clerkUserId,
+  });
 }
 
-export async function createApplication(args: { anonymousSessionId: string }) {
+export async function createApplication(args: {
+  anonymousSessionId: string;
+  clerkUserId?: string | null;
+}) {
+  const user = args.clerkUserId
+    ? await getOrCreateUser({ clerkUserId: args.clerkUserId })
+    : null;
   const application = await db.application.create({
     data: {
       anonymousSessionId: args.anonymousSessionId,
+      userId: user?.id,
       status: "started",
       currentStep: "started",
     },
@@ -798,6 +858,7 @@ export async function createApplication(args: { anonymousSessionId: string }) {
 export async function submitJob(args: {
   anonymousSessionId: string;
   applicationId: string;
+  clerkUserId?: string | null;
   rawJobText: string;
 }) {
   await assertApplicationForSession(args);
@@ -874,61 +935,93 @@ export async function submitJob(args: {
   return { job, jobRequirements };
 }
 
-export async function submitCandidateInfo(args: {
+async function fetchLinkedInPublicText(url: string) {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (compatible; TaylorCV/1.0; +https://taylorcv.local)",
+      },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!response.ok) return null;
+
+    const html = await response.text();
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    return text.length >= 300 ? text.slice(0, MAX_CANDIDATE_BACKGROUND_CHARS) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function upsertCandidateProfileFromOutput(args: {
   anonymousSessionId: string;
   applicationId: string;
+  profileOutput: CandidateProfilerOutput;
   rawCvText?: string | null;
   rawBackgroundText?: string | null;
+  profileSource?: string | null;
+  sourceSummary?: string | null;
+  sourceUrl?: string | null;
+  profileConfirmedAt?: Date | null;
 }) {
-  await assertApplicationForSession(args);
-
-  const combinedLength =
-    (args.rawCvText?.length ?? 0) + (args.rawBackgroundText?.length ?? 0);
-  if (combinedLength > MAX_CANDIDATE_BACKGROUND_CHARS) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Candidate background must be 30,000 characters or fewer",
-    });
-  }
-
-  const profileOutput = await runCandidateProfilerAgent({
-    applicationId: args.applicationId,
-    rawCvText: args.rawCvText,
-    rawBackgroundText: args.rawBackgroundText,
-  });
-
-  const candidateProfile = await db.candidateProfile.upsert({
+  return db.candidateProfile.upsert({
     where: { applicationId: args.applicationId },
     update: {
       rawCvText: args.rawCvText,
       rawBackgroundText: args.rawBackgroundText,
-      summary: profileOutput.summary,
-      skillsJson: profileOutput.skills,
-      projectsJson: profileOutput.projects,
-      educationJson: profileOutput.education,
-      certificationsJson: profileOutput.certifications,
-      experienceJson: profileOutput.experience,
-      toolsJson: profileOutput.tools,
-      achievementsJson: profileOutput.achievements,
+      contactInfoJson: inputJson(args.profileOutput.contactInfo),
+      linksJson: inputJson(args.profileOutput.links),
+      profileSource: args.profileSource,
+      sourceSummary: args.sourceSummary ?? args.profileOutput.sourceSummary,
+      sourceUrl: args.sourceUrl,
+      profileConfirmedAt: args.profileConfirmedAt,
+      summary: args.profileOutput.summary,
+      skillsJson: inputJson(args.profileOutput.skills),
+      projectsJson: inputJson(args.profileOutput.projects),
+      educationJson: inputJson(args.profileOutput.education),
+      certificationsJson: inputJson(args.profileOutput.certifications),
+      experienceJson: inputJson(args.profileOutput.experience),
+      toolsJson: inputJson(args.profileOutput.tools),
+      achievementsJson: inputJson(args.profileOutput.achievements),
     },
     create: {
       anonymousSessionId: args.anonymousSessionId,
       applicationId: args.applicationId,
       rawCvText: args.rawCvText,
       rawBackgroundText: args.rawBackgroundText,
-      summary: profileOutput.summary,
-      skillsJson: profileOutput.skills,
-      projectsJson: profileOutput.projects,
-      educationJson: profileOutput.education,
-      certificationsJson: profileOutput.certifications,
-      experienceJson: profileOutput.experience,
-      toolsJson: profileOutput.tools,
-      achievementsJson: profileOutput.achievements,
+      contactInfoJson: inputJson(args.profileOutput.contactInfo),
+      linksJson: inputJson(args.profileOutput.links),
+      profileSource: args.profileSource,
+      sourceSummary: args.sourceSummary ?? args.profileOutput.sourceSummary,
+      sourceUrl: args.sourceUrl,
+      profileConfirmedAt: args.profileConfirmedAt,
+      summary: args.profileOutput.summary,
+      skillsJson: inputJson(args.profileOutput.skills),
+      projectsJson: inputJson(args.profileOutput.projects),
+      educationJson: inputJson(args.profileOutput.education),
+      certificationsJson: inputJson(args.profileOutput.certifications),
+      experienceJson: inputJson(args.profileOutput.experience),
+      toolsJson: inputJson(args.profileOutput.tools),
+      achievementsJson: inputJson(args.profileOutput.achievements),
     },
   });
+}
 
-  await clearGeneratedWork(args.applicationId);
-
+async function replaceCandidateProfileChunks(args: {
+  anonymousSessionId: string;
+  applicationId: string;
+  candidateProfileId: string;
+  profileOutput: CandidateProfilerOutput;
+}) {
   await db.candidateChunk.deleteMany({
     where: {
       applicationId: args.applicationId,
@@ -938,7 +1031,7 @@ export async function submitCandidateInfo(args: {
 
   const chunkOutput = await runEvidenceChunkCreatorAgent({
     applicationId: args.applicationId,
-    input: { mode: "profile", profile: profileOutput },
+    input: { mode: "profile", profile: args.profileOutput },
   });
 
   const candidateChunks = [];
@@ -947,22 +1040,159 @@ export async function submitCandidateInfo(args: {
       await insertCandidateChunkWithEmbedding({
         anonymousSessionId: args.anonymousSessionId,
         applicationId: args.applicationId,
-        candidateProfileId: candidateProfile.id,
+        candidateProfileId: args.candidateProfileId,
         sourceType: chunk.sourceType,
         sourceId: chunk.sourceId,
         chunkType: chunk.chunkType,
         content: chunk.content,
         tags: chunk.tags,
-        metadata: { candidateProfileId: candidateProfile.id },
+        metadata: { candidateProfileId: args.candidateProfileId },
       })
     );
   }
+
+  return candidateChunks;
+}
+
+export async function submitCandidateProfileSource(args: {
+  anonymousSessionId: string;
+  applicationId: string;
+  clerkUserId?: string | null;
+  source: "cv_upload" | "linkedin_url" | "linkedin_paste" | "manual";
+  rawCvText?: string | null;
+  rawBackgroundText?: string | null;
+  sourceUrl?: string | null;
+  manualProfile?: CandidateProfilerOutput | null;
+}) {
+  await assertApplicationForSession(args);
+
+  const sourceUrl = optionalText(args.sourceUrl);
+  let rawCvText = args.rawCvText ?? null;
+  let rawBackgroundText = args.rawBackgroundText ?? null;
+
+  if (args.source === "linkedin_url" && sourceUrl && !optionalText(rawBackgroundText)) {
+    const importedText = await fetchLinkedInPublicText(sourceUrl);
+    if (!importedText) {
+      return {
+        importStatus: "needs_paste" as const,
+        message:
+          "LinkedIn import did not work. Paste your LinkedIn About/Experience/Education text here instead.",
+      };
+    }
+    rawBackgroundText = importedText;
+  }
+
+  const combinedLength = (rawCvText?.length ?? 0) + (rawBackgroundText?.length ?? 0);
+  if (combinedLength > MAX_CANDIDATE_BACKGROUND_CHARS) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Candidate background must be 30,000 characters or fewer",
+    });
+  }
+  if (combinedLength === 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Add candidate information before Taylor scans your profile.",
+    });
+  }
+
+  const profileOutput =
+    args.source === "manual" && args.manualProfile
+      ? args.manualProfile
+      : await runCandidateProfilerAgent({
+          applicationId: args.applicationId,
+          rawCvText,
+          rawBackgroundText,
+        });
+
+  const candidateProfile = await upsertCandidateProfileFromOutput({
+    anonymousSessionId: args.anonymousSessionId,
+    applicationId: args.applicationId,
+    rawCvText,
+    rawBackgroundText,
+    profileOutput,
+    profileSource: args.source,
+    sourceSummary: profileOutput.sourceSummary,
+    sourceUrl,
+    profileConfirmedAt: null,
+  });
+
+  await clearGeneratedWork(args.applicationId);
+  await db.candidateChunk.deleteMany({
+    where: {
+      applicationId: args.applicationId,
+      anonymousSessionId: args.anonymousSessionId,
+    },
+  });
 
   await db.application.update({
     where: { id: args.applicationId },
     data: {
       status: "candidate_added",
-      currentStep: "candidate_added",
+      currentStep: "profile_needs_confirmation",
+      originalEvidenceMatchScore: null,
+      updatedEvidenceMatchScore: null,
+    },
+  });
+
+  return {
+    importStatus: "profile_ready" as const,
+    candidateProfile,
+    missingEssentials: profileMissingEssentials(profileOutput),
+  };
+}
+
+export async function confirmCandidateProfile(args: {
+  anonymousSessionId: string;
+  applicationId: string;
+  clerkUserId?: string | null;
+  profile: CandidateProfilerOutput;
+}) {
+  await assertApplicationForSession(args);
+
+  const missingEssentials = profileMissingEssentials(args.profile);
+  if (missingEssentials.length > 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Confirm these required details before continuing: ${missingEssentials.join(", ")}.`,
+    });
+  }
+
+  const existingProfile = await db.candidateProfile.findUnique({
+    where: { applicationId: args.applicationId },
+  });
+  if (!existingProfile) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Scan your profile before confirming details.",
+    });
+  }
+
+  await clearGeneratedWork(args.applicationId);
+
+  const candidateProfile = await upsertCandidateProfileFromOutput({
+    anonymousSessionId: args.anonymousSessionId,
+    applicationId: args.applicationId,
+    rawCvText: existingProfile.rawCvText,
+    rawBackgroundText: existingProfile.rawBackgroundText,
+    profileOutput: args.profile,
+    profileSource: existingProfile.profileSource,
+    sourceSummary: existingProfile.sourceSummary,
+    sourceUrl: existingProfile.sourceUrl,
+    profileConfirmedAt: new Date(),
+  });
+  const candidateChunks = await replaceCandidateProfileChunks({
+    anonymousSessionId: args.anonymousSessionId,
+    applicationId: args.applicationId,
+    candidateProfileId: candidateProfile.id,
+    profileOutput: args.profile,
+  });
+
+  await db.application.update({
+    where: { id: args.applicationId },
+    data: {
+      status: "candidate_added",
+      currentStep: "profile_confirmed",
       originalEvidenceMatchScore: null,
       updatedEvidenceMatchScore: null,
     },
@@ -971,9 +1201,27 @@ export async function submitCandidateInfo(args: {
   return { candidateProfile, candidateChunks };
 }
 
+export async function submitCandidateInfo(args: {
+  anonymousSessionId: string;
+  applicationId: string;
+  clerkUserId?: string | null;
+  rawCvText?: string | null;
+  rawBackgroundText?: string | null;
+}) {
+  return submitCandidateProfileSource({
+    anonymousSessionId: args.anonymousSessionId,
+    applicationId: args.applicationId,
+    clerkUserId: args.clerkUserId,
+    source: "cv_upload",
+    rawCvText: args.rawCvText,
+    rawBackgroundText: args.rawBackgroundText,
+  });
+}
+
 export async function runEvidenceMatching(args: {
   anonymousSessionId: string;
   applicationId: string;
+  clerkUserId?: string | null;
 }) {
   const application = await assertApplicationForSession(args);
 
@@ -981,12 +1229,22 @@ export async function runEvidenceMatching(args: {
     where: { applicationId: args.applicationId },
     include: { requirements: true },
   });
+  const candidateProfile = await db.candidateProfile.findUnique({
+    where: { applicationId: args.applicationId },
+  });
   const candidateChunkCount = await db.candidateChunk.count({
     where: {
       applicationId: args.applicationId,
       anonymousSessionId: args.anonymousSessionId,
     },
   });
+
+  if (!candidateProfile?.profileConfirmedAt) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Confirm your profile details before Taylor matches evidence.",
+    });
+  }
 
   if (!job || job.requirements.length === 0 || candidateChunkCount === 0) {
     throw new TRPCError({
@@ -1025,6 +1283,7 @@ export async function runEvidenceMatching(args: {
 export async function generateGapQuestions(args: {
   anonymousSessionId: string;
   applicationId: string;
+  clerkUserId?: string | null;
 }) {
   await assertApplicationForSession(args);
 
@@ -1141,6 +1400,7 @@ export async function generateGapQuestions(args: {
 export async function answerGapQuestions(args: {
   anonymousSessionId: string;
   applicationId: string;
+  clerkUserId?: string | null;
   answers: Array<{
     gapQuestionId: string;
     answerText?: string | null;
@@ -1290,6 +1550,7 @@ export async function answerGapQuestions(args: {
 export async function generateCvStrategy(args: {
   anonymousSessionId: string;
   applicationId: string;
+  clerkUserId?: string | null;
 }) {
   await assertApplicationForSession(args);
 
@@ -1333,6 +1594,7 @@ export async function generateCvStrategy(args: {
 export async function generateCv(args: {
   anonymousSessionId: string;
   applicationId: string;
+  clerkUserId?: string | null;
   strategyId: string;
 }) {
   await assertApplicationForSession(args);
@@ -1367,6 +1629,62 @@ export async function generateCv(args: {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "Add your background before generating the CV.",
+    });
+  }
+  if (!candidateProfile.profileConfirmedAt) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Confirm your profile details before generating the CV.",
+    });
+  }
+  const missingEssentials = profileMissingEssentials({
+    contactInfo: isRecord(candidateProfile.contactInfoJson)
+      ? {
+          fullName: optionalText(candidateProfile.contactInfoJson.fullName as string),
+          professionalTitle: optionalText(
+            candidateProfile.contactInfoJson.professionalTitle as string
+          ),
+          location: optionalText(candidateProfile.contactInfoJson.location as string),
+          email: optionalText(candidateProfile.contactInfoJson.email as string),
+          phone: optionalText(candidateProfile.contactInfoJson.phone as string),
+        }
+      : {
+          fullName: null,
+          professionalTitle: null,
+          location: null,
+          email: null,
+          phone: null,
+        },
+    links: isRecord(candidateProfile.linksJson)
+      ? {
+          linkedin: optionalText(candidateProfile.linksJson.linkedin as string),
+          github: optionalText(candidateProfile.linksJson.github as string),
+          portfolio: optionalText(candidateProfile.linksJson.portfolio as string),
+          other: Array.isArray(candidateProfile.linksJson.other)
+            ? (candidateProfile.linksJson.other as Array<{
+                label: string | null;
+                url: string;
+              }>)
+            : [],
+        }
+      : { linkedin: null, github: null, portfolio: null, other: [] },
+    sourceSummary:
+      typeof candidateProfile.sourceSummary === "string"
+        ? candidateProfile.sourceSummary
+        : null,
+    summary: candidateProfile.summary,
+    skills: stringArray(candidateProfile.skillsJson),
+    projects: [],
+    experience: [],
+    education: [],
+    certifications: [],
+    tools: stringArray(candidateProfile.toolsJson),
+    achievements: stringArray(candidateProfile.achievementsJson),
+  }).filter((field) => field !== "phone");
+  if (missingEssentials.length > 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Confirm these required details before generating the CV: ${missingEssentials.join(", ")}.`,
     });
   }
   if (evidenceMap.length === 0) {
@@ -1467,6 +1785,7 @@ export async function generateCv(args: {
 export async function rewriteCvSection(args: {
   anonymousSessionId: string;
   applicationId: string;
+  clerkUserId?: string | null;
   cvDraftId: string;
   sectionId: string;
   instruction: string;
@@ -1515,6 +1834,7 @@ export async function rewriteCvSection(args: {
 export async function updateCvSection(args: {
   anonymousSessionId: string;
   applicationId: string;
+  clerkUserId?: string | null;
   cvDraftId: string;
   sectionId: string;
   content: string;
@@ -1549,14 +1869,119 @@ export async function updateCvSection(args: {
   return { updatedCvDraft };
 }
 
-export async function getApplicationState(args: {
+export async function claimApplication(args: {
   anonymousSessionId: string;
   applicationId: string;
+  clerkUserId: string;
 }) {
+  const user = await getOrCreateUser({ clerkUserId: args.clerkUserId });
   const application = await db.application.findFirst({
     where: {
       id: args.applicationId,
-      anonymousSessionId: args.anonymousSessionId,
+      OR: [{ anonymousSessionId: args.anonymousSessionId }, { userId: user.id }],
+    },
+  });
+
+  if (!application) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Application does not belong to this session.",
+    });
+  }
+  if (application.userId && application.userId !== user.id) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "This application is already saved to another account.",
+    });
+  }
+
+  const updatedApplication = await db.application.update({
+    where: { id: args.applicationId },
+    data: { userId: user.id },
+  });
+
+  return { application: updatedApplication };
+}
+
+export async function listUserApplications(args: { clerkUserId: string }) {
+  const user = await getOrCreateUser({ clerkUserId: args.clerkUserId });
+  const applications = await db.application.findMany({
+    where: { userId: user.id },
+    include: {
+      job: true,
+      requirementFitScores: true,
+      cvDrafts: {
+        orderBy: { version: "desc" },
+        take: 1,
+      },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  return {
+    applications: applications.map((application) => ({
+      id: application.id,
+      dreamRole: application.dreamRole,
+      jobTitle: application.job?.title ?? application.dreamRole ?? "Untitled role",
+      company: application.job?.company,
+      evidenceMatchScore: application.updatedEvidenceMatchScore,
+      status: application.cvDrafts[0] ? "CV ready" : "Draft",
+      createdAt: application.createdAt,
+      updatedAt: application.updatedAt,
+      hasCv: !!application.cvDrafts[0],
+    })),
+  };
+}
+
+export async function getApplicationExportData(args: {
+  clerkUserId: string;
+  applicationId: string;
+}) {
+  const user = await getOrCreateUser({ clerkUserId: args.clerkUserId });
+  const application = await db.application.findFirst({
+    where: { id: args.applicationId, userId: user.id },
+  });
+  if (!application) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Application does not belong to your account.",
+    });
+  }
+
+  const cvDraft = await db.cvDraft.findFirst({
+    where: { applicationId: args.applicationId },
+    orderBy: { version: "desc" },
+  });
+  if (!cvDraft) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "This application does not have a generated CV yet.",
+    });
+  }
+
+  return {
+    cvDraft: {
+      ...cvDraft,
+      presentationJson: stripCvPresentationDebug(cvDraft.presentationJson),
+    },
+  };
+}
+
+export async function getApplicationState(args: {
+  anonymousSessionId: string;
+  applicationId: string;
+  clerkUserId?: string | null;
+}) {
+  const user = args.clerkUserId
+    ? await db.user.findUnique({ where: { clerkUserId: args.clerkUserId } })
+    : null;
+  const application = await db.application.findFirst({
+    where: {
+      id: args.applicationId,
+      OR: [
+        { anonymousSessionId: args.anonymousSessionId },
+        ...(user ? [{ userId: user.id }] : []),
+      ],
     },
   });
 

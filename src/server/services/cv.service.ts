@@ -4,6 +4,10 @@ import { db } from "~/server/db";
 import type { CvStrategyContext } from "~/server/agents/cvStrategy.agent";
 import { buildRequirementEvidenceMap } from "~/server/services/rag.service";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
 export async function buildCvStrategyContext(applicationId: string) {
   const job = await db.job.findUnique({
     where: { applicationId },
@@ -127,6 +131,22 @@ export async function buildCvWriterContext(args: {
     job,
     requirements: job.requirements,
     candidateProfile,
+    confirmedProfile: {
+      contactInfo: isRecord(candidateProfile.contactInfoJson)
+        ? candidateProfile.contactInfoJson
+        : null,
+      links: isRecord(candidateProfile.linksJson)
+        ? candidateProfile.linksJson
+        : null,
+      education: candidateProfile.educationJson,
+      experience: candidateProfile.experienceJson,
+      projects: candidateProfile.projectsJson,
+      certifications: candidateProfile.certificationsJson,
+      skills: candidateProfile.skillsJson,
+      tools: candidateProfile.toolsJson,
+      achievements: candidateProfile.achievementsJson,
+      profileConfirmedAt: candidateProfile.profileConfirmedAt,
+    },
     strategy,
     selectedEvidence: [...evidenceByChunkId.values()].map((evidence) => ({
       ...evidence,

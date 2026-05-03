@@ -22,6 +22,21 @@ export async function runCandidateProfilerAgent(args: {
     schema: CandidateProfilerOutputSchema,
     jsonSchema: AgentJsonSchemas.candidateProfiler,
     mockOutput: () => ({
+      contactInfo: {
+        fullName: null,
+        professionalTitle: "AI Application Builder",
+        location: null,
+        email: null,
+        phone: null,
+      },
+      links: {
+        linkedin: null,
+        github: null,
+        portfolio: null,
+        other: [],
+      },
+      sourceSummary:
+        "Mock candidate profile generated from supplied AI application background.",
       summary:
         "Full-stack AI builder with hands-on RAG, OpenAI, PostgreSQL, pgvector, Next.js, TypeScript, and deployment experience.",
       skills: [
@@ -42,6 +57,7 @@ export async function runCandidateProfilerAgent(args: {
           outcomes: [
             "Created searchable project evidence for renovation recommendations.",
           ],
+          links: [],
         },
         {
           name: "Taylor CV",
@@ -56,15 +72,22 @@ export async function runCandidateProfilerAgent(args: {
             "Prisma",
           ],
           outcomes: ["Connected job requirements to candidate evidence chunks."],
+          links: [],
         },
       ],
       experience: [
         {
           role: "AI Product Builder",
           organization: null,
+          startDate: null,
+          endDate: null,
+          current: false,
           description:
             "Designed and deployed AI workflows with backend orchestration, model calls, database writes, and frontend display.",
+          bullets: [],
           technologies: ["Next.js", "TypeScript", "OpenAI", "PostgreSQL"],
+          tools: ["Next.js", "TypeScript", "OpenAI", "PostgreSQL"],
+          achievements: [],
           outcomes: ["Shipped working MVPs that connect AI workflows to users."],
         },
       ],
