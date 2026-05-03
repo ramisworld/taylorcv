@@ -39,6 +39,7 @@ import {
   normalizeCvPresentation,
   presentationToRendererTokens,
 } from "~/lib/cvPresentation";
+import { LandingPage } from "~/components/landing/LandingPage";
 import { api, type RouterInputs, type RouterOutputs } from "~/trpc/react";
 
 const currentApplicationStorageKey = "currentApplicationId";
@@ -616,6 +617,459 @@ function SecondaryButton(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
         props.className
       )}
     />
+  );
+}
+
+function LandingWordmark() {
+  return (
+    <a className="flex items-center gap-3" href="/" aria-label="Taylor CV home">
+      <span className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-100/20 bg-cyan-100/10 text-cyan-50 shadow-[0_0_36px_rgba(34,211,238,0.18)]">
+        <Sparkles className="h-4 w-4" />
+        <span className="absolute inset-0 rounded-xl bg-white/10 blur-md" />
+      </span>
+      <span className="text-sm font-semibold text-white">Taylor CV</span>
+    </a>
+  );
+}
+
+function FluidWaveBackground() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isWebGlReady, setIsWebGlReady] = useState(false);
+
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    if (prefersReducedMotion) return;
+
+    const canvas = canvasRef.current;
+    const gl = canvas?.getContext("webgl", {
+      alpha: true,
+      antialias: false,
+      depth: false,
+      powerPreference: "high-performance",
+      stencil: false,
+    });
+    if (!canvas || !gl) return;
+    const targetCanvas = canvas;
+    const context = gl;
+
+    const vertexSource = `
+      attribute vec2 a_position;
+      void main() {
+        gl_Position = vec4(a_position, 0.0, 1.0);
+      }
+    `;
+    const fragmentSource = `
+      precision highp float;
+
+      uniform vec2 u_resolution;
+      uniform float u_time;
+      uniform vec2 u_pointer;
+
+      float hash(vec2 p) {
+        p = fract(p * vec2(123.34, 456.21));
+        p += dot(p, p + 45.32);
+        return fract(p.x * p.y);
+      }
+
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        vec2 u = f * f * (3.0 - 2.0 * f);
+        return mix(
+          mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+          mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+          u.y
+        );
+      }
+
+      float fbm(vec2 p) {
+        float value = 0.0;
+        float amplitude = 0.52;
+        for (int i = 0; i < 5; i++) {
+          value += amplitude * noise(p);
+          p = mat2(1.62, 1.18, -1.18, 1.62) * p + 0.13;
+          amplitude *= 0.48;
+        }
+        return value;
+      }
+
+      void main() {
+        vec2 uv = gl_FragCoord.xy / u_resolution.xy;
+        vec2 p = uv - 0.5;
+        p.x *= u_resolution.x / u_resolution.y;
+
+        float breath = 0.5 + 0.5 * sin(u_time * 0.42);
+        vec2 pointer = (u_pointer - 0.5) * vec2(u_resolution.x / u_resolution.y, 1.0);
+        float pointerField = exp(-length(p - pointer) * 3.0);
+
+        vec2 q = p;
+        q += 0.075 * vec2(
+          sin(p.y * 4.8 + u_time * 0.32),
+          cos(p.x * 4.1 - u_time * 0.25)
+        );
+        q += normalize(p - pointer + vec2(0.001)) * pointerField * 0.045;
+        q += vec2(fbm(p * 1.7 + u_time * 0.035), fbm(p * 2.1 - u_time * 0.028)) * 0.18;
+
+        float silk = fbm(q * 2.35 + vec2(u_time * 0.028, -u_time * 0.021));
+        float ribbon = sin((q.x * 3.6 + q.y * 2.1 + silk * 1.7) + u_time * 0.24);
+        float bloom = smoothstep(0.14, 0.98, silk + ribbon * 0.18 + breath * 0.12);
+        float edge = smoothstep(0.78, 0.15, length(p));
+
+        vec3 graphite = vec3(0.018, 0.024, 0.035);
+        vec3 navy = vec3(0.025, 0.070, 0.118);
+        vec3 teal = vec3(0.020, 0.690, 0.730);
+        vec3 electric = vec3(0.120, 0.450, 1.000);
+        vec3 champagne = vec3(0.910, 0.780, 0.500);
+
+        vec3 color = mix(graphite, navy, smoothstep(-0.35, 0.52, q.y + silk * 0.28));
+        color += teal * bloom * 0.26 * edge;
+        color += electric * pointerField * 0.18;
+        color += champagne * smoothstep(0.91, 1.0, silk + ribbon * 0.08) * 0.045;
+        color *= 0.70 + edge * 0.55;
+
+        gl_FragColor = vec4(color, 0.96);
+      }
+    `;
+
+    function createShader(type: number, source: string) {
+      const shader = context.createShader(type);
+      if (!shader) return null;
+      context.shaderSource(shader, source);
+      context.compileShader(shader);
+      if (!context.getShaderParameter(shader, context.COMPILE_STATUS)) {
+        context.deleteShader(shader);
+        return null;
+      }
+      return shader;
+    }
+
+    const vertexShader = createShader(context.VERTEX_SHADER, vertexSource);
+    const fragmentShader = createShader(context.FRAGMENT_SHADER, fragmentSource);
+    const program = context.createProgram();
+    if (!vertexShader || !fragmentShader || !program) return;
+
+    context.attachShader(program, vertexShader);
+    context.attachShader(program, fragmentShader);
+    context.linkProgram(program);
+    if (!context.getProgramParameter(program, context.LINK_STATUS)) return;
+
+    const positionBuffer = context.createBuffer();
+    const positionLocation = context.getAttribLocation(program, "a_position");
+    const resolutionLocation = context.getUniformLocation(program, "u_resolution");
+    const timeLocation = context.getUniformLocation(program, "u_time");
+    const pointerLocation = context.getUniformLocation(program, "u_pointer");
+    if (
+      !positionBuffer ||
+      positionLocation < 0 ||
+      !resolutionLocation ||
+      !timeLocation ||
+      !pointerLocation
+    ) {
+      return;
+    }
+
+    context.bindBuffer(context.ARRAY_BUFFER, positionBuffer);
+    context.bufferData(
+      context.ARRAY_BUFFER,
+      new Float32Array([-1, -1, 3, -1, -1, 3]),
+      context.STATIC_DRAW
+    );
+
+    let frameId = 0;
+    const pointer = { x: 0.72, y: 0.38 };
+    const smoothPointer = { x: pointer.x, y: pointer.y };
+
+    function resize() {
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+      const width = Math.floor(targetCanvas.clientWidth * pixelRatio);
+      const height = Math.floor(targetCanvas.clientHeight * pixelRatio);
+      if (targetCanvas.width !== width || targetCanvas.height !== height) {
+        targetCanvas.width = width;
+        targetCanvas.height = height;
+      }
+      context.viewport(0, 0, targetCanvas.width, targetCanvas.height);
+    }
+
+    function onPointerMove(event: PointerEvent) {
+      pointer.x = event.clientX / Math.max(window.innerWidth, 1);
+      pointer.y = 1 - event.clientY / Math.max(window.innerHeight, 1);
+    }
+
+    function render(time: number) {
+      resize();
+      smoothPointer.x += (pointer.x - smoothPointer.x) * 0.035;
+      smoothPointer.y += (pointer.y - smoothPointer.y) * 0.035;
+
+      context.useProgram(program);
+      context.enableVertexAttribArray(positionLocation);
+      context.bindBuffer(context.ARRAY_BUFFER, positionBuffer);
+      context.vertexAttribPointer(positionLocation, 2, context.FLOAT, false, 0, 0);
+      context.uniform2f(resolutionLocation, targetCanvas.width, targetCanvas.height);
+      context.uniform1f(timeLocation, time * 0.001);
+      context.uniform2f(pointerLocation, smoothPointer.x, smoothPointer.y);
+      context.drawArrays(context.TRIANGLES, 0, 3);
+      frameId = window.requestAnimationFrame(render);
+    }
+
+    resize();
+    window.addEventListener("resize", resize);
+    window.addEventListener("pointermove", onPointerMove);
+    setIsWebGlReady(true);
+    frameId = window.requestAnimationFrame(render);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("pointermove", onPointerMove);
+      context.deleteBuffer(positionBuffer);
+      context.deleteProgram(program);
+      context.deleteShader(vertexShader);
+      context.deleteShader(fragmentShader);
+    };
+  }, []);
+
+  return (
+    <>
+      <div
+        className={cn(
+          "landing-fluid-fallback pointer-events-none absolute inset-0",
+          isWebGlReady ? "opacity-70" : "opacity-100"
+        )}
+      />
+      <canvas
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none absolute inset-0 h-full w-full transition-opacity duration-700",
+          isWebGlReady ? "opacity-100" : "opacity-0"
+        )}
+        ref={canvasRef}
+      />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(255,255,255,0.10),transparent_24%),linear-gradient(180deg,rgba(3,7,18,0.04)_0%,rgba(3,7,18,0.72)_82%,#05070d_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.024)_1px,transparent_1px)] bg-[size:72px_72px] opacity-25 [mask-image:radial-gradient(circle_at_50%_20%,black,transparent_72%)]" />
+    </>
+  );
+}
+
+function ProductPreviewMockup() {
+  return (
+    <div className="landing-float relative mx-auto w-full max-w-[560px] lg:ml-auto">
+      <div className="absolute -left-6 top-12 hidden rounded-full border border-cyan-200/20 bg-cyan-200/10 px-4 py-2 text-xs font-medium text-cyan-50 shadow-[0_0_36px_rgba(34,211,238,0.16)] backdrop-blur-2xl sm:block">
+        Evidence match: 98.7%
+      </div>
+      <div className="absolute -right-4 bottom-16 hidden rounded-full border border-emerald-200/20 bg-emerald-200/10 px-4 py-2 text-xs font-medium text-emerald-50 shadow-[0_0_34px_rgba(16,185,129,0.14)] backdrop-blur-2xl md:block">
+        Role scan in progress
+      </div>
+      <div className="rounded-[24px] border border-white/14 bg-white/[0.075] p-3 shadow-[0_30px_120px_rgba(0,0,0,0.46)] backdrop-blur-2xl">
+        <div className="rounded-[20px] border border-white/10 bg-[#07101a]/80 p-4">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium uppercase text-cyan-100/80">
+                Taylor workspace
+              </p>
+              <p className="mt-1 text-lg font-semibold text-white">
+                Senior Product Analyst
+              </p>
+            </div>
+            <div className="rounded-full border border-white/12 bg-white/[0.07] px-3 py-1 text-xs text-zinc-200">
+              Live draft
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              ["Background", "analysed"],
+              ["Role scan", "in progress"],
+              ["Evidence", "98.7%"],
+            ].map(([label, value]) => (
+              <div
+                className="rounded-xl border border-white/10 bg-white/[0.065] p-3"
+                key={label}
+              >
+                <p className="text-[11px] font-medium uppercase text-zinc-500">
+                  {label}
+                </p>
+                <p className="mt-2 text-sm font-semibold text-white">{value}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 rounded-[18px] border border-white/10 bg-white/[0.04] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 pb-4">
+              <div>
+                <div className="h-4 w-32 rounded-full bg-white/80" />
+                <div className="mt-2 h-3 w-44 rounded-full bg-cyan-100/35" />
+              </div>
+              <div className="space-y-2 pt-1">
+                <div className="h-2 w-24 rounded-full bg-white/20" />
+                <div className="h-2 w-28 rounded-full bg-white/14" />
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-[0.72fr_1fr]">
+              <div className="space-y-2">
+                <div className="h-2 w-20 rounded-full bg-zinc-500/60" />
+                <div className="h-2 w-full rounded-full bg-white/18" />
+                <div className="h-2 w-4/5 rounded-full bg-white/14" />
+                <div className="h-2 w-2/3 rounded-full bg-white/12" />
+              </div>
+              <div className="rounded-xl border border-cyan-100/15 bg-cyan-100/[0.055] p-3">
+                <p className="text-[11px] font-medium uppercase text-cyan-100/70">
+                  Rewritten bullet
+                </p>
+                <p className="mt-2 text-sm leading-6 text-zinc-100">
+                  Turned ambiguous customer data into a weekly retention signal,
+                  giving leaders clearer renewal decisions.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center gap-2 text-xs text-zinc-400">
+            <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.75)]" />
+            Matching claims to role requirements
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PublicLandingPage(props: {
+  isLoading: boolean;
+  onGetStarted: () => void;
+}) {
+  return (
+    <main className="min-h-screen overflow-x-hidden bg-[#05070d] text-white">
+      <section className="relative min-h-screen overflow-hidden">
+        <FluidWaveBackground />
+        <header className="fixed left-0 right-0 top-0 z-30 px-4 pt-4 sm:px-6">
+          <div className="mx-auto flex h-16 max-w-7xl items-center justify-between rounded-full border border-white/12 bg-white/[0.075] px-4 shadow-[0_18px_80px_rgba(0,0,0,0.30)] backdrop-blur-2xl sm:px-5">
+            <LandingWordmark />
+            <nav className="flex items-center gap-1 text-sm text-zinc-300 sm:gap-2">
+              <a
+                className="hidden rounded-full px-3 py-2 transition hover:bg-white/10 hover:text-white sm:inline-flex"
+                href="#pricing"
+              >
+                Pricing
+              </a>
+              <a
+                className="hidden rounded-full px-3 py-2 transition hover:bg-white/10 hover:text-white sm:inline-flex"
+                href="#how-it-works"
+              >
+                How it works
+              </a>
+              <button
+                className="inline-flex items-center justify-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-zinc-950 shadow-[0_0_30px_rgba(255,255,255,0.16)] transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-70"
+                disabled={props.isLoading}
+                onClick={props.onGetStarted}
+                type="button"
+              >
+                {props.isLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Get started
+              </button>
+            </nav>
+          </div>
+        </header>
+
+        <div className="relative z-10 mx-auto grid min-h-screen max-w-7xl items-center gap-10 px-5 pb-16 pt-32 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:gap-12 lg:pt-24">
+          <div className="max-w-3xl">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-cyan-100/16 bg-cyan-100/[0.07] px-3 py-1.5 text-xs font-medium text-cyan-50 backdrop-blur-xl">
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan-200 shadow-[0_0_18px_rgba(103,232,249,0.9)]" />
+              AI career agent for high-intent applications
+            </div>
+            <h1 className="max-w-4xl text-balance text-5xl font-semibold leading-[0.96] text-white sm:text-6xl lg:text-7xl">
+              Stop sending generic CVs.
+            </h1>
+            <p className="mt-6 max-w-2xl text-pretty text-lg leading-8 text-zinc-300 sm:text-xl">
+              Taylor studies your background, reads the role, finds your
+              strongest evidence, and builds a tailored CV for the job you
+              actually want.
+            </p>
+            <div className="mt-9 flex flex-col gap-4 sm:flex-row sm:items-center">
+              <button
+                className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-white px-7 text-base font-semibold text-zinc-950 shadow-[0_20px_70px_rgba(34,211,238,0.18)] transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-70"
+                disabled={props.isLoading}
+                onClick={props.onGetStarted}
+                type="button"
+              >
+                {props.isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Get started
+                <ArrowRight className="h-4 w-4" />
+              </button>
+              <p className="text-sm font-medium text-zinc-300">
+                First tailored CV free.
+              </p>
+            </div>
+          </div>
+
+          <ProductPreviewMockup />
+        </div>
+      </section>
+
+      <section
+        className="relative border-t border-white/10 bg-[#05070d] px-5 py-24 sm:px-6"
+        id="how-it-works"
+      >
+        <div className="mx-auto max-w-7xl">
+          <div className="max-w-2xl">
+            <p className="text-xs font-semibold uppercase text-cyan-100/70">
+              How it works
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold text-white sm:text-4xl">
+              From raw background to role-specific CV.
+            </h2>
+          </div>
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {[
+              ["1", "Add your background", "Upload or paste your current CV, notes, and proof points."],
+              ["2", "Paste the job", "Taylor reads the role and identifies what matters most."],
+              ["3", "Get a tailored CV", "Your strongest evidence is rewritten into a focused draft."],
+            ].map(([step, title, copy]) => (
+              <div
+                className="rounded-[24px] border border-white/10 bg-white/[0.055] p-6 shadow-[0_22px_80px_rgba(0,0,0,0.22)] backdrop-blur-xl"
+                key={title}
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-100/20 bg-cyan-100/10 text-sm font-semibold text-cyan-50">
+                  {step}
+                </div>
+                <h3 className="mt-6 text-xl font-semibold text-white">{title}</h3>
+                <p className="mt-3 text-sm leading-6 text-zinc-400">{copy}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section
+        className="relative border-t border-white/10 bg-[radial-gradient(circle_at_30%_10%,rgba(34,211,238,0.10),transparent_30%),#05070d] px-5 py-24 sm:px-6"
+        id="pricing"
+      >
+        <div className="mx-auto max-w-7xl">
+          <div className="max-w-3xl rounded-[24px] border border-white/10 bg-white/[0.06] p-8 shadow-[0_28px_90px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+            <p className="text-xs font-semibold uppercase text-cyan-100/70">
+              Pricing
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold text-white sm:text-4xl">
+              First tailored CV free.
+            </h2>
+            <p className="mt-4 text-lg leading-8 text-zinc-300">
+              Upgrade when you want more exports and saved applications.
+            </p>
+            <button
+              className="mt-7 inline-flex min-h-12 items-center justify-center rounded-full bg-white px-6 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-70"
+              disabled={props.isLoading}
+              onClick={props.onGetStarted}
+              type="button"
+            >
+              Get started
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }
 
@@ -2729,6 +3183,7 @@ function AccountGateModal(props: {
 export default function Home() {
   const utils = api.useUtils();
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
+  const [showPublicLanding, setShowPublicLanding] = useState(true);
   const [applicationId, setApplicationId] = useState<string | null>(null);
   const [resumedApplicationId, setResumedApplicationId] = useState<string | null>(null);
   const [stage, setStage] = useState<AppStage>("landing");
@@ -2770,25 +3225,23 @@ export default function Home() {
       localStorage.setItem(currentApplicationStorageKey, data.applicationId);
       setApplicationId(data.applicationId);
       setResumedApplicationId(null);
+      setShowPublicLanding(false);
+      window.history.pushState(null, "", `/?applicationId=${data.applicationId}`);
     },
     onError: (mutationError) => setError(mutationError.message),
   });
 
   useEffect(() => {
-    const requestedApplicationId = new URLSearchParams(window.location.search).get(
-      "applicationId"
-    );
+    const searchParams = new URLSearchParams(window.location.search);
+    const requestedApplicationId = searchParams.get("applicationId");
     if (requestedApplicationId) {
       localStorage.setItem(currentApplicationStorageKey, requestedApplicationId);
       setApplicationId(requestedApplicationId);
+      setShowPublicLanding(false);
       return;
     }
-    const storedApplicationId = localStorage.getItem(currentApplicationStorageKey);
-    if (storedApplicationId) {
-      setApplicationId(storedApplicationId);
-      return;
-    }
-    createApplication.mutate();
+
+    setShowPublicLanding(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -3109,6 +3562,17 @@ export default function Home() {
     generateStrategy.mutate({ applicationId });
   }
 
+  function enterWorkspace() {
+    const storedApplicationId = localStorage.getItem(currentApplicationStorageKey);
+    if (storedApplicationId) {
+      setApplicationId(storedApplicationId);
+      setShowPublicLanding(false);
+      window.history.pushState(null, "", `/?applicationId=${storedApplicationId}`);
+      return;
+    }
+    createApplication.mutate();
+  }
+
   const pending =
     saveDreamRole.isPending ||
     submitJob.isPending ||
@@ -3148,6 +3612,15 @@ export default function Home() {
           "Matching evidence to the role",
           "Preparing the gap check",
         ];
+
+  if (showPublicLanding) {
+    return (
+      <LandingPage
+        isLoading={createApplication.isPending}
+        onGetStarted={enterWorkspace}
+      />
+    );
+  }
 
   return (
     <main className="relative h-screen overflow-hidden bg-zinc-950 text-white">
