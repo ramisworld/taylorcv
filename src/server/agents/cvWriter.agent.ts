@@ -42,7 +42,7 @@ export async function runCvWriterAgent(args: {
       const cvJson = {
         sectionOrder,
         header: {
-          name: "Taylor Candidate",
+          name: null,
           targetTitle: title,
           location: null,
           phone: null,

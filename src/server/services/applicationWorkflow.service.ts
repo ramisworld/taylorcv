@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import type { Prisma } from "../../../generated/prisma/index.js";
 
 import { runCandidateProfilerAgent } from "~/server/agents/candidateProfiler.agent";
+import { runCvLayoutStyleAgent } from "~/server/agents/cvLayoutStyle.agent";
 import { runCvRewriteAgent } from "~/server/agents/cvRewrite.agent";
 import { runCvQualityReviewAgent } from "~/server/agents/cvQualityReview.agent";
 import { runCvStrategyAgent } from "~/server/agents/cvStrategy.agent";
@@ -13,6 +14,11 @@ import { runEvidenceScoringAgent } from "~/server/agents/evidenceScoring.agent";
 import { runGapQuestionAgent } from "~/server/agents/gapQuestion.agent";
 import { runJobParserAgent } from "~/server/agents/jobParser.agent";
 import { db } from "~/server/db";
+import { parseStructuredCv } from "~/lib/cvDocument";
+import {
+  normalizeCvPresentation,
+  stripCvPresentationDebug,
+} from "~/lib/cvPresentation";
 import {
   buildCvStrategyContext,
   buildCvWriterContext,
@@ -529,6 +535,37 @@ function applyStrategySectionOrder<
       ...cvOutput.cvJson,
       sectionOrder,
     },
+  };
+}
+
+function cvLayoutRendererConstraints() {
+  return {
+    pageTarget: "one_page",
+    controlledOutputOnly: true,
+    noContentChanges: true,
+    canonicalSectionIds: [
+      "summary",
+      "experience",
+      "projects",
+      "skills",
+      "education",
+      "certifications",
+      "achievements",
+      "links",
+    ],
+    accentUsage:
+      "Accent may only be used for headings, dividers, selected labels, links, and small emphasis. Body text stays dark and metadata stays grey.",
+    availableTemplates: [
+      "technical_compact",
+      "modern_professional",
+      "creative_marketing",
+      "graduate_clean",
+      "executive_clean",
+      "trades_practical",
+      "retail_service",
+      "analytical_finance",
+      "project_heavy_builder",
+    ],
   };
 }
 
@@ -1388,6 +1425,21 @@ export async function generateCv(args: {
           strategy
         )
       : firstCvOutput;
+  const cvText = buildCvTextFromJson(cvOutput.cvJson);
+  const layoutOutput = await runCvLayoutStyleAgent({
+    applicationId: args.applicationId,
+    context: {
+      ...context,
+      cvJson: cvOutput.cvJson,
+      cvText,
+      rendererConstraints: cvLayoutRendererConstraints(),
+      optionalDesignPreferences: null,
+    },
+  });
+  const structuredCv = parseStructuredCv(cvOutput.cvJson);
+  const presentationJson = structuredCv
+    ? normalizeCvPresentation(layoutOutput, structuredCv, context)
+    : layoutOutput;
   const latestDraft = await db.cvDraft.findFirst({
     where: { applicationId: args.applicationId },
     orderBy: { version: "desc" },
@@ -1399,7 +1451,8 @@ export async function generateCv(args: {
       strategyId: args.strategyId,
       version: (latestDraft?.version ?? 0) + 1,
       cvJson: cvOutput.cvJson,
-      cvText: buildCvTextFromJson(cvOutput.cvJson),
+      cvText,
+      presentationJson: presentationJson as Prisma.InputJsonValue,
     },
   });
 
@@ -1610,6 +1663,12 @@ export async function getApplicationState(args: {
           question: question.question,
         }))
       : [];
+  const clientCvDraft = cvDraft
+    ? {
+        ...cvDraft,
+        presentationJson: stripCvPresentationDebug(cvDraft.presentationJson),
+      }
+    : null;
 
   return {
     application,
@@ -1642,7 +1701,7 @@ export async function getApplicationState(args: {
     gapAnswers,
     gapCoachInsight,
     cvStrategy,
-    cvDraft,
+    cvDraft: clientCvDraft,
     cvJson: cvDraft?.cvJson ?? null,
     cvText: cvDraft?.cvText ?? null,
     agentRuns,

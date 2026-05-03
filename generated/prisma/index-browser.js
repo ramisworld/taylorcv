@@ -269,6 +269,7 @@ exports.Prisma.CvDraftScalarFieldEnum = {
   version: 'version',
   cvJson: 'cvJson',
   cvText: 'cvText',
+  presentationJson: 'presentationJson',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };

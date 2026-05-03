@@ -29,6 +29,10 @@ import {
   type StructuredCv,
 } from "~/lib/cvDocument";
 import { exportCvDocx, exportCvPdf } from "~/lib/cvExport";
+import {
+  normalizeCvPresentation,
+  presentationToRendererTokens,
+} from "~/lib/cvPresentation";
 import { api, type RouterOutputs } from "~/trpc/react";
 
 const currentApplicationStorageKey = "currentApplicationId";
@@ -132,6 +136,57 @@ function answerQuality(answer: string) {
   return { label: "Needs more detail", tone: "text-amber-200" };
 }
 
+function readableParagraphs(text: string) {
+  const explicitParagraphs = text
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+
+  if (explicitParagraphs.length > 1) return explicitParagraphs;
+
+  const sentences =
+    text
+      .trim()
+      .match(/[^.!?]+[.!?]+|[^.!?]+$/g)
+      ?.map((sentence) => sentence.trim())
+      .filter(Boolean) ?? [];
+
+  if (sentences.length <= 2) return [text.trim()].filter(Boolean);
+
+  const paragraphs: string[] = [];
+  let current = "";
+
+  for (const sentence of sentences) {
+    const next = current ? `${current} ${sentence}` : sentence;
+    if (current && next.length > 190) {
+      paragraphs.push(current);
+      current = sentence;
+      continue;
+    }
+    current = next;
+  }
+
+  if (current) paragraphs.push(current);
+  return paragraphs.length > 0 ? paragraphs : [text.trim()].filter(Boolean);
+}
+
+function uniqueItems(items: Array<string | null | undefined>, max = 6) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const item of items) {
+    const value = item?.trim();
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(value);
+    if (result.length >= max) break;
+  }
+
+  return result;
+}
+
 function SectionShell(props: {
   eyebrow?: string;
   title: string;
@@ -226,7 +281,7 @@ function TopRail(props: {
         </div>
         <div>
           <p className="text-sm font-semibold text-white">Taylor CV</p>
-          <p className="text-xs text-zinc-400">AI career agent</p>
+          <p className="text-xs text-zinc-400">CV tailoring assistant</p>
         </div>
       </div>
       <nav className="hidden items-center gap-2 md:flex">
@@ -350,6 +405,8 @@ function DreamRoleInput(props: {
 function TextDropPanel(props: {
   title: string;
   subtitle: string;
+  helperTitle: string;
+  helperBullets: string[];
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
@@ -362,14 +419,25 @@ function TextDropPanel(props: {
   error?: string | null;
 }) {
   return (
-    <GlassPanel className="grid max-h-[68vh] grid-cols-1 overflow-hidden lg:grid-cols-[0.8fr_1.2fr]">
-      <div className="border-b border-white/10 p-6 lg:border-b-0 lg:border-r">
+    <GlassPanel className="grid max-h-[70vh] grid-cols-1 overflow-hidden lg:grid-cols-[0.72fr_1.28fr]">
+      <div className="border-b border-white/10 p-5 lg:border-b-0 lg:border-r">
         <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-cyan-200/10 text-cyan-100">
           <FileText className="h-5 w-5" />
         </div>
         <h2 className="mt-5 text-2xl font-semibold text-white">{props.title}</h2>
         <p className="mt-3 text-sm leading-6 text-zinc-300">{props.subtitle}</p>
-        <label className="mt-6 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-white/20 bg-white/[0.04] px-4 py-4 text-sm font-medium text-zinc-200 transition hover:bg-white/[0.08]">
+        <div className="mt-5 rounded-lg border border-white/10 bg-black/20 p-4">
+          <p className="text-sm font-semibold text-cyan-100">{props.helperTitle}</p>
+          <ul className="mt-3 space-y-2 text-sm leading-5 text-zinc-300">
+            {props.helperBullets.map((bullet) => (
+              <li className="flex gap-2" key={bullet}>
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-200" />
+                <span>{bullet}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <label className="mt-5 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-white/20 bg-white/[0.04] px-4 py-3 text-sm font-medium text-zinc-200 transition hover:bg-white/[0.08]">
           <Upload className="h-4 w-4" />
           {props.uploadLabel}
           <input
@@ -391,7 +459,7 @@ function TextDropPanel(props: {
       </div>
       <div className="flex min-h-0 flex-col p-4">
         <textarea
-          className="min-h-[320px] flex-1 resize-none rounded-lg border border-white/10 bg-black/30 p-4 text-sm leading-6 text-white outline-none placeholder:text-zinc-500 focus:border-cyan-200/60"
+          className="min-h-[340px] flex-1 resize-none rounded-lg border border-white/10 bg-black/30 p-4 text-sm leading-6 text-white outline-none placeholder:text-zinc-500 focus:border-cyan-200/60"
           maxLength={props.maxLength}
           onChange={(event) => props.onChange(event.target.value)}
           placeholder="Paste it here. Messy is fine."
@@ -423,36 +491,70 @@ function ScanningStage(props: {
 }) {
   return (
     <SectionShell title={props.title} subtitle={props.subtitle}>
-      <GlassPanel className="max-w-3xl p-8">
-        <div className="relative h-36 overflow-hidden rounded-lg border border-cyan-200/15 bg-black/30">
-          <motion.div
-            animate={{ x: ["-20%", "120%"] }}
-            className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-cyan-200/25 to-transparent"
-            transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(45,212,191,0.16),transparent_55%)]" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Loader2 className="h-10 w-10 animate-spin text-cyan-100" />
-          </div>
-        </div>
-        <div className="mt-6 grid gap-3 md:grid-cols-2">
-          {props.messages.map((message, index) => (
-            <motion.div
-              animate={{ opacity: [0.45, 1, 0.45] }}
-              className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-zinc-200"
-              key={message}
-              transition={{
-                duration: 1.7,
-                repeat: Infinity,
-                delay: index * 0.16,
-              }}
-            >
-              {message}
-            </motion.div>
-          ))}
-        </div>
+      <GlassPanel className="max-w-3xl p-6">
+        <ProgressChecklist items={props.messages} />
       </GlassPanel>
     </SectionShell>
+  );
+}
+
+function ProgressChecklist(props: { items: string[] }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const itemKey = props.items.join("|");
+
+  useEffect(() => {
+    setCurrentIndex(0);
+    if (props.items.length <= 1) return;
+
+    const interval = window.setInterval(() => {
+      setCurrentIndex((current) =>
+        Math.min(current + 1, props.items.length - 1)
+      );
+    }, 950);
+
+    return () => window.clearInterval(interval);
+  }, [itemKey, props.items.length]);
+
+  return (
+    <ol className="space-y-3">
+      {props.items.map((item, index) => {
+        const completed = index < currentIndex;
+        const current = index === currentIndex;
+        return (
+          <li
+            className={cn(
+              "flex items-center gap-3 rounded-lg border px-4 py-3 transition",
+              completed
+                ? "border-emerald-200/20 bg-emerald-200/10 text-emerald-50"
+                : current
+                  ? "border-cyan-200/30 bg-cyan-200/10 text-white shadow-[0_0_28px_rgba(103,232,249,0.12)]"
+                  : "border-white/10 bg-white/[0.04] text-zinc-500"
+            )}
+            key={item}
+          >
+            <span
+              className={cn(
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
+                completed
+                  ? "border-emerald-200/30 bg-emerald-200/15 text-emerald-100"
+                  : current
+                    ? "border-cyan-200 bg-cyan-200 text-zinc-950"
+                    : "border-white/10 bg-white/[0.04] text-zinc-500"
+              )}
+            >
+              {completed ? (
+                <Check className="h-4 w-4" />
+              ) : current ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                index + 1
+              )}
+            </span>
+            <span className="text-sm font-medium">{item}</span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -534,31 +636,36 @@ function MatchStrategyStage(props: {
   const score = props.state.updatedEvidenceMatchScore ?? props.state.evidenceMatchScore.score;
   const strategy = props.state.cvStrategy;
   const weakSpots = props.state.weakSpots.slice(0, 3);
+  const strongMatches = props.state.strongMatches.slice(0, 3);
 
   return (
     <SectionShell
       eyebrow="Evidence fit"
       title={`${score}% Evidence Match Score`}
-      subtitle="This score is deterministic: each requirement contributes once using importance and final evidence confidence."
+      subtitle="Taylor has matched your evidence against the role and found the clearest positioning angle."
     >
-      <div className="grid max-h-[68vh] min-h-0 gap-5 overflow-hidden lg:grid-cols-[0.78fr_1.22fr]">
-        <GlassPanel className="p-6">
+      <div className="grid h-[68vh] min-h-0 gap-5 overflow-hidden lg:grid-cols-[0.78fr_1.22fr]">
+        <GlassPanel className="min-h-0 overflow-y-auto p-6">
           <p className="text-sm font-medium text-zinc-300">Positioning angle</p>
           <p className="mt-3 text-2xl font-semibold leading-tight text-white">
             {strategy?.targetPositioning ??
               props.state.cvStrategy?.strategySummary ??
               "Lead with the strongest role-relevant evidence and avoid unsupported claims."}
           </p>
-          <div className="mt-6 rounded-lg border border-white/10 bg-black/20 p-4">
-            <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">
-              Score breakdown
+          <details className="mt-6 rounded-lg border border-white/10 bg-black/20 p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-zinc-200">
+              View score breakdown
+            </summary>
+            <p className="mt-3 text-sm leading-6 text-zinc-300">
+              Taylor checks each role requirement against the strongest evidence
+              found in your background.
             </p>
-            <p className="mt-2 text-sm text-zinc-300">
+            <p className="mt-2 text-sm text-zinc-400">
               {props.state.evidenceMatchScore.earnedPoints.toFixed(2)} earned of{" "}
               {props.state.evidenceMatchScore.possiblePoints.toFixed(2)} possible
-              weighted points.
+              weighted score points.
             </p>
-          </div>
+          </details>
           <PrimaryButton
             className="mt-6 w-full"
             onClick={
@@ -568,7 +675,7 @@ function MatchStrategyStage(props: {
             }
             type="button"
           >
-            {props.gapQuestionError ? "Retry gap scan" : "Hear Taylor's honest read"}
+            {props.gapQuestionError ? "Retry gap check" : "Hear Taylor's honest read"}
             {props.gapQuestionError ? (
               <RefreshCcw className="h-4 w-4" />
             ) : (
@@ -576,14 +683,14 @@ function MatchStrategyStage(props: {
             )}
           </PrimaryButton>
         </GlassPanel>
-        <GlassPanel className="min-h-0 overflow-y-auto p-5">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
+        <GlassPanel className="min-h-0 overflow-hidden p-5">
+          <div className="grid h-full min-h-0 gap-4 md:grid-cols-2">
+            <div className="min-h-0 overflow-y-auto pr-1">
               <p className="mb-3 text-sm font-semibold text-emerald-100">
                 Strong matches
               </p>
               <div className="space-y-3">
-                {props.state.strongMatches.slice(0, 5).map((match) => (
+                {strongMatches.map((match) => (
                   <div
                     className="rounded-lg border border-emerald-200/15 bg-emerald-200/10 p-3"
                     key={match.requirementId}
@@ -596,15 +703,15 @@ function MatchStrategyStage(props: {
                 ))}
               </div>
             </div>
-            <div>
+            <div className="min-h-0 overflow-y-auto pr-1">
               <p className="mb-3 text-sm font-semibold text-amber-100">
                 Weak spots
               </p>
               <div className="space-y-3">
                 {props.gapQuestionError ? (
                   <div className="rounded-lg border border-amber-200/20 bg-amber-200/10 p-3 text-sm leading-6 text-amber-50">
-                    The fit score is ready, but Taylor could not save the
-                    clarification questions. Retry the gap scan before creating
+                    The fit score is ready, but Taylor could not prepare the
+                    clarification questions. Retry the gap check before creating
                     the CV so the weak spots are handled properly.
                   </div>
                 ) : weakSpots.length > 0 ? (
@@ -646,18 +753,21 @@ function HonestReadStage(props: {
     (hasQuestions
       ? "Here is the honest read: you have real evidence to work with. I only need a few precise answers to sharpen the claims and keep the CV truthful."
       : "You already have strong evidence for the main requirements. I do not need extra clarification - I can build the CV now.");
+  const paragraphs = readableParagraphs(message);
 
   return (
     <SectionShell eyebrow="Taylor's read" title="Here is the honest read.">
       <GlassPanel className="max-w-3xl p-7">
-        <motion.p
+        <motion.div
           animate={{ opacity: 1, y: 0 }}
-          className="text-xl leading-9 text-zinc-100"
+          className="space-y-4 text-xl leading-8 text-zinc-100"
           initial={{ opacity: 0, y: 10 }}
           transition={{ duration: 0.45 }}
         >
-          {message}
-        </motion.p>
+          {paragraphs.map((paragraph) => (
+            <p key={paragraph}>{paragraph}</p>
+          ))}
+        </motion.div>
         <motion.div
           animate={{ opacity: 1, y: 0 }}
           className="mt-7"
@@ -806,9 +916,12 @@ function GapQuestionsStage(props: {
 
 function CvPaper(props: {
   cv: StructuredCv;
+  presentation?: unknown;
   onEditSummary?: (text: string) => void;
   compact?: boolean;
 }) {
+  const presentation = normalizeCvPresentation(props.presentation, props.cv);
+  const tokens = presentationToRendererTokens(presentation);
   const meta = [
     props.cv.header.targetTitle,
     props.cv.header.location,
@@ -816,20 +929,41 @@ function CvPaper(props: {
     props.cv.header.email,
     ...props.cv.header.links.map(linkText),
   ].filter(Boolean);
+  const headerAlign = props.cv.header.name ? tokens.headerAlign : "left";
 
-  function heading(label: string) {
+  function heading(section: CvSectionId) {
     return (
-      <h2 className="border-b border-zinc-300 pb-1 text-[11px] font-bold uppercase tracking-normal text-zinc-950">
-        {label}
+      <h2
+        className="pb-1 uppercase tracking-normal"
+        style={{
+          borderBottom:
+            tokens.dividerStyle === "no_rule"
+              ? "0"
+              : `1px solid ${tokens.dividerColor}`,
+          color: tokens.accentColor,
+          fontSize: tokens.headingSize,
+          fontWeight: tokens.headingWeight,
+        }}
+      >
+        {tokens.labelFor(section)}
       </h2>
     );
   }
 
   function bullets(items: string[]) {
     return (
-      <ul className="mt-1.5 list-disc space-y-1 pl-5 text-[12px] leading-[1.45] text-zinc-800">
+      <ul
+        className="mt-1.5 list-disc pl-5"
+        style={{
+          color: tokens.bodyTextColor,
+          fontSize: tokens.bodySize,
+          lineHeight: tokens.lineHeight,
+        }}
+      >
         {items.map((bullet, index) => (
-          <li key={`${bullet}-${index}`}>{bullet}</li>
+          <li key={`${bullet}-${index}`} style={{ marginBottom: tokens.bulletGap }}>
+            {bullet}
+          </li>
         ))}
       </ul>
     );
@@ -839,13 +973,18 @@ function CvPaper(props: {
     if (section === "summary") {
       return (
         <section key="summary">
-          {heading("Summary")}
+          {heading("summary")}
           <p
-            className="mt-2 rounded-sm text-[12px] leading-[1.5] text-zinc-800 outline-cyan-500/40 focus:outline"
+            className="mt-2 rounded-sm outline-cyan-500/40 focus:outline"
             contentEditable={!!props.onEditSummary}
             onBlur={(event) =>
               props.onEditSummary?.(event.currentTarget.textContent ?? "")
             }
+            style={{
+              color: tokens.bodyTextColor,
+              fontSize: tokens.bodySize,
+              lineHeight: tokens.lineHeight,
+            }}
             suppressContentEditableWarning
           >
             {props.cv.summary}
@@ -857,18 +996,29 @@ function CvPaper(props: {
     if (section === "projects" && props.cv.projects.length > 0) {
       return (
         <section key="projects">
-          {heading("Selected Projects")}
-          <div className="mt-2 space-y-3">
+          {heading("projects")}
+          <div className="mt-2" style={{ display: "grid", gap: tokens.itemGap }}>
             {props.cv.projects.map((project, index) => {
               const title = joinPresent([project.name, project.descriptor], " - ");
               return (
                 <div key={`${title}-${index}`}>
                   {title || project.dates ? (
                     <div className="flex items-baseline justify-between gap-3">
-                      <p className="text-[12.5px] font-semibold leading-snug">
+                      <p
+                        className="font-semibold leading-snug"
+                        style={{
+                          color: tokens.bodyTextColor,
+                          fontSize: tokens.bodySize + 0.5,
+                        }}
+                      >
                         {title}
                       </p>
-                      <p className="text-[11.5px] text-zinc-600">
+                      <p
+                        style={{
+                          color: tokens.mutedTextColor,
+                          fontSize: tokens.subtitleSize,
+                        }}
+                      >
                         {project.dates}
                       </p>
                     </div>
@@ -885,18 +1035,31 @@ function CvPaper(props: {
     if (section === "experience" && props.cv.experience.length > 0) {
       return (
         <section key="experience">
-          {heading("Experience")}
-          <div className="mt-2 space-y-3">
+          {heading("experience")}
+          <div className="mt-2" style={{ display: "grid", gap: tokens.itemGap }}>
             {props.cv.experience.map((item, index) => {
               const title = joinPresent([item.title, item.company], " - ");
               const metaText = joinPresent([item.dates, item.location], " | ");
               return (
                 <div key={`${title}-${index}`}>
                   <div className="flex items-baseline justify-between gap-3">
-                    <p className="text-[12.5px] font-semibold leading-snug">
+                    <p
+                      className="font-semibold leading-snug"
+                      style={{
+                        color: tokens.bodyTextColor,
+                        fontSize: tokens.bodySize + 0.5,
+                      }}
+                    >
                       {title}
                     </p>
-                    <p className="text-[11.5px] text-zinc-600">{metaText}</p>
+                    <p
+                      style={{
+                        color: tokens.mutedTextColor,
+                        fontSize: tokens.subtitleSize,
+                      }}
+                    >
+                      {metaText}
+                    </p>
                   </div>
                   {bullets(item.bullets)}
                 </div>
@@ -910,12 +1073,36 @@ function CvPaper(props: {
     if (section === "skills" && props.cv.skills.groups.length > 0) {
       return (
         <section key="skills">
-          {heading("Skills")}
-          <dl className="mt-2 space-y-1 text-[12px] leading-[1.45]">
+          {heading("skills")}
+          <dl
+            className={cn(
+              "mt-2",
+              tokens.skillsStyle === "compact_inline_groups"
+                ? "space-y-0.5"
+                : "space-y-1"
+            )}
+            style={{
+              color: tokens.bodyTextColor,
+              fontSize: tokens.bodySize,
+              lineHeight: tokens.lineHeight,
+            }}
+          >
             {props.cv.skills.groups.map((group) => (
-              <div className="grid grid-cols-[120px_1fr] gap-2" key={group.label}>
-                <dt className="font-semibold text-zinc-950">{group.label}:</dt>
-                <dd className="text-zinc-800">{group.items.join(", ")}</dd>
+              <div
+                className={cn(
+                  "grid gap-2",
+                  tokens.skillsStyle === "compact_inline_groups"
+                    ? "grid-cols-[92px_1fr]"
+                    : "grid-cols-[120px_1fr]"
+                )}
+                key={group.label}
+              >
+                <dt className="font-semibold" style={{ color: tokens.accentColor }}>
+                  {group.label}:
+                </dt>
+                <dd style={{ color: tokens.bodyTextColor }}>
+                  {group.items.join(", ")}
+                </dd>
               </div>
             ))}
           </dl>
@@ -926,18 +1113,37 @@ function CvPaper(props: {
     if (section === "education" && props.cv.education.length > 0) {
       return (
         <section key="education">
-          {heading("Education")}
-          <div className="mt-2 space-y-2">
+          {heading("education")}
+          <div className="mt-2" style={{ display: "grid", gap: tokens.itemGap }}>
             {props.cv.education.map((item, index) => (
               <div key={`${item.institution}-${index}`}>
                 <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-[12.5px] font-semibold">
+                  <p
+                    className="font-semibold"
+                    style={{
+                      color: tokens.bodyTextColor,
+                      fontSize: tokens.bodySize + 0.5,
+                    }}
+                  >
                     {joinPresent([item.degree, item.institution], " - ")}
                   </p>
-                  <p className="text-[11.5px] text-zinc-600">{item.dates}</p>
+                  <p
+                    style={{
+                      color: tokens.mutedTextColor,
+                      fontSize: tokens.subtitleSize,
+                    }}
+                  >
+                    {item.dates}
+                  </p>
                 </div>
                 {item.details.length > 0 ? (
-                  <p className="text-[12px] leading-[1.45] text-zinc-700">
+                  <p
+                    style={{
+                      color: tokens.bodyTextColor,
+                      fontSize: tokens.bodySize,
+                      lineHeight: tokens.lineHeight,
+                    }}
+                  >
                     {item.details.join("; ")}
                   </p>
                 ) : null}
@@ -951,8 +1157,15 @@ function CvPaper(props: {
     if (section === "certifications" && props.cv.certifications.length > 0) {
       return (
         <section key="certifications">
-          {heading("Certifications")}
-          <p className="mt-2 text-[12px] leading-[1.45] text-zinc-800">
+          {heading("certifications")}
+          <p
+            className="mt-2"
+            style={{
+              color: tokens.bodyTextColor,
+              fontSize: tokens.bodySize,
+              lineHeight: tokens.lineHeight,
+            }}
+          >
             {props.cv.certifications.join("; ")}
           </p>
         </section>
@@ -966,22 +1179,42 @@ function CvPaper(props: {
     <article
       className={cn(
         "mx-auto w-full max-w-[820px] bg-white text-zinc-950 shadow-2xl shadow-black/30",
-        props.compact ? "px-8 py-7" : "min-h-[980px] px-10 py-9"
+        props.compact ? "px-8 py-7" : "min-h-[980px]"
       )}
+      style={{
+        color: tokens.bodyTextColor,
+        fontFamily: tokens.fontFamily,
+        padding: props.compact ? "28px 32px" : tokens.pagePaddingCss,
+      }}
     >
-      <header className="text-center">
+      <header style={{ textAlign: headerAlign }}>
         {props.cv.header.name ? (
-          <h1 className="text-2xl font-bold leading-tight tracking-normal">
+          <h1
+            className="font-bold leading-tight tracking-normal"
+            style={{
+              color: tokens.bodyTextColor,
+              fontSize: tokens.nameSize,
+            }}
+          >
             {props.cv.header.name}
           </h1>
         ) : null}
         {meta.length > 0 ? (
-          <p className="mt-1 text-[11.5px] leading-5 text-zinc-700">
+          <p
+            className="mt-1 leading-5"
+            style={{
+              color: tokens.mutedTextColor,
+              fontSize: tokens.subtitleSize,
+            }}
+          >
             {meta.join(" | ")}
           </p>
         ) : null}
       </header>
-      <div className="mt-5 space-y-4">
+      <div
+        className="mt-5"
+        style={{ display: "grid", gap: tokens.sectionGap }}
+      >
         {orderedSections(props.cv.sectionOrder).map(renderSection)}
       </div>
     </article>
@@ -1030,10 +1263,39 @@ function sectionText(cv: StructuredCv | null, section: string) {
   return "";
 }
 
+function CvSkeletonPreview() {
+  const sectionWidths = ["w-11/12", "w-10/12", "w-full", "w-9/12"];
+
+  return (
+    <div className="h-full overflow-y-auto rounded-lg bg-white/5 p-5">
+      <div className="mx-auto min-h-[760px] w-full max-w-[820px] bg-white px-10 py-9 shadow-2xl shadow-black/30">
+        <div className="space-y-2">
+          <div className="h-7 w-56 rounded bg-zinc-900/85" />
+          <div className="h-3 w-80 rounded bg-zinc-300" />
+        </div>
+        <div className="mt-8 space-y-8">
+          {[0, 1, 2, 3].map((section) => (
+            <div key={section}>
+              <div className="h-3 w-36 rounded bg-cyan-900/70" />
+              <div className="mt-3 space-y-2">
+                {sectionWidths.map((width, index) => (
+                  <div
+                    className={cn("h-3 rounded bg-zinc-200", width)}
+                    key={`${section}-${index}`}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CvGeneratingStage(props: {
   cv: StructuredCv | null;
-  score: number | null;
-  originalScore: number | null;
+  presentation?: unknown;
 }) {
   const statuses = [
     "Building your CV around your strongest evidence",
@@ -1043,55 +1305,24 @@ function CvGeneratingStage(props: {
     "Checking for unsupported claims",
     "Preparing final document",
   ];
-  const improvement =
-    props.score !== null && props.originalScore !== null
-      ? props.score - props.originalScore
-      : null;
 
   return (
-    <SectionShell title="Building your focused CV.">
-      <div className="grid h-[72vh] min-h-0 gap-5 lg:grid-cols-[0.36fr_0.64fr]">
-        <GlassPanel className="overflow-hidden p-5">
+    <SectionShell title="Building your focused CV." subtitle="Your CV is being drafted here.">
+      <div className="grid h-[72vh] min-h-0 gap-5 lg:grid-cols-[0.34fr_0.66fr]">
+        <GlassPanel className="min-h-0 overflow-hidden p-5">
           <div className="flex items-center gap-3">
             <Loader2 className="h-5 w-5 animate-spin text-cyan-100" />
             <p className="font-semibold text-white">Taylor is writing</p>
           </div>
-          <div className="mt-5 space-y-3">
-            {statuses.map((status, index) => (
-              <motion.div
-                animate={{ opacity: [0.5, 1, 0.5] }}
-                className="rounded-lg border border-white/10 bg-white/[0.05] p-3 text-sm text-zinc-200"
-                key={status}
-                transition={{
-                  duration: 1.9,
-                  repeat: Infinity,
-                  delay: index * 0.12,
-                }}
-              >
-                {status}
-              </motion.div>
-            ))}
+          <div className="mt-5">
+            <ProgressChecklist items={statuses} />
           </div>
-          {props.score !== null ? (
-            <div className="mt-5 rounded-lg border border-cyan-200/15 bg-cyan-200/10 p-4">
-              <p className="text-3xl font-semibold text-white">{props.score}%</p>
-              <p className="text-sm text-cyan-100">Evidence Match Score</p>
-              {improvement !== null ? (
-                <p className="mt-1 text-sm text-emerald-200">
-                  {improvement >= 0 ? "+" : ""}
-                  {improvement} after clarified gaps
-                </p>
-              ) : null}
-            </div>
-          ) : null}
         </GlassPanel>
         <div className="min-h-0 overflow-y-auto rounded-lg">
           {props.cv ? (
-            <CvPaper cv={props.cv} compact />
+            <CvPaper cv={props.cv} presentation={props.presentation} compact />
           ) : (
-            <div className="flex h-full items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-zinc-400">
-              The document will appear here when the backend returns it.
-            </div>
+            <CvSkeletonPreview />
           )}
         </div>
       </div>
@@ -1099,9 +1330,219 @@ function CvGeneratingStage(props: {
   );
 }
 
+function finalEvidenceScore(state: ApplicationState) {
+  return state.updatedEvidenceMatchScore ?? state.evidenceMatchScore.score;
+}
+
+function scoreImprovement(state: ApplicationState) {
+  const original = state.originalEvidenceMatchScore;
+  if (original === null || original === undefined) return null;
+
+  const improvement = finalEvidenceScore(state) - original;
+  return improvement > 0 ? improvement : null;
+}
+
+function strongestEvidence(state: ApplicationState) {
+  const importanceRank = { high: 0, medium: 1, low: 2 } as const;
+  const confidenceRank = { high: 0, medium: 1, weak: 2, missing: 3 } as const;
+
+  return [...state.strongMatches]
+    .sort(
+      (a, b) =>
+        (confidenceRank[a.overallConfidence] ?? 4) -
+          (confidenceRank[b.overallConfidence] ?? 4) ||
+        (importanceRank[a.requirementImportance] ?? 3) -
+          (importanceRank[b.requirementImportance] ?? 3)
+    )
+    .slice(0, 3);
+}
+
+function roleKeywords(state: ApplicationState) {
+  const importanceRank = { high: 0, medium: 1, low: 2 } as const;
+  const sortedRequirements = [...state.jobRequirements].sort(
+    (a, b) =>
+      (importanceRank[a.importance] ?? 3) - (importanceRank[b.importance] ?? 3)
+  );
+
+  return uniqueItems(
+    [
+      ...strongestEvidence(state).map((match) => match.requirementLabel),
+      ...sortedRequirements.map((requirement) => requirement.label),
+    ],
+    7
+  );
+}
+
+function remainingWeakSpots(state: ApplicationState) {
+  const openRequirementIds = new Set(
+    state.requirementFitScores
+      .filter(
+        (score) =>
+          score.finalConfidence === "weak" || score.finalConfidence === "missing"
+      )
+      .map((score) => score.jobRequirementId)
+  );
+
+  return state.weakSpots
+    .filter(
+      (spot) =>
+        !spot.targetRequirementId || openRequirementIds.has(spot.targetRequirementId)
+    )
+    .slice(0, 2);
+}
+
+function sharpeningNotes(state: ApplicationState) {
+  const strategy = state.cvStrategy;
+  const sectionOrder = textArray(strategy?.sectionOrderJson);
+  const keywords = roleKeywords(state);
+  const evidence = strongestEvidence(state);
+  const notes: string[] = [];
+
+  if (strategy?.targetPositioning || strategy?.strategySummary) {
+    notes.push("Repositioned the CV around the strongest credible angle for this role.");
+  }
+
+  const projectIndex = sectionOrder.findIndex((section) =>
+    /project/i.test(section)
+  );
+  const experienceIndex = sectionOrder.findIndex((section) =>
+    /experience/i.test(section)
+  );
+  if (projectIndex >= 0 && (experienceIndex < 0 || projectIndex < experienceIndex)) {
+    notes.push("Moved project proof ahead of general experience so the best evidence is easier to scan.");
+  }
+
+  if (evidence[0]) {
+    notes.push(`Put stronger proof for ${evidence[0].requirementLabel} near the top.`);
+  }
+
+  if (keywords.length > 0) {
+    notes.push("Added role-specific language without turning the CV into keyword stuffing.");
+  }
+
+  if (state.cvDraft) {
+    notes.push("Turned the strategy into a cleaner finished CV instead of leaving it as notes.");
+  }
+
+  notes.push("Removed or avoided claims that were not backed by the evidence you provided.");
+  return uniqueItems(notes, 5);
+}
+
+function FinalResultPanel(props: { state: ApplicationState }) {
+  const score = finalEvidenceScore(props.state);
+  const improvement = scoreImprovement(props.state);
+  const angle =
+    props.state.cvStrategy?.targetPositioning ??
+    props.state.cvStrategy?.strategySummary ??
+    "This CV leads with the strongest role-relevant proof and avoids unsupported claims.";
+  const evidence = strongestEvidence(props.state);
+  const keywords = roleKeywords(props.state);
+  const weakSpots = remainingWeakSpots(props.state);
+  const changes = sharpeningNotes(props.state);
+
+  return (
+    <GlassPanel className="flex min-h-0 flex-col overflow-hidden">
+      <div className="border-b border-white/10 p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100">
+          Final result
+        </p>
+        <div className="mt-3 flex items-end gap-3">
+          <p className="text-5xl font-semibold leading-none text-white">{score}%</p>
+          <p className="pb-1 text-sm font-medium text-zinc-300">
+            Evidence Match Score
+          </p>
+        </div>
+        {improvement !== null ? (
+          <p className="mt-3 inline-flex rounded-full border border-emerald-200/20 bg-emerald-200/10 px-3 py-1 text-sm font-medium text-emerald-100">
+            +{improvement} points from the original score
+          </p>
+        ) : null}
+      </div>
+
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
+        <section>
+          <p className="text-sm font-semibold text-cyan-100">
+            Improved positioning angle
+          </p>
+          <p className="mt-2 text-sm leading-6 text-zinc-200">{angle}</p>
+        </section>
+
+        {evidence.length > 0 ? (
+          <section>
+            <p className="text-sm font-semibold text-emerald-100">
+              Strongest evidence now used
+            </p>
+            <div className="mt-3 space-y-2">
+              {evidence.map((match) => (
+                <div
+                  className="rounded-lg border border-emerald-200/15 bg-emerald-200/10 p-3"
+                  key={match.requirementId}
+                >
+                  <p className="text-sm font-medium text-white">
+                    {match.requirementLabel}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-zinc-300">
+                    {match.reason}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <section>
+          <p className="text-sm font-semibold text-cyan-100">
+            Role-specific keywords / ATS alignment
+          </p>
+          <p className="mt-2 text-sm leading-6 text-zinc-300">
+            Keyword coverage improved with role-specific terms
+            {keywords.length > 0 ? ` such as ${keywords.join(", ")}` : ""}.
+            The CV is structured for recruiter and ATS readability.
+          </p>
+        </section>
+
+        <section>
+          <p className="text-sm font-semibold text-white">
+            What Taylor changed to make it sharper
+          </p>
+          <ul className="mt-3 space-y-2 text-sm leading-5 text-zinc-300">
+            {changes.map((change) => (
+              <li className="flex gap-2" key={change}>
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-cyan-100" />
+                <span>{change}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="rounded-lg border border-white/10 bg-black/20 p-4">
+          <p className="text-sm font-semibold text-white">Honesty note</p>
+          <p className="mt-2 text-sm leading-6 text-zinc-300">
+            Unsupported claims were avoided. Taylor used the strongest evidence
+            available and kept weaker areas conservative.
+          </p>
+        </section>
+
+        {weakSpots.length > 0 ? (
+          <section className="rounded-lg border border-amber-200/15 bg-amber-200/10 p-4">
+            <p className="text-sm font-semibold text-amber-100">
+              Optional next improvement
+            </p>
+            <p className="mt-2 text-sm leading-6 text-zinc-300">
+              Add a stronger example for{" "}
+              {weakSpots.map((spot) => spot.label).join(", ")} if you have one.
+            </p>
+          </section>
+        ) : null}
+      </div>
+    </GlassPanel>
+  );
+}
+
 function CvEditorStage(props: {
   state: ApplicationState;
   cv: StructuredCv | null;
+  presentation?: unknown;
   chatMessages: ChatMessage[];
   selectedSection: string;
   rewriteInstruction: string;
@@ -1117,85 +1558,21 @@ function CvEditorStage(props: {
   onRewrite: () => void;
   onEditText: (value: string) => void;
   onSaveSection: () => void;
-  onEditSummary: (value: string) => void;
 }) {
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const editableSections = [
+    "summary",
+    "projects",
+    "experience",
+    "skills",
+    "education",
+    "certifications",
+  ];
+
   return (
-    <SectionShell className="justify-start" title="Your tailored CV is ready.">
-      <div className="grid h-[74vh] min-h-0 gap-5 lg:grid-cols-[0.34fr_0.66fr]">
-        <GlassPanel className="flex min-h-0 flex-col overflow-hidden">
-          <div className="border-b border-white/10 p-4">
-            <p className="text-sm font-semibold text-white">Taylor editor</p>
-            <p className="mt-1 text-xs text-zinc-400">
-              Ask for focused edits or tune a section directly.
-            </p>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4">
-            <div className="space-y-3">
-              {props.chatMessages.map((message, index) => (
-                <div
-                  className={cn(
-                    "rounded-lg p-3 text-sm leading-6",
-                    message.role === "agent"
-                      ? "border border-white/10 bg-white/[0.05] text-zinc-200"
-                      : "ml-8 bg-cyan-200 text-zinc-950"
-                  )}
-                  key={`${message.text}-${index}`}
-                >
-                  {message.text}
-                </div>
-              ))}
-            </div>
-            <div className="mt-5 space-y-3">
-              <select
-                className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none"
-                onChange={(event) => props.onSelectSection(event.target.value)}
-                value={props.selectedSection}
-              >
-                {["summary", "projects", "experience", "skills", "education", "certifications"].map(
-                  (section) => (
-                    <option className="bg-zinc-950" key={section} value={section}>
-                      {section}
-                    </option>
-                  )
-                )}
-              </select>
-              <textarea
-                className="min-h-24 w-full resize-none rounded-lg border border-white/10 bg-black/30 p-3 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-cyan-200/60"
-                onChange={(event) => props.onRewriteInstruction(event.target.value)}
-                placeholder="Make the summary more confident, shorten projects, keep it one page..."
-                value={props.rewriteInstruction}
-              />
-              <PrimaryButton
-                className="w-full"
-                disabled={props.isBusy || !props.rewriteInstruction.trim()}
-                onClick={props.onRewrite}
-                type="button"
-              >
-                {props.isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Ask Taylor to edit
-                <Send className="h-4 w-4" />
-              </PrimaryButton>
-            </div>
-            <div className="mt-5 space-y-3 border-t border-white/10 pt-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
-                Direct section edit
-              </p>
-              <textarea
-                className="min-h-36 w-full resize-none rounded-lg border border-white/10 bg-black/30 p-3 text-sm text-white outline-none focus:border-cyan-200/60"
-                onChange={(event) => props.onEditText(event.target.value)}
-                value={props.editText}
-              />
-              <SecondaryButton
-                className="w-full"
-                disabled={props.isBusy}
-                onClick={props.onSaveSection}
-                type="button"
-              >
-                Save section
-              </SecondaryButton>
-            </div>
-          </div>
-        </GlassPanel>
+    <SectionShell className="!max-w-7xl justify-start" title="Your tailored CV is ready.">
+      <div className="grid h-[76vh] min-h-0 gap-5 lg:grid-cols-[0.31fr_0.69fr]">
+        <FinalResultPanel state={props.state} />
         <div className="flex min-h-0 flex-col overflow-hidden">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
@@ -1212,10 +1589,16 @@ function CvEditorStage(props: {
                 Copy CV
               </SecondaryButton>
             </div>
-            <SecondaryButton disabled={props.isBusy} onClick={props.onRegenerate} type="button">
-              <RefreshCcw className="h-4 w-4" />
-              Regenerate
-            </SecondaryButton>
+            <div className="flex flex-wrap gap-2">
+              <SecondaryButton disabled={props.isBusy} onClick={props.onRegenerate} type="button">
+                <RefreshCcw className="h-4 w-4" />
+                Regenerate
+              </SecondaryButton>
+              <SecondaryButton onClick={() => setIsEditOpen(true)} type="button">
+                <MessageCircle className="h-4 w-4" />
+                Ask Taylor to edit
+              </SecondaryButton>
+            </div>
           </div>
           {props.exportError ? (
             <p className="mb-3 rounded-lg border border-amber-300/20 bg-amber-300/10 p-3 text-sm text-amber-100">
@@ -1224,7 +1607,7 @@ function CvEditorStage(props: {
           ) : null}
           <div className="min-h-0 flex-1 overflow-y-auto rounded-lg">
             {props.cv ? (
-              <CvPaper cv={props.cv} onEditSummary={props.onEditSummary} />
+              <CvPaper cv={props.cv} presentation={props.presentation} />
             ) : (
               <div className="flex h-full items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-zinc-400">
                 CV data is loading.
@@ -1233,6 +1616,94 @@ function CvEditorStage(props: {
           </div>
         </div>
       </div>
+
+      {isEditOpen ? (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/50 p-4 backdrop-blur-sm">
+          <GlassPanel className="flex h-full w-full max-w-md flex-col overflow-hidden">
+            <div className="flex items-start justify-between gap-4 border-b border-white/10 p-4">
+              <div>
+                <p className="text-sm font-semibold text-white">Ask Taylor to edit</p>
+                <p className="mt-1 text-xs leading-5 text-zinc-400">
+                  Keep edits focused. Taylor will keep the claims truthful and role-specific.
+                </p>
+              </div>
+              <button
+                className="rounded-full p-1 text-zinc-400 hover:bg-white/10 hover:text-white"
+                onClick={() => setIsEditOpen(false)}
+                type="button"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <div className="space-y-3">
+                {props.chatMessages.map((message, index) => (
+                  <div
+                    className={cn(
+                      "rounded-lg p-3 text-sm leading-6",
+                      message.role === "agent"
+                        ? "border border-white/10 bg-white/[0.05] text-zinc-200"
+                        : "ml-8 bg-cyan-200 text-zinc-950"
+                    )}
+                    key={`${message.text}-${index}`}
+                  >
+                    {message.text}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-5 space-y-3">
+                <select
+                  className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none"
+                  onChange={(event) => props.onSelectSection(event.target.value)}
+                  value={props.selectedSection}
+                >
+                  {editableSections.map((section) => (
+                    <option className="bg-zinc-950" key={section} value={section}>
+                      {section}
+                    </option>
+                  ))}
+                </select>
+                <textarea
+                  className="min-h-24 w-full resize-none rounded-lg border border-white/10 bg-black/30 p-3 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-cyan-200/60"
+                  onChange={(event) =>
+                    props.onRewriteInstruction(event.target.value)
+                  }
+                  placeholder="Make the summary more confident, shorten projects, keep it one page..."
+                  value={props.rewriteInstruction}
+                />
+                <PrimaryButton
+                  className="w-full"
+                  disabled={props.isBusy || !props.rewriteInstruction.trim()}
+                  onClick={props.onRewrite}
+                  type="button"
+                >
+                  {props.isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Send edit request
+                  <Send className="h-4 w-4" />
+                </PrimaryButton>
+              </div>
+              <div className="mt-5 space-y-3 border-t border-white/10 pt-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">
+                  Edit a section directly
+                </p>
+                <textarea
+                  className="min-h-44 w-full resize-none rounded-lg border border-white/10 bg-black/30 p-3 text-sm text-white outline-none focus:border-cyan-200/60"
+                  onChange={(event) => props.onEditText(event.target.value)}
+                  value={props.editText}
+                />
+                <SecondaryButton
+                  className="w-full"
+                  disabled={props.isBusy}
+                  onClick={props.onSaveSection}
+                  type="button"
+                >
+                  Save section
+                </SecondaryButton>
+              </div>
+            </div>
+          </GlassPanel>
+        </div>
+      ) : null}
     </SectionShell>
   );
 }
@@ -1292,6 +1763,7 @@ export default function Home() {
     () => parseStructuredCv(state?.cvDraft?.cvJson ?? null),
     [state?.cvDraft?.cvJson]
   );
+  const cvPresentation = state?.cvDraft?.presentationJson ?? null;
 
   useEffect(() => {
     if (applicationId && stateQuery.data === null && !createApplication.isPending) {
@@ -1356,7 +1828,7 @@ export default function Home() {
       if (applicationId) await utils.application.getApplicationState.invalidate({ applicationId });
       setStage("match_strategy");
       setGapQuestionError(mutationError.message);
-      setError("Taylor could not save the clarification questions. Retry the gap scan before creating the CV.");
+      setError("Taylor could not prepare the clarification questions. Retry the gap check before creating the CV.");
     },
   });
 
@@ -1527,19 +1999,19 @@ export default function Home() {
   const scanningMessages =
     stage === "job_scanning"
       ? [
-          "Reading job description",
-          "Extracting requirements",
-          "Identifying hiring signals",
+          "Reading the job description",
+          "Extracting the core requirements",
+          "Finding the hiring signals",
           "Ranking what matters most",
-          "Building role profile",
+          "Preparing the role profile",
         ]
       : [
-          "Projects found",
-          "Skills found",
-          "Tools found",
-          "Experience found",
-          "Education/certifications found",
-          "Strong evidence signals found",
+          "Finding projects and achievements",
+          "Finding skills and tools",
+          "Finding relevant experience",
+          "Finding education and certifications",
+          "Matching evidence to the role",
+          "Preparing the gap check",
         ];
 
   return (
@@ -1603,6 +2075,13 @@ export default function Home() {
                     submitJob.mutate({ applicationId, rawJobText: jobText });
                   }}
                   submitLabel={isOcrRunning ? "Reading screenshot..." : "Scan job"}
+                  helperBullets={[
+                    "Role title, company, and seniority clues",
+                    "Must-have requirements and repeated priorities",
+                    "Hidden hiring signals in the description",
+                    "Role-specific language to reuse later",
+                  ]}
+                  helperTitle="Taylor will extract"
                   subtitle="Use pasted job text or upload a screenshot. No links for now."
                   title="Job description"
                   uploadLabel="Upload/paste screenshot"
@@ -1615,7 +2094,7 @@ export default function Home() {
               <ScanningStage
                 key="job_scanning"
                 messages={scanningMessages}
-                subtitle="This finishes when the Job Parser Agent completes."
+                subtitle="Taylor is extracting the requirements and ranking what matters most."
                 title="Scanning the role."
               />
             ) : null}
@@ -1653,6 +2132,13 @@ export default function Home() {
                     });
                   }}
                   submitLabel="Scan my evidence"
+                  helperBullets={[
+                    "Projects, achievements, and practical examples",
+                    "Skills, tools, education, and certifications",
+                    "Evidence that lines up with the job requirements",
+                    "Gaps where a short clarification could help",
+                  ]}
+                  helperTitle="Taylor will look for"
                   subtitle="Use your current CV or write a rough background dump."
                   title="Candidate evidence"
                   uploadLabel="Upload current CV"
@@ -1675,7 +2161,7 @@ export default function Home() {
                 gapQuestionError={
                   gapQuestionError ??
                   (needsGapQuestionScan
-                    ? "The clarification questions have not been saved for this fit score yet."
+                    ? "The clarification questions are not ready for this fit score yet."
                     : null)
                 }
                 key="match_strategy"
@@ -1733,8 +2219,7 @@ export default function Home() {
               <CvGeneratingStage
                 cv={structuredCv}
                 key="cv_generating"
-                originalScore={state?.originalEvidenceMatchScore ?? null}
-                score={state?.updatedEvidenceMatchScore ?? null}
+                presentation={cvPresentation}
               />
             ) : null}
 
@@ -1752,27 +2237,19 @@ export default function Home() {
                 onDocx={() => {
                   if (!structuredCv) return;
                   setExportError(null);
-                  void exportCvDocx(structuredCv).catch(() =>
+                  void exportCvDocx(structuredCv, cvPresentation).catch(() =>
                     setExportError("DOCX export failed. Try again after the CV finishes loading.")
                   );
-                }}
-                onEditSummary={(value) => {
-                  if (!applicationId || !state.cvDraft || !value.trim()) return;
-                  updateSection.mutate({
-                    applicationId,
-                    cvDraftId: state.cvDraft.id,
-                    sectionId: "summary",
-                    content: value.trim(),
-                  });
                 }}
                 onEditText={setEditText}
                 onPdf={() => {
                   if (!structuredCv) return;
                   setExportError(null);
-                  void exportCvPdf(structuredCv).catch(() =>
+                  void exportCvPdf(structuredCv, cvPresentation).catch(() =>
                     setExportError("PDF export failed. Try again after the CV finishes loading.")
                   );
                 }}
+                presentation={cvPresentation}
                 onRegenerate={startCvGeneration}
                 onRewrite={() => {
                   if (!applicationId || !state.cvDraft) return;

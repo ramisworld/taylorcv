@@ -310,6 +310,7 @@ model CvDraft {
   version       Int         @default(1)
   cvJson        Json        @map("cv_json")
   cvText        String      @map("cv_text") @db.Text
+  presentationJson Json?    @map("presentation_json")
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
   application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)

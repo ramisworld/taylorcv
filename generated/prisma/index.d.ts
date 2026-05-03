@@ -16687,6 +16687,7 @@ export namespace Prisma {
     version: number
     cvJson: number
     cvText: number
+    presentationJson: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -16728,6 +16729,7 @@ export namespace Prisma {
     version?: true
     cvJson?: true
     cvText?: true
+    presentationJson?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -16826,6 +16828,7 @@ export namespace Prisma {
     version: number
     cvJson: JsonValue
     cvText: string
+    presentationJson: JsonValue | null
     createdAt: Date
     updatedAt: Date
     _count: CvDraftCountAggregateOutputType | null
@@ -16856,6 +16859,7 @@ export namespace Prisma {
     version?: boolean
     cvJson?: boolean
     cvText?: boolean
+    presentationJson?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     application?: boolean | ApplicationDefaultArgs<ExtArgs>
@@ -16869,6 +16873,7 @@ export namespace Prisma {
     version?: boolean
     cvJson?: boolean
     cvText?: boolean
+    presentationJson?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     application?: boolean | ApplicationDefaultArgs<ExtArgs>
@@ -16882,6 +16887,7 @@ export namespace Prisma {
     version?: boolean
     cvJson?: boolean
     cvText?: boolean
+    presentationJson?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     application?: boolean | ApplicationDefaultArgs<ExtArgs>
@@ -16895,11 +16901,12 @@ export namespace Prisma {
     version?: boolean
     cvJson?: boolean
     cvText?: boolean
+    presentationJson?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type CvDraftOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "applicationId" | "strategyId" | "version" | "cvJson" | "cvText" | "createdAt" | "updatedAt", ExtArgs["result"]["cvDraft"]>
+  export type CvDraftOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "applicationId" | "strategyId" | "version" | "cvJson" | "cvText" | "presentationJson" | "createdAt" | "updatedAt", ExtArgs["result"]["cvDraft"]>
   export type CvDraftInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     application?: boolean | ApplicationDefaultArgs<ExtArgs>
     strategy?: boolean | CvDraft$strategyArgs<ExtArgs>
@@ -16926,6 +16933,7 @@ export namespace Prisma {
       version: number
       cvJson: Prisma.JsonValue
       cvText: string
+      presentationJson: Prisma.JsonValue | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["cvDraft"]>
@@ -17359,6 +17367,7 @@ export namespace Prisma {
     readonly version: FieldRef<"CvDraft", 'Int'>
     readonly cvJson: FieldRef<"CvDraft", 'Json'>
     readonly cvText: FieldRef<"CvDraft", 'String'>
+    readonly presentationJson: FieldRef<"CvDraft", 'Json'>
     readonly createdAt: FieldRef<"CvDraft", 'DateTime'>
     readonly updatedAt: FieldRef<"CvDraft", 'DateTime'>
   }
@@ -19089,6 +19098,7 @@ export namespace Prisma {
     version: 'version',
     cvJson: 'cvJson',
     cvText: 'cvText',
+    presentationJson: 'presentationJson',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -20357,6 +20367,7 @@ export namespace Prisma {
     version?: IntFilter<"CvDraft"> | number
     cvJson?: JsonFilter<"CvDraft">
     cvText?: StringFilter<"CvDraft"> | string
+    presentationJson?: JsonNullableFilter<"CvDraft">
     createdAt?: DateTimeFilter<"CvDraft"> | Date | string
     updatedAt?: DateTimeFilter<"CvDraft"> | Date | string
     application?: XOR<ApplicationScalarRelationFilter, ApplicationWhereInput>
@@ -20370,6 +20381,7 @@ export namespace Prisma {
     version?: SortOrder
     cvJson?: SortOrder
     cvText?: SortOrder
+    presentationJson?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     application?: ApplicationOrderByWithRelationInput
@@ -20386,6 +20398,7 @@ export namespace Prisma {
     version?: IntFilter<"CvDraft"> | number
     cvJson?: JsonFilter<"CvDraft">
     cvText?: StringFilter<"CvDraft"> | string
+    presentationJson?: JsonNullableFilter<"CvDraft">
     createdAt?: DateTimeFilter<"CvDraft"> | Date | string
     updatedAt?: DateTimeFilter<"CvDraft"> | Date | string
     application?: XOR<ApplicationScalarRelationFilter, ApplicationWhereInput>
@@ -20399,6 +20412,7 @@ export namespace Prisma {
     version?: SortOrder
     cvJson?: SortOrder
     cvText?: SortOrder
+    presentationJson?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: CvDraftCountOrderByAggregateInput
@@ -20418,6 +20432,7 @@ export namespace Prisma {
     version?: IntWithAggregatesFilter<"CvDraft"> | number
     cvJson?: JsonWithAggregatesFilter<"CvDraft">
     cvText?: StringWithAggregatesFilter<"CvDraft"> | string
+    presentationJson?: JsonNullableWithAggregatesFilter<"CvDraft">
     createdAt?: DateTimeWithAggregatesFilter<"CvDraft"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"CvDraft"> | Date | string
   }
@@ -21556,6 +21571,7 @@ export namespace Prisma {
     version?: number
     cvJson: JsonNullValueInput | InputJsonValue
     cvText: string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     application: ApplicationCreateNestedOneWithoutCvDraftsInput
@@ -21569,6 +21585,7 @@ export namespace Prisma {
     version?: number
     cvJson: JsonNullValueInput | InputJsonValue
     cvText: string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -21578,6 +21595,7 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     cvJson?: JsonNullValueInput | InputJsonValue
     cvText?: StringFieldUpdateOperationsInput | string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     application?: ApplicationUpdateOneRequiredWithoutCvDraftsNestedInput
@@ -21591,6 +21609,7 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     cvJson?: JsonNullValueInput | InputJsonValue
     cvText?: StringFieldUpdateOperationsInput | string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -21602,6 +21621,7 @@ export namespace Prisma {
     version?: number
     cvJson: JsonNullValueInput | InputJsonValue
     cvText: string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -21611,6 +21631,7 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     cvJson?: JsonNullValueInput | InputJsonValue
     cvText?: StringFieldUpdateOperationsInput | string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -21622,6 +21643,7 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     cvJson?: JsonNullValueInput | InputJsonValue
     cvText?: StringFieldUpdateOperationsInput | string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -22695,6 +22717,7 @@ export namespace Prisma {
     version?: SortOrder
     cvJson?: SortOrder
     cvText?: SortOrder
+    presentationJson?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -25072,6 +25095,7 @@ export namespace Prisma {
     version?: number
     cvJson: JsonNullValueInput | InputJsonValue
     cvText: string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     strategy?: CvStrategyCreateNestedOneWithoutCvDraftsInput
@@ -25083,6 +25107,7 @@ export namespace Prisma {
     version?: number
     cvJson: JsonNullValueInput | InputJsonValue
     cvText: string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -25461,6 +25486,7 @@ export namespace Prisma {
     version?: IntFilter<"CvDraft"> | number
     cvJson?: JsonFilter<"CvDraft">
     cvText?: StringFilter<"CvDraft"> | string
+    presentationJson?: JsonNullableFilter<"CvDraft">
     createdAt?: DateTimeFilter<"CvDraft"> | Date | string
     updatedAt?: DateTimeFilter<"CvDraft"> | Date | string
   }
@@ -27431,6 +27457,7 @@ export namespace Prisma {
     version?: number
     cvJson: JsonNullValueInput | InputJsonValue
     cvText: string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
     application: ApplicationCreateNestedOneWithoutCvDraftsInput
@@ -27442,6 +27469,7 @@ export namespace Prisma {
     version?: number
     cvJson: JsonNullValueInput | InputJsonValue
     cvText: string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -28066,6 +28094,7 @@ export namespace Prisma {
     version?: number
     cvJson: JsonNullValueInput | InputJsonValue
     cvText: string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -28300,6 +28329,7 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     cvJson?: JsonNullValueInput | InputJsonValue
     cvText?: StringFieldUpdateOperationsInput | string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     strategy?: CvStrategyUpdateOneWithoutCvDraftsNestedInput
@@ -28311,6 +28341,7 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     cvJson?: JsonNullValueInput | InputJsonValue
     cvText?: StringFieldUpdateOperationsInput | string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -28321,6 +28352,7 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     cvJson?: JsonNullValueInput | InputJsonValue
     cvText?: StringFieldUpdateOperationsInput | string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -28729,6 +28761,7 @@ export namespace Prisma {
     version?: number
     cvJson: JsonNullValueInput | InputJsonValue
     cvText: string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -28738,6 +28771,7 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     cvJson?: JsonNullValueInput | InputJsonValue
     cvText?: StringFieldUpdateOperationsInput | string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     application?: ApplicationUpdateOneRequiredWithoutCvDraftsNestedInput
@@ -28749,6 +28783,7 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     cvJson?: JsonNullValueInput | InputJsonValue
     cvText?: StringFieldUpdateOperationsInput | string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -28759,6 +28794,7 @@ export namespace Prisma {
     version?: IntFieldUpdateOperationsInput | number
     cvJson?: JsonNullValueInput | InputJsonValue
     cvText?: StringFieldUpdateOperationsInput | string
+    presentationJson?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }

@@ -1,5 +1,28 @@
 import { z } from "zod";
 
+import {
+  canonicalPresentationSectionIds,
+  cvAccentPalettes,
+  cvAccentUsageTargets,
+  cvBodySizes,
+  cvCareerStyles,
+  cvDensityTokens,
+  cvDividerStyles,
+  cvFontPairings,
+  cvHeaderStyles,
+  cvHeadingWeights,
+  cvNameSizes,
+  cvPageTargets,
+  cvSectionContentStyles,
+  cvSectionPriorities,
+  cvSectionSpacings,
+  cvSectionTreatments,
+  cvSectionWidths,
+  cvSkillsStyles,
+  cvSubtitleStyles,
+  cvTemplateIds,
+} from "./cvPresentation.ts";
+
 export const RequirementTypeSchema = z.enum([
   "skill",
   "tool",
@@ -206,9 +229,123 @@ export const CvQualityReviewOutputSchema = z.object({
   revisionInstructions: z.string(),
 });
 
+const SafeSectionLabelSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(48)
+  .regex(/^[^<>{}#[\];=]+$/)
+  .nullable();
+
+export const CvSectionPresentationSchema = z.object({
+  treatment: z.enum(cvSectionTreatments),
+  priority: z.enum(cvSectionPriorities),
+  divider: z.boolean(),
+  spacingBefore: z.enum(cvSectionSpacings),
+  spacingAfter: z.enum(cvSectionSpacings),
+  width: z.enum(cvSectionWidths),
+  contentStyle: z.enum(cvSectionContentStyles),
+});
+
+export const CvLayoutStyleOutputSchema = z.object({
+  schemaVersion: z.literal(1),
+  templateId: z.enum(cvTemplateIds),
+  careerStyle: z.enum(cvCareerStyles),
+  density: z.enum(cvDensityTokens),
+  pageTarget: z.enum(cvPageTargets),
+  typography: z.object({
+    fontPairing: z.enum(cvFontPairings),
+    nameSize: z.enum(cvNameSizes),
+    subtitleStyle: z.enum(cvSubtitleStyles),
+    bodySize: z.enum(cvBodySizes),
+    headingWeight: z.enum(cvHeadingWeights),
+  }),
+  colourSystem: z.object({
+    accentPalette: z.enum(cvAccentPalettes),
+    bodyText: z.literal("dark"),
+    mutedText: z.literal("grey"),
+    dividerStyle: z.enum(cvDividerStyles),
+  }),
+  accentUsageRules: z.object({
+    useAccentFor: z.array(z.enum(cvAccentUsageTargets)),
+    neverUseAccentForBodyText: z.literal(true),
+    bodyTextMustRemain: z.literal("dark"),
+    metadataTextMustRemain: z.literal("grey"),
+  }),
+  headerStyle: z.enum(cvHeaderStyles),
+  skillsStyle: z.enum(cvSkillsStyles),
+  sectionStyles: z.object(
+    Object.fromEntries(
+      canonicalPresentationSectionIds.map((section) => [
+        section,
+        CvSectionPresentationSchema.nullable(),
+      ])
+    ) as Record<
+      (typeof canonicalPresentationSectionIds)[number],
+      z.ZodNullable<typeof CvSectionPresentationSchema>
+    >
+  ),
+  sectionLabelOverrides: z.object(
+    Object.fromEntries(
+      canonicalPresentationSectionIds.map((section) => [
+        section,
+        SafeSectionLabelSchema,
+      ])
+    ) as Record<
+      (typeof canonicalPresentationSectionIds)[number],
+      typeof SafeSectionLabelSchema
+    >
+  ),
+  renderWarnings: z.array(z.string().max(220)),
+  rationale: z.string().min(1).max(700),
+});
+
 export const CvRewriteOutputSchema = z.object({
   updatedSection: z.string().min(1),
 });
+
+const cvSectionPresentationJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "treatment",
+    "priority",
+    "divider",
+    "spacingBefore",
+    "spacingAfter",
+    "width",
+    "contentStyle",
+  ],
+  properties: {
+    treatment: { type: "string", enum: cvSectionTreatments },
+    priority: { type: "string", enum: cvSectionPriorities },
+    divider: { type: "boolean" },
+    spacingBefore: { type: "string", enum: cvSectionSpacings },
+    spacingAfter: { type: "string", enum: cvSectionSpacings },
+    width: { type: "string", enum: cvSectionWidths },
+    contentStyle: { type: "string", enum: cvSectionContentStyles },
+  },
+} as const;
+
+const cvSectionStyleProperties = Object.fromEntries(
+  canonicalPresentationSectionIds.map((section) => [
+    section,
+    {
+      anyOf: [cvSectionPresentationJsonSchema, { type: "null" }],
+    },
+  ])
+);
+
+const cvSectionLabelProperties = Object.fromEntries(
+  canonicalPresentationSectionIds.map((section) => [
+    section,
+    {
+      type: ["string", "null"],
+      maxLength: 48,
+      pattern: "^[^<>{}#[\\];=]+$",
+    },
+  ])
+);
 
 export const AgentJsonSchemas = {
   jobParser: {
@@ -606,6 +743,100 @@ export const AgentJsonSchemas = {
       passed: { type: "boolean" },
       issues: { type: "array", items: { type: "string" } },
       revisionInstructions: { type: "string" },
+    },
+  },
+  cvLayoutStyle: {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "schemaVersion",
+      "templateId",
+      "careerStyle",
+      "density",
+      "pageTarget",
+      "typography",
+      "colourSystem",
+      "accentUsageRules",
+      "headerStyle",
+      "skillsStyle",
+      "sectionStyles",
+      "sectionLabelOverrides",
+      "renderWarnings",
+      "rationale",
+    ],
+    properties: {
+      schemaVersion: { type: "number", enum: [1] },
+      templateId: { type: "string", enum: cvTemplateIds },
+      careerStyle: { type: "string", enum: cvCareerStyles },
+      density: { type: "string", enum: cvDensityTokens },
+      pageTarget: { type: "string", enum: cvPageTargets },
+      typography: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "fontPairing",
+          "nameSize",
+          "subtitleStyle",
+          "bodySize",
+          "headingWeight",
+        ],
+        properties: {
+          fontPairing: { type: "string", enum: cvFontPairings },
+          nameSize: { type: "string", enum: cvNameSizes },
+          subtitleStyle: { type: "string", enum: cvSubtitleStyles },
+          bodySize: { type: "string", enum: cvBodySizes },
+          headingWeight: { type: "string", enum: cvHeadingWeights },
+        },
+      },
+      colourSystem: {
+        type: "object",
+        additionalProperties: false,
+        required: ["accentPalette", "bodyText", "mutedText", "dividerStyle"],
+        properties: {
+          accentPalette: { type: "string", enum: cvAccentPalettes },
+          bodyText: { type: "string", enum: ["dark"] },
+          mutedText: { type: "string", enum: ["grey"] },
+          dividerStyle: { type: "string", enum: cvDividerStyles },
+        },
+      },
+      accentUsageRules: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "useAccentFor",
+          "neverUseAccentForBodyText",
+          "bodyTextMustRemain",
+          "metadataTextMustRemain",
+        ],
+        properties: {
+          useAccentFor: {
+            type: "array",
+            items: { type: "string", enum: cvAccentUsageTargets },
+          },
+          neverUseAccentForBodyText: { type: "boolean", enum: [true] },
+          bodyTextMustRemain: { type: "string", enum: ["dark"] },
+          metadataTextMustRemain: { type: "string", enum: ["grey"] },
+        },
+      },
+      headerStyle: { type: "string", enum: cvHeaderStyles },
+      skillsStyle: { type: "string", enum: cvSkillsStyles },
+      sectionStyles: {
+        type: "object",
+        additionalProperties: false,
+        required: canonicalPresentationSectionIds,
+        properties: cvSectionStyleProperties,
+      },
+      sectionLabelOverrides: {
+        type: "object",
+        additionalProperties: false,
+        required: canonicalPresentationSectionIds,
+        properties: cvSectionLabelProperties,
+      },
+      renderWarnings: {
+        type: "array",
+        items: { type: "string", maxLength: 220 },
+      },
+      rationale: { type: "string", maxLength: 700 },
     },
   },
   cvRewrite: {

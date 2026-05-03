@@ -304,16 +304,17 @@ model CvStrategy {
 }
 
 model CvDraft {
-  id            String      @id @default(cuid())
-  applicationId String      @map("application_id")
-  strategyId    String?     @map("strategy_id")
-  version       Int         @default(1)
-  cvJson        Json        @map("cv_json")
-  cvText        String      @map("cv_text") @db.Text
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
-  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  strategy      CvStrategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+  id               String      @id @default(cuid())
+  applicationId    String      @map("application_id")
+  strategyId       String?     @map("strategy_id")
+  version          Int         @default(1)
+  cvJson           Json        @map("cv_json")
+  cvText           String      @map("cv_text") @db.Text
+  presentationJson Json?       @map("presentation_json")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+  application      Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  strategy         CvStrategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
 
   @@index([applicationId])
   @@index([strategyId])

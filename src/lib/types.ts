@@ -4,6 +4,7 @@ import type {
   ButtonAnswerSchema,
   CandidateProfilerOutputSchema,
   CvRewriteOutputSchema,
+  CvLayoutStyleOutputSchema,
   CvQualityReviewOutputSchema,
   CvStrategyOutputSchema,
   CvWriterOutputSchema,
@@ -35,6 +36,7 @@ export type CvWriterOutput = z.infer<typeof CvWriterOutputSchema>;
 export type CvQualityReviewOutput = z.infer<
   typeof CvQualityReviewOutputSchema
 >;
+export type CvLayoutStyleOutput = z.infer<typeof CvLayoutStyleOutputSchema>;
 export type CvRewriteOutput = z.infer<typeof CvRewriteOutputSchema>;
 
 export type RetrievedCandidateChunk = {
