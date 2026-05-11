@@ -5,6 +5,7 @@ import {
   confidenceValue,
   importanceWeight,
 } from "../src/lib/scoring.ts";
+import { buildEvidenceMatchPersistencePlan } from "../src/lib/evidenceMatchPersistence.ts";
 
 function fitScore({ importance, confidence }) {
   const possiblePoints = importanceWeight(importance);
@@ -54,5 +55,57 @@ assert.equal(
   "top retrieved evidence_matches rows must not be double-counted"
 );
 assert.equal(traceRowsForOneRequirement.length, 3);
+
+const fakeChunkPlan = buildEvidenceMatchPersistencePlan({
+  applicationId: "app-1",
+  jobRequirements: [{ id: "req-rag", label: "RAG", importance: "high" }],
+  output: {
+    requirementFitSummary: [
+      {
+        requirementId: "req-rag",
+        confidence: "high",
+        bestCandidateChunkId: "chunk-rag",
+        reason: "Agent selected a fake fixture ID.",
+        claimRisk: "safe",
+        cvUsefulness: "headline",
+      },
+    ],
+  },
+  retrievedEvidenceByRequirement: {
+    "req-rag": [{ id: "real-db-chunk-1", similarityScore: 0.91 }],
+  },
+  validCandidateChunkIds: new Set(["real-db-chunk-1"]),
+});
+
+assert.equal(fakeChunkPlan.rejectedMatches.length, 1);
+assert.equal(fakeChunkPlan.rejectedMatches[0]?.rejectedCandidateChunkId, "chunk-rag");
+assert.equal(fakeChunkPlan.evidenceMatches[0]?.candidateChunkId, null);
+assert.equal(fakeChunkPlan.evidenceMatches[0]?.confidence, "missing");
+assert.equal(fakeChunkPlan.requirementFitScores[0]?.bestCandidateChunkId, null);
+
+const validChunkPlan = buildEvidenceMatchPersistencePlan({
+  applicationId: "app-1",
+  jobRequirements: [{ id: "req-rag", label: "RAG", importance: "high" }],
+  output: {
+    requirementFitSummary: [
+      {
+        requirementId: "req-rag",
+        confidence: "high",
+        bestCandidateChunkId: "real-db-chunk-1",
+        reason: "Agent selected a persisted chunk ID.",
+        claimRisk: "safe",
+        cvUsefulness: "headline",
+      },
+    ],
+  },
+  retrievedEvidenceByRequirement: {
+    "req-rag": [{ id: "real-db-chunk-1", similarityScore: 0.91 }],
+  },
+  validCandidateChunkIds: new Set(["real-db-chunk-1"]),
+});
+
+assert.equal(validChunkPlan.rejectedMatches.length, 0);
+assert.equal(validChunkPlan.evidenceMatches[0]?.candidateChunkId, "real-db-chunk-1");
+assert.equal(validChunkPlan.requirementFitScores[0]?.bestCandidateChunkId, "real-db-chunk-1");
 
 console.log("Deterministic scoring tests passed.");

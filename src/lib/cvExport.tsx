@@ -18,10 +18,16 @@ import {
 } from "docx";
 
 import {
+  claimText,
+  contactItems,
+  isRecord,
   joinPresent,
-  linkText,
+  normalizeCvSections,
   orderedSections,
+  textArray,
+  textOrNull,
   type CvSectionId,
+  type NormalizedCvSection,
   type StructuredCv,
 } from "~/lib/cvDocument";
 import {
@@ -165,16 +171,216 @@ function PdfSection(props: {
   );
 }
 
+function dynamicText(value: unknown): string | null {
+  if (typeof value === "string") return value.trim() || null;
+  if (!isRecord(value)) return null;
+
+  return (
+    textOrNull(value.text) ??
+    textOrNull(value.content) ??
+    textOrNull(value.summary) ??
+    textOrNull(value.label) ??
+    null
+  );
+}
+
+function dynamicTitle(value: unknown) {
+  if (!isRecord(value)) return null;
+  return joinPresent(
+    [
+      textOrNull(value.title),
+      textOrNull(value.name),
+      textOrNull(value.degree),
+      textOrNull(value.company),
+      textOrNull(value.institution),
+      textOrNull(value.descriptor),
+    ],
+    " - "
+  );
+}
+
+function dynamicMeta(value: unknown) {
+  if (!isRecord(value)) return null;
+  return joinPresent([textOrNull(value.dates), textOrNull(value.location)], " | ");
+}
+
+function dynamicBullets(value: unknown): string[] {
+  if (typeof value === "string") return [value.trim()].filter(Boolean);
+  if (!isRecord(value)) return [];
+
+  const bullets = textArray(value.bullets);
+  if (bullets.length > 0) return bullets;
+
+  const details = textArray(value.details);
+  if (details.length > 0) return details;
+
+  const items = textArray(value.items);
+  if (items.length > 0) return items;
+
+  const text = dynamicText(value);
+  return text ? [text] : [];
+}
+
+function isNonEmptyText(value: string | null): value is string {
+  return Boolean(value);
+}
+
+function contactPrefix(kind: string) {
+  if (kind === "location") return "Location";
+  if (kind === "phone") return "Phone";
+  if (kind === "email") return "Email";
+  if (kind === "linkedin") return "LinkedIn";
+  if (kind === "github") return "GitHub";
+  if (kind === "portfolio") return "Portfolio";
+  return "Link";
+}
+
+function contactIconText(kind: string) {
+  if (kind === "location") return "Loc";
+  if (kind === "phone") return "Tel";
+  if (kind === "email") return "@";
+  if (kind === "linkedin") return "in";
+  if (kind === "github") return "GH";
+  if (kind === "portfolio") return "URL";
+  return "Link";
+}
+
+function renderNormalizedPdfSection(section: NormalizedCvSection, tokens: RendererTokens) {
+  if (section.type === "summary" || section.type === "inline") {
+    return (
+      <PdfSection title={section.label} key={section.id} tokens={tokens}>
+        {section.paragraphs.map((paragraph, index) => (
+          <Text
+            key={`${section.id}-paragraph-${index}`}
+            style={[
+              styles.paragraph,
+              {
+                color: tokens.bodyTextColor,
+                fontSize: tokens.bodySize,
+                lineHeight: tokens.lineHeight,
+              },
+            ]}
+          >
+            {paragraph}
+          </Text>
+        ))}
+      </PdfSection>
+    );
+  }
+
+  if (section.type === "bullets" || section.type === "certifications") {
+    return (
+      <PdfSection title={section.label} key={section.id} tokens={tokens}>
+        <BulletList bullets={section.bullets.map(claimText)} tokens={tokens} />
+      </PdfSection>
+    );
+  }
+
+  if (section.type === "experience") {
+    return (
+      <PdfSection title={section.label} key={section.id} tokens={tokens}>
+        {section.items.map((item, index) => {
+          const title = joinPresent([item.role, item.company], " - ");
+          const meta = joinPresent([item.dates, item.location], " | ");
+          return (
+            <View key={`${section.id}-item-${index}`} style={{ marginBottom: tokens.itemGap }}>
+              {title || meta ? (
+                <View style={styles.itemTitleRow}>
+                  <Text style={[styles.itemTitle, { color: tokens.bodyTextColor }]}>
+                    {title}
+                  </Text>
+                  <Text style={[styles.itemMeta, { color: tokens.mutedTextColor }]}>
+                    {meta}
+                  </Text>
+                </View>
+              ) : null}
+              <BulletList bullets={item.bullets.map(claimText)} tokens={tokens} />
+            </View>
+          );
+        })}
+      </PdfSection>
+    );
+  }
+
+  if (section.type === "projects") {
+    return (
+      <PdfSection title={section.label} key={section.id} tokens={tokens}>
+        {section.items.map((item, index) => {
+          const title = joinPresent([item.name, item.descriptor], " - ");
+          return (
+            <View key={`${section.id}-item-${index}`} style={{ marginBottom: tokens.itemGap }}>
+              {title || item.dates ? (
+                <View style={styles.itemTitleRow}>
+                  <Text style={[styles.itemTitle, { color: tokens.bodyTextColor }]}>
+                    {title}
+                  </Text>
+                  <Text style={[styles.itemMeta, { color: tokens.mutedTextColor }]}>
+                    {item.dates ?? ""}
+                  </Text>
+                </View>
+              ) : null}
+              <BulletList bullets={item.bullets.map(claimText)} tokens={tokens} />
+            </View>
+          );
+        })}
+      </PdfSection>
+    );
+  }
+
+  if (section.type === "skills") {
+    return (
+      <PdfSection title={section.label} key={section.id} tokens={tokens}>
+        {section.groups.map((group) => (
+          <Text
+            style={[
+              styles.paragraph,
+              {
+                color: tokens.bodyTextColor,
+                fontSize: tokens.bodySize,
+                marginBottom: tokens.bulletGap,
+              },
+            ]}
+            key={group.group}
+          >
+            <Text style={{ fontFamily: "Helvetica-Bold", color: tokens.accentColor }}>
+              {group.group}:{" "}
+            </Text>
+            {group.skills.join(", ")}
+          </Text>
+        ))}
+      </PdfSection>
+    );
+  }
+
+  if (section.type !== "education") return null;
+
+  return (
+    <PdfSection title={section.label} key={section.id} tokens={tokens}>
+      {section.items.map((item, index) => {
+        const title = joinPresent([item.degree, item.institution], " - ");
+        return (
+          <View key={`${section.id}-item-${index}`} style={{ marginBottom: tokens.itemGap }}>
+            <View style={styles.itemTitleRow}>
+              <Text style={[styles.itemTitle, { color: tokens.bodyTextColor }]}>{title}</Text>
+              <Text style={[styles.itemMeta, { color: tokens.mutedTextColor }]}>
+                {item.dates ?? ""}
+              </Text>
+            </View>
+            {item.details.length > 0 ? (
+              <Text style={{ color: tokens.bodyTextColor }}>{item.details.join(", ")}</Text>
+            ) : null}
+          </View>
+        );
+      })}
+    </PdfSection>
+  );
+}
+
 function CvPdfDocument(props: { cv: StructuredCv; presentation?: unknown }) {
   const presentation = normalizeCvPresentation(props.presentation, props.cv);
   const tokens = presentationToRendererTokens(presentation);
-  const meta = [
-    props.cv.header.targetTitle,
-    props.cv.header.location,
-    props.cv.header.phone,
-    props.cv.header.email,
-    ...props.cv.header.links.map(linkText),
-  ].filter(Boolean);
+  const meta = contactItems(props.cv.header);
+  const sections = normalizeCvSections(props.cv);
   const headerAlign = props.cv.header.name ? tokens.headerAlign : "left";
 
   function renderSection(section: CvSectionId) {
@@ -214,7 +420,7 @@ function CvPdfDocument(props: { cv: StructuredCv; presentation?: unknown }) {
                     </Text>
                   </View>
                 ) : null}
-                <BulletList bullets={project.bullets} tokens={tokens} />
+                <BulletList bullets={project.bullets.map(claimText)} tokens={tokens} />
               </View>
             );
           })}
@@ -226,7 +432,7 @@ function CvPdfDocument(props: { cv: StructuredCv; presentation?: unknown }) {
       return (
         <PdfSection title={tokens.labelFor("experience")} key="experience" tokens={tokens}>
           {props.cv.experience.map((item, index) => {
-            const title = joinPresent([item.title, item.company], " - ");
+            const title = joinPresent([item.role, item.company], " - ");
             const meta = joinPresent([item.dates, item.location], " | ");
             return (
               <View key={`${title}-${index}`} style={{ marginBottom: tokens.itemGap }}>
@@ -240,7 +446,7 @@ function CvPdfDocument(props: { cv: StructuredCv; presentation?: unknown }) {
                     </Text>
                   </View>
                 ) : null}
-                <BulletList bullets={item.bullets} tokens={tokens} />
+                <BulletList bullets={item.bullets.map(claimText)} tokens={tokens} />
               </View>
             );
           })}
@@ -261,12 +467,12 @@ function CvPdfDocument(props: { cv: StructuredCv; presentation?: unknown }) {
                   marginBottom: tokens.bulletGap,
                 },
               ]}
-              key={group.label}
+              key={group.group}
             >
               <Text style={{ fontFamily: "Helvetica-Bold", color: tokens.accentColor }}>
-                {group.label}:{" "}
+                {group.group}:{" "}
               </Text>
-              {group.items.join(", ")}
+              {group.skills.join(", ")}
             </Text>
           ))}
         </PdfSection>
@@ -355,6 +561,20 @@ function CvPdfDocument(props: { cv: StructuredCv; presentation?: unknown }) {
               {props.cv.header.name}
             </Text>
           ) : null}
+          {props.cv.header.targetTitle ? (
+            <Text
+              style={[
+                styles.meta,
+                {
+                color: tokens.accentColor,
+                fontSize: tokens.subtitleSize + 1,
+                fontFamily: tokens.pdfFontFamily,
+              },
+              ]}
+            >
+              {props.cv.header.targetTitle}
+            </Text>
+          ) : null}
           {meta.length > 0 ? (
             <Text
               style={[
@@ -365,11 +585,11 @@ function CvPdfDocument(props: { cv: StructuredCv; presentation?: unknown }) {
                 },
               ]}
             >
-              {meta.join(" | ")}
+              {meta.map((item) => `${contactIconText(item.kind)} ${item.value}`).join(" | ")}
             </Text>
           ) : null}
         </View>
-        {orderedSections(props.cv.sectionOrder).map(renderSection)}
+        {sections.map((section) => renderNormalizedPdfSection(section, tokens))}
       </Page>
     </PdfDocument>
   );
@@ -422,6 +642,148 @@ function bullet(text: string, tokens: RendererTokens) {
   });
 }
 
+function paragraph(text: string, tokens: RendererTokens, bold = false) {
+  return new Paragraph({
+    children: [
+      new TextRun({
+        text,
+        bold,
+        color: docxColor(tokens.bodyTextColor),
+        font: tokens.docxFontFamily,
+        size: Math.round(tokens.bodySize * 2),
+      }),
+    ],
+  });
+}
+
+function pushNormalizedDocxSection(
+  children: Paragraph[],
+  section: NormalizedCvSection,
+  tokens: RendererTokens
+) {
+  if (section.type === "summary" || section.type === "inline") {
+    children.push(heading(section.label.toUpperCase(), tokens));
+    children.push(...section.paragraphs.map((text) => paragraph(text, tokens)));
+    return;
+  }
+
+  if (section.type === "bullets" || section.type === "certifications") {
+    children.push(heading(section.label.toUpperCase(), tokens));
+    children.push(...section.bullets.map((item) => bullet(item.text, tokens)));
+    return;
+  }
+
+  children.push(heading(section.label.toUpperCase(), tokens));
+
+  if (section.type === "skills") {
+    for (const group of section.groups) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `${group.group}: `,
+              bold: true,
+              color: docxColor(tokens.accentColor),
+              font: tokens.docxFontFamily,
+            }),
+            new TextRun({
+              text: group.skills.join(", "),
+              color: docxColor(tokens.bodyTextColor),
+              font: tokens.docxFontFamily,
+            }),
+          ],
+        })
+      );
+    }
+    return;
+  }
+
+  if (section.type === "experience") {
+    for (const item of section.items) {
+      const title = joinPresent([item.role, item.company], " - ");
+      const meta = joinPresent([item.dates, item.location], " | ");
+      if (title || meta) {
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: title,
+                bold: true,
+                color: docxColor(tokens.bodyTextColor),
+                font: tokens.docxFontFamily,
+              }),
+              new TextRun({
+                text: meta ? ` | ${meta}` : "",
+                color: docxColor(tokens.mutedTextColor),
+                font: tokens.docxFontFamily,
+              }),
+            ],
+          })
+        );
+      }
+      children.push(...item.bullets.map((item) => bullet(item.text, tokens)));
+    }
+    return;
+  }
+
+  if (section.type === "projects") {
+    for (const item of section.items) {
+      const title = joinPresent([item.name, item.descriptor], " - ");
+      const meta = item.dates;
+      if (title || meta) {
+        children.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: title,
+                bold: true,
+                color: docxColor(tokens.bodyTextColor),
+                font: tokens.docxFontFamily,
+              }),
+              new TextRun({
+                text: meta ? ` | ${meta}` : "",
+                color: docxColor(tokens.mutedTextColor),
+                font: tokens.docxFontFamily,
+              }),
+            ],
+          })
+        );
+      }
+      children.push(...item.bullets.map((item) => bullet(item.text, tokens)));
+    }
+    return;
+  }
+
+  if (section.type !== "education") return;
+
+  for (const item of section.items) {
+    const title = joinPresent([item.degree, item.institution], " - ");
+    const meta = item.dates;
+    if (title || meta) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: title ?? "",
+              bold: true,
+              color: docxColor(tokens.bodyTextColor),
+              font: tokens.docxFontFamily,
+            }),
+            new TextRun({
+              text: meta ? ` | ${meta}` : "",
+              color: docxColor(tokens.mutedTextColor),
+              font: tokens.docxFontFamily,
+            }),
+          ],
+        })
+      );
+    }
+    if (item.details.length > 0) {
+      children.push(paragraph(item.details.join(", "), tokens));
+    }
+  }
+}
+
 export async function exportCvPdf(cv: StructuredCv, presentation?: unknown) {
   const blob = await pdf(
     <CvPdfDocument cv={cv} presentation={presentation} />
@@ -437,13 +799,8 @@ export async function exportCvDocx(cv: StructuredCv, presentation?: unknown) {
     cv.header.name && tokens.headerAlign === "center"
       ? AlignmentType.CENTER
       : AlignmentType.LEFT;
-  const meta = [
-    cv.header.targetTitle,
-    cv.header.location,
-    cv.header.phone,
-    cv.header.email,
-    ...cv.header.links.map(linkText),
-  ].filter(Boolean);
+  const meta = contactItems(cv.header);
+  const sections = normalizeCvSections(cv);
 
   if (cv.header.name) {
     children.push(
@@ -461,13 +818,29 @@ export async function exportCvDocx(cv: StructuredCv, presentation?: unknown) {
       })
     );
   }
+  if (cv.header.targetTitle) {
+    children.push(
+      new Paragraph({
+        alignment: headerAlignment,
+        children: [
+          new TextRun({
+            text: cv.header.targetTitle,
+            bold: true,
+            size: Math.round((tokens.subtitleSize + 1) * 2),
+            color: docxColor(tokens.accentColor),
+            font: tokens.docxFontFamily,
+          }),
+        ],
+      })
+    );
+  }
   if (meta.length > 0) {
     children.push(
       new Paragraph({
         alignment: headerAlignment,
         children: [
           new TextRun({
-            text: meta.join(" | "),
+            text: meta.map((item) => `${contactIconText(item.kind)} ${item.value}`).join(" | "),
             size: Math.round(tokens.subtitleSize * 2),
             color: docxColor(tokens.mutedTextColor),
             font: tokens.docxFontFamily,
@@ -478,7 +851,11 @@ export async function exportCvDocx(cv: StructuredCv, presentation?: unknown) {
     );
   }
 
-  for (const section of orderedSections(cv.sectionOrder)) {
+  if (sections.length > 0) {
+    for (const section of sections) {
+      pushNormalizedDocxSection(children, section, tokens);
+    }
+  } else for (const section of orderedSections(cv.sectionOrder, cv.roleArchetype)) {
     if (section === "summary") {
       children.push(
         heading(tokens.labelFor("summary").toUpperCase(), tokens),
@@ -518,14 +895,14 @@ export async function exportCvDocx(cv: StructuredCv, presentation?: unknown) {
             })
           );
         }
-        children.push(...project.bullets.map((item) => bullet(item, tokens)));
+        children.push(...project.bullets.map((item) => bullet(item.text, tokens)));
       }
     }
 
     if (section === "experience" && cv.experience.length > 0) {
       children.push(heading(tokens.labelFor("experience").toUpperCase(), tokens));
       for (const item of cv.experience) {
-        const title = joinPresent([item.title, item.company], " - ");
+        const title = joinPresent([item.role, item.company], " - ");
         const metaText = joinPresent([item.dates, item.location], " | ");
         if (title || metaText) {
           children.push(
@@ -546,7 +923,7 @@ export async function exportCvDocx(cv: StructuredCv, presentation?: unknown) {
             })
           );
         }
-        children.push(...item.bullets.map((text) => bullet(text, tokens)));
+        children.push(...item.bullets.map((item) => bullet(item.text, tokens)));
       }
     }
 
@@ -557,13 +934,13 @@ export async function exportCvDocx(cv: StructuredCv, presentation?: unknown) {
           new Paragraph({
             children: [
               new TextRun({
-                text: `${group.label}: `,
+                text: `${group.group}: `,
                 bold: true,
                 color: docxColor(tokens.accentColor),
                 font: tokens.docxFontFamily,
               }),
               new TextRun({
-                text: group.items.join(", "),
+                text: group.skills.join(", "),
                 color: docxColor(tokens.bodyTextColor),
                 font: tokens.docxFontFamily,
               }),

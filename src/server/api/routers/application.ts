@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { CandidateProfilerOutputSchema } from "~/lib/schemas";
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -10,21 +9,13 @@ import {
   answerGapQuestions,
   claimApplication,
   createApplication,
-  confirmCandidateProfile,
   generateCv,
-  generateCvStrategy,
-  generateGapQuestions,
   getApplicationExportData,
   getApplicationState,
   listUserApplications,
   resetApplication,
-  rewriteCvSection,
-  runEvidenceMatching,
-  setDreamRole,
   submitCandidateProfileSource,
-  submitCandidateInfo,
   submitJob,
-  updateCvSection,
 } from "~/server/services/applicationWorkflow.service";
 
 const applicationIdSchema = z.object({
@@ -38,21 +29,6 @@ export const applicationRouter = createTRPCRouter({
       clerkUserId: ctx.clerkUserId,
     })
   ),
-
-  setDreamRole: publicProcedure
-    .input(
-      applicationIdSchema.extend({
-        dreamRole: z.string().min(1).max(200),
-      })
-    )
-    .mutation(({ ctx, input }) =>
-      setDreamRole({
-        anonymousSessionId: ctx.anonymousSessionId,
-        applicationId: input.applicationId,
-        clerkUserId: ctx.clerkUserId,
-        dreamRole: input.dreamRole,
-      })
-    ),
 
   resetApplication: publicProcedure
     .input(applicationIdSchema)
@@ -79,45 +55,14 @@ export const applicationRouter = createTRPCRouter({
       })
     ),
 
-  submitCandidateInfo: publicProcedure
-    .input(
-      applicationIdSchema
-        .extend({
-          rawCvText: z.string().nullable().optional(),
-          rawBackgroundText: z.string().nullable().optional(),
-        })
-        .refine(
-          (input) =>
-            (input.rawCvText?.length ?? 0) +
-              (input.rawBackgroundText?.length ?? 0) <=
-            30_000,
-          "Candidate background must be 30,000 characters or fewer"
-        )
-    )
-    .mutation(({ ctx, input }) =>
-      submitCandidateInfo({
-        anonymousSessionId: ctx.anonymousSessionId,
-        applicationId: input.applicationId,
-        clerkUserId: ctx.clerkUserId,
-        rawCvText: input.rawCvText,
-        rawBackgroundText: input.rawBackgroundText,
-      })
-    ),
-
   submitCandidateProfileSource: publicProcedure
     .input(
       applicationIdSchema
         .extend({
-          source: z.enum([
-            "cv_upload",
-            "linkedin_url",
-            "linkedin_paste",
-            "manual",
-          ]),
+          source: z.enum(["cv_upload", "linkedin_url"]),
           rawCvText: z.string().nullable().optional(),
           rawBackgroundText: z.string().nullable().optional(),
           sourceUrl: z.string().nullable().optional(),
-          manualProfile: CandidateProfilerOutputSchema.nullable().optional(),
         })
         .refine(
           (input) =>
@@ -136,42 +81,6 @@ export const applicationRouter = createTRPCRouter({
         rawCvText: input.rawCvText,
         rawBackgroundText: input.rawBackgroundText,
         sourceUrl: input.sourceUrl,
-        manualProfile: input.manualProfile,
-      })
-    ),
-
-  confirmCandidateProfile: publicProcedure
-    .input(
-      applicationIdSchema.extend({
-        profile: CandidateProfilerOutputSchema,
-      })
-    )
-    .mutation(({ ctx, input }) =>
-      confirmCandidateProfile({
-        anonymousSessionId: ctx.anonymousSessionId,
-        applicationId: input.applicationId,
-        clerkUserId: ctx.clerkUserId,
-        profile: input.profile,
-      })
-    ),
-
-  runEvidenceMatching: publicProcedure
-    .input(applicationIdSchema)
-    .mutation(({ ctx, input }) =>
-      runEvidenceMatching({
-        anonymousSessionId: ctx.anonymousSessionId,
-        applicationId: input.applicationId,
-        clerkUserId: ctx.clerkUserId,
-      })
-    ),
-
-  generateGapQuestions: publicProcedure
-    .input(applicationIdSchema)
-    .mutation(({ ctx, input }) =>
-      generateGapQuestions({
-        anonymousSessionId: ctx.anonymousSessionId,
-        applicationId: input.applicationId,
-        clerkUserId: ctx.clerkUserId,
       })
     ),
 
@@ -182,6 +91,9 @@ export const applicationRouter = createTRPCRouter({
           z.object({
             gapQuestionId: z.string().min(1),
             answerText: z.string().nullable().optional(),
+            selectedOption: z.string().nullable().optional(),
+            followUpText: z.string().nullable().optional(),
+            metricText: z.string().nullable().optional(),
             skipped: z.boolean().nullable().optional(),
           })
         ),
@@ -196,20 +108,10 @@ export const applicationRouter = createTRPCRouter({
       })
     ),
 
-  generateCvStrategy: publicProcedure
-    .input(applicationIdSchema)
-    .mutation(({ ctx, input }) =>
-      generateCvStrategy({
-        anonymousSessionId: ctx.anonymousSessionId,
-        applicationId: input.applicationId,
-        clerkUserId: ctx.clerkUserId,
-      })
-    ),
-
   generateCv: publicProcedure
     .input(
       applicationIdSchema.extend({
-        strategyId: z.string().min(1),
+        strategyId: z.string().min(1).nullable().optional(),
       })
     )
     .mutation(({ ctx, input }) =>
@@ -218,44 +120,6 @@ export const applicationRouter = createTRPCRouter({
         applicationId: input.applicationId,
         clerkUserId: ctx.clerkUserId,
         strategyId: input.strategyId,
-      })
-    ),
-
-  rewriteCvSection: publicProcedure
-    .input(
-      applicationIdSchema.extend({
-        cvDraftId: z.string().min(1),
-        sectionId: z.string().min(1),
-        instruction: z.string().min(1),
-      })
-    )
-    .mutation(({ ctx, input }) =>
-      rewriteCvSection({
-        anonymousSessionId: ctx.anonymousSessionId,
-        applicationId: input.applicationId,
-        clerkUserId: ctx.clerkUserId,
-        cvDraftId: input.cvDraftId,
-        sectionId: input.sectionId,
-        instruction: input.instruction,
-      })
-    ),
-
-  updateCvSection: publicProcedure
-    .input(
-      applicationIdSchema.extend({
-        cvDraftId: z.string().min(1),
-        sectionId: z.string().min(1),
-        content: z.string(),
-      })
-    )
-    .mutation(({ ctx, input }) =>
-      updateCvSection({
-        anonymousSessionId: ctx.anonymousSessionId,
-        applicationId: input.applicationId,
-        clerkUserId: ctx.clerkUserId,
-        cvDraftId: input.cvDraftId,
-        sectionId: input.sectionId,
-        content: input.content,
       })
     ),
 

@@ -1,4 +1,5 @@
 import {
+  claimText,
   orderedSections,
   type CvSectionId,
   type StructuredCv,
@@ -66,7 +67,7 @@ export const cvAccentPalettes = [
   "navy",
   "amber",
 ] as const;
-export const cvDividerStyles = ["accent_line", "light_rule", "no_rule"] as const;
+export const cvDividerStyles = ["light_rule", "no_rule"] as const;
 export const cvHeaderStyles = [
   "left_aligned_large_name",
   "centered_classic",
@@ -100,10 +101,14 @@ export const cvSectionContentStyles = [
 ] as const;
 export const cvAccentUsageTargets = [
   "section_headings",
-  "divider_lines",
   "selected_labels",
   "links",
   "small_emphasis",
+] as const;
+export const cvLayoutArchitectures = [
+  "premium_hybrid",
+  "classic_single_column",
+  "simple_practical",
 ] as const;
 
 export type PresentationSectionId =
@@ -113,6 +118,7 @@ export type CvCareerStyle = (typeof cvCareerStyles)[number];
 export type CvDensity = (typeof cvDensityTokens)[number];
 export type CvAccentPalette = (typeof cvAccentPalettes)[number];
 export type CvSkillsStyle = (typeof cvSkillsStyles)[number];
+export type CvLayoutArchitecture = (typeof cvLayoutArchitectures)[number];
 
 export type CvSectionPresentation = {
   treatment: (typeof cvSectionTreatments)[number];
@@ -126,6 +132,7 @@ export type CvSectionPresentation = {
 
 export type CvPresentation = {
   schemaVersion: 1;
+  layoutArchitecture: CvLayoutArchitecture;
   templateId: CvTemplateId;
   careerStyle: CvCareerStyle;
   density: CvDensity;
@@ -158,6 +165,7 @@ export type CvPresentation = {
 };
 
 export type RendererTokens = {
+  layoutArchitecture: CvLayoutArchitecture;
   templateId: CvTemplateId;
   careerStyle: CvCareerStyle;
   density: CvDensity;
@@ -307,13 +315,14 @@ function estimateCvLoad(cv: StructuredCv) {
     0
   );
   const skillItems = cv.skills.groups.reduce(
-    (total, group) => total + group.items.length,
+    (total, group) => total + group.skills.length,
     0
   );
   const educationItems = cv.education.length;
   const certificationItems = cv.certifications.length;
   const bulletWords = [...cv.projects, ...cv.experience]
     .flatMap((item) => item.bullets)
+    .map(claimText)
     .join(" ")
     .trim()
     .split(/\s+/)
@@ -323,7 +332,7 @@ function estimateCvLoad(cv: StructuredCv) {
     summaryWords,
     bulletCount: projectBullets + experienceBullets,
     skillItems,
-    sectionCount: orderedSections(cv.sectionOrder).length,
+    sectionCount: orderedSections(cv.sectionOrder, cv.roleArchetype).length,
     estimatedWords: summaryWords + bulletWords + skillItems * 2,
     supportingItems: educationItems + certificationItems,
   };
@@ -378,7 +387,8 @@ function inferCareerStyle(cv: StructuredCv, context?: unknown) {
     [
       cv.header.targetTitle,
       cv.summary,
-      cv.skills.groups.map((group) => `${group.label} ${group.items.join(" ")}`).join(" "),
+      cv.roleArchetype,
+      cv.skills.groups.map((group) => `${group.group} ${group.skills.join(" ")}`).join(" "),
       contextText,
     ]
       .filter(Boolean)
@@ -528,6 +538,17 @@ export function normalizeCvPresentation(
   const compact = needsCompactPageFit(cv);
   const inferredCareerStyle = inferCareerStyle(cv, context);
   const rawTemplateId = source?.templateId;
+  const rawLayoutArchitecture = source?.layoutArchitecture;
+  const layoutArchitecture = includesToken(
+    cvLayoutArchitectures,
+    rawLayoutArchitecture
+  )
+    ? rawLayoutArchitecture
+    : inferredCareerStyle === "technical" || inferredCareerStyle === "academic"
+      ? "premium_hybrid"
+      : inferredCareerStyle === "retail" || inferredCareerStyle === "trades"
+        ? "simple_practical"
+        : "classic_single_column";
   const templateId = includesToken(cvTemplateIds, rawTemplateId)
     ? rawTemplateId
     : templateForCareer(inferredCareerStyle, cv);
@@ -546,6 +567,8 @@ export function normalizeCvPresentation(
   const sectionStylesSource = record(source?.sectionStyles);
   const labelSource = record(source?.sectionLabelOverrides);
   const labels = defaultLabelsForCareer(careerStyle);
+  const normalizedDividerStyle =
+    colourSystem?.dividerStyle === "no_rule" ? "no_rule" : "light_rule";
   const skillsStyle: CvSkillsStyle = compact
     ? "compact_inline_groups"
     : includesToken(cvSkillsStyles, source?.skillsStyle)
@@ -565,6 +588,7 @@ export function normalizeCvPresentation(
 
   return {
     schemaVersion: 1,
+    layoutArchitecture,
     templateId,
     careerStyle,
     density,
@@ -600,14 +624,11 @@ export function normalizeCvPresentation(
         : template.accentPalette,
       bodyText: "dark",
       mutedText: "grey",
-      dividerStyle: includesToken(cvDividerStyles, colourSystem?.dividerStyle)
-        ? colourSystem.dividerStyle
-        : "accent_line",
+      dividerStyle: normalizedDividerStyle,
     },
     accentUsageRules: {
       useAccentFor: [
         "section_headings",
-        "divider_lines",
         "selected_labels",
         "links",
         "small_emphasis",
@@ -678,6 +699,7 @@ export function presentationToRendererTokens(
     presentation.headerStyle === "editorial_header";
 
   return {
+    layoutArchitecture: presentation.layoutArchitecture,
     templateId: presentation.templateId,
     careerStyle: presentation.careerStyle,
     density: presentation.density,
@@ -686,18 +708,18 @@ export function presentationToRendererTokens(
     fontFamily: fonts.css,
     pdfFontFamily: fonts.pdf,
     docxFontFamily: fonts.docx,
-    pagePadding: compact ? 28 : spacious ? 46 : 38,
-    pagePaddingCss: compact ? "28px 34px" : spacious ? "46px 52px" : "38px 44px",
+    pagePadding: compact ? 30 : spacious ? 48 : 40,
+    pagePaddingCss: compact ? "30px 38px" : spacious ? "48px 56px" : "40px 48px",
     headerAlign: centered ? "center" : "left",
     nameSize:
-      presentation.typography.nameSize === "very_large" && !compact ? 27 : 23,
-    subtitleSize: compact ? 10.5 : 11.5,
+      presentation.typography.nameSize === "very_large" && !compact ? 32 : 29,
+    subtitleSize: compact ? 11.5 : 12.5,
     bodySize:
       presentation.typography.bodySize === "compact" || compact ? 11.2 : 12,
-    headingSize: compact ? 10.2 : 11,
-    lineHeight: compact ? 1.34 : 1.45,
-    sectionGap: compact ? 9 : spacious ? 18 : 13,
-    itemGap: compact ? 6 : spacious ? 11 : 8,
+    headingSize: compact ? 11.4 : 12.6,
+    lineHeight: compact ? 1.38 : 1.48,
+    sectionGap: compact ? 12 : spacious ? 22 : 16,
+    itemGap: compact ? 7 : spacious ? 12 : 9,
     bulletGap: compact ? 1.5 : 3,
     headingWeight:
       presentation.typography.headingWeight === "medium"
@@ -708,10 +730,7 @@ export function presentationToRendererTokens(
     bodyTextColor: "#18181b",
     mutedTextColor: "#52525b",
     accentColor,
-    dividerColor:
-      presentation.colourSystem.dividerStyle === "accent_line"
-        ? accentColor
-        : "#d4d4d8",
+    dividerColor: "#d4d4d8",
     dividerStyle: presentation.colourSystem.dividerStyle,
     labelFor: (section) =>
       safeLabel(

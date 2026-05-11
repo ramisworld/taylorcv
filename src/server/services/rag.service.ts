@@ -37,12 +37,18 @@ export type RequirementEvidenceMapRow = {
     contentPreview: string;
     confidence: "high" | "medium";
     reason: string;
+    cvUsefulness: string | null;
+    claimRisk: string | null;
+    metadata: unknown;
   }>;
   weakEvidence: Array<{
     chunkId: string;
     contentPreview: string;
     confidence: "weak";
     reason: string;
+    cvUsefulness: string | null;
+    claimRisk: string | null;
+    metadata: unknown;
   }>;
   reason: string;
 };
@@ -112,6 +118,8 @@ export async function replaceWithScoredEvidenceMatches(args: {
     jobRequirementId: string;
     candidateChunkId: string | null;
     confidence: EvidenceConfidence;
+    cvUsefulness: string;
+    claimRisk: string;
     reason: string;
   };
 
@@ -147,6 +155,16 @@ export async function replaceWithScoredEvidenceMatches(args: {
             jobRequirementId: args.requirement.id,
             candidateChunkId: chunk.id,
             confidence,
+            cvUsefulness:
+              scored?.cvUsefulness ??
+              (confidence === "high"
+                ? "headline"
+                : confidence === "medium"
+                  ? "supporting"
+                  : "keyword_only"),
+            claimRisk:
+              scored?.claimRisk ??
+              (confidence === "high" ? "safe" : "careful_wording"),
             reason:
               scored?.reason ??
               "Retrieved candidate evidence was only weakly related to this requirement.",
@@ -157,6 +175,8 @@ export async function replaceWithScoredEvidenceMatches(args: {
             jobRequirementId: args.requirement.id,
             candidateChunkId: null,
             confidence: "missing" as const,
+            cvUsefulness: "do_not_use",
+            claimRisk: "avoid_claim",
             reason: "No usable evidence found for this requirement.",
           },
         ];
@@ -170,6 +190,8 @@ export async function replaceWithScoredEvidenceMatches(args: {
         ? similarityByChunkId.get(match.candidateChunkId)
         : null,
       confidence: match.confidence,
+      cvUsefulness: match.cvUsefulness,
+      claimRisk: match.claimRisk,
       reason: match.reason,
     })),
   });
@@ -302,6 +324,7 @@ export async function buildRequirementEvidenceMap(
         select: {
           id: true,
           content: true,
+          metadataJson: true,
         },
       },
     },
@@ -354,6 +377,9 @@ export async function buildRequirementEvidenceMap(
         contentPreview: preview(match.candidateChunk.content),
         confidence: match.confidence,
         reason: match.reason,
+        cvUsefulness: match.cvUsefulness,
+        claimRisk: match.claimRisk,
+        metadata: match.candidateChunk.metadataJson,
       }));
 
     const weakEvidence = sortedMatches
@@ -370,6 +396,9 @@ export async function buildRequirementEvidenceMap(
         contentPreview: preview(match.candidateChunk.content),
         confidence: match.confidence,
         reason: match.reason,
+        cvUsefulness: match.cvUsefulness,
+        claimRisk: match.claimRisk,
+        metadata: match.candidateChunk.metadataJson,
       }));
 
     const reason =

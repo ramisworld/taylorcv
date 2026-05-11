@@ -4,46 +4,47 @@ import { TRPCError } from "@trpc/server";
 import type { Prisma } from "../../../generated/prisma/index.js";
 
 import type { CandidateProfilerOutput } from "~/lib/types";
+import { buildEvidenceMatchPersistencePlan } from "~/lib/evidenceMatchPersistence";
+import { parseStructuredCv } from "~/lib/cvDocument";
+import { stripCvPresentationDebug } from "~/lib/cvPresentation";
+import { runBatchEvidenceFitAndGapPlannerAgent } from "~/server/agents/batchEvidenceFitAndGapPlanner.agent";
 import { runCandidateProfilerAgent } from "~/server/agents/candidateProfiler.agent";
-import { runCvLayoutStyleAgent } from "~/server/agents/cvLayoutStyle.agent";
-import { runCvRewriteAgent } from "~/server/agents/cvRewrite.agent";
-import { runCvQualityReviewAgent } from "~/server/agents/cvQualityReview.agent";
-import { runCvStrategyAgent } from "~/server/agents/cvStrategy.agent";
-import { runCvWriterAgent } from "~/server/agents/cvWriter.agent";
-import { runEvidenceChunkCreatorAgent } from "~/server/agents/evidenceChunkCreator.agent";
-import { runEvidenceScoringAgent } from "~/server/agents/evidenceScoring.agent";
-import { runGapQuestionAgent } from "~/server/agents/gapQuestion.agent";
+import { runCvBuilderAgent } from "~/server/agents/cvBuilder.agent";
 import { runJobParserAgent } from "~/server/agents/jobParser.agent";
 import { db } from "~/server/db";
-import { parseStructuredCv } from "~/lib/cvDocument";
 import {
-  normalizeCvPresentation,
-  stripCvPresentationDebug,
-} from "~/lib/cvPresentation";
-import {
-  buildCvStrategyContext,
-  buildCvWriterContext,
-} from "~/server/services/cv.service";
+  buildEvidenceChunksFromProfile,
+  buildGapAnswerEvidenceChunk,
+} from "~/server/services/evidenceChunkBuilder.service";
 import {
   buildRequirementEvidenceMap,
   calculateEvidenceMatchScore,
-  replaceWithScoredEvidenceMatches,
-  retrieveCandidateEvidenceForRequirement,
-  type RequirementEvidenceMapRow,
 } from "~/server/services/rag.service";
-import { insertCandidateChunkWithEmbedding } from "~/server/tools/vectorSearch.tool";
+import {
+  calculateDeterministicAfterScore,
+  compactCvRepairInstructions,
+  composeDeterministicPresentation,
+  repairCvOutput,
+  runDeterministicCvQa,
+} from "~/server/services/cvQa.service";
+import { timedStep } from "~/server/services/timing.service";
+import {
+  insertCandidateChunksWithEmbeddings,
+  searchCandidateChunksForRequirements,
+} from "~/server/tools/vectorSearch.tool";
 
 const MAX_JOB_DESCRIPTION_CHARS = 20_000;
 const MAX_CANDIDATE_BACKGROUND_CHARS = 30_000;
+const LINKEDIN_FAILURE_MESSAGE =
+  "We couldn’t read this LinkedIn profile automatically. Please upload your CV instead.";
 
-async function clearGeneratedWork(applicationId: string) {
-  await db.cvDraft.deleteMany({ where: { applicationId } });
-  await db.cvStrategy.deleteMany({ where: { applicationId } });
-  await db.gapAnswer.deleteMany({ where: { applicationId } });
-  await db.gapQuestion.deleteMany({ where: { applicationId } });
-  await db.gapCoachInsight.deleteMany({ where: { applicationId } });
-  await db.requirementFitScore.deleteMany({ where: { applicationId } });
-  await db.evidenceMatch.deleteMany({ where: { applicationId } });
+function inputJson(value: unknown) {
+  return value as Prisma.InputJsonValue;
+}
+
+function optionalText(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }
 
 function stringArray(value: unknown) {
@@ -52,222 +53,100 @@ function stringArray(value: unknown) {
     : [];
 }
 
-function optionalText(value: string | null | undefined) {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
-}
-
-function inputJson(value: unknown) {
-  return value as Prisma.InputJsonValue;
-}
-
-function profileMissingEssentials(profile: CandidateProfilerOutput) {
-  const contact = profile.contactInfo;
-  return [
-    ["full name", contact.fullName],
-    ["professional title", contact.professionalTitle],
-    ["location", contact.location],
-    ["preferred email", contact.email],
-  ]
-    .filter(([, value]) => !optionalText(value as string | null | undefined))
-    .map(([label]) => label as string);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
 function jsonArrayLength(value: unknown) {
   return Array.isArray(value) ? value.length : 0;
 }
 
-function normalizedText(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+function safeErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Unknown error";
 }
 
-const lowSignalWords = new Set([
-  "a",
-  "an",
-  "and",
-  "are",
-  "at",
-  "be",
-  "can",
-  "for",
-  "from",
-  "in",
-  "of",
-  "on",
-  "or",
-  "the",
-  "to",
-  "with",
-]);
+type GapAnswerTrustLevel = "usable" | "use_carefully" | "suspicious" | "do_not_use";
 
-function textTokens(value: string) {
-  return new Set(
-    normalizedText(value)
-      .split(" ")
-      .filter((token) => token.length > 2 && !lowSignalWords.has(token))
-  );
+const suspiciousGapAnswerPattern =
+  /\b(model calls?|batching|batch(?:ed)? slower steps|timing logs?|latency logs?|refactor|pipeline|unnecessary model calls?|backend optimisation|backend optimization)\b/i;
+
+function classifyGapAnswerTrust(text: string): GapAnswerTrustLevel {
+  const normalized = text.trim();
+  if (!normalized) return "do_not_use";
+  if (suspiciousGapAnswerPattern.test(normalized)) return "suspicious";
+  if (/\b(owned|built|created|tested|used|implemented|worked on|delivered|improved)\b/i.test(normalized)) {
+    return "usable";
+  }
+  return "use_carefully";
 }
 
-function gapCandidateRows(evidenceMap: RequirementEvidenceMapRow[]) {
+function chunkTrustLevel(chunk: { metadataJson: unknown; content: string }) {
+  if (isRecord(chunk.metadataJson) && typeof chunk.metadataJson.trustLevel === "string") {
+    return chunk.metadataJson.trustLevel;
+  }
+  return classifyGapAnswerTrust(chunk.content);
+}
+
+function normalizeJobRequirements<T extends { label: string; description: string; importance: string }>(
+  requirements: T[]
+) {
+  const seen = new Set<string>();
   const importanceRank = { high: 0, medium: 1, low: 2 } as const;
-  const confidenceRank = { missing: 0, weak: 1, medium: 2, high: 3 } as const;
-
-  return evidenceMap
-    .filter(
-      (row) =>
-        row.requirementImportance !== "low" &&
-        row.overallConfidence !== "high"
-    )
+  const deduped = [...requirements]
     .sort(
       (a, b) =>
-        importanceRank[a.requirementImportance] -
-          importanceRank[b.requirementImportance] ||
-        confidenceRank[a.overallConfidence] - confidenceRank[b.overallConfidence]
-    );
+        (importanceRank[a.importance as keyof typeof importanceRank] ?? 3) -
+        (importanceRank[b.importance as keyof typeof importanceRank] ?? 3)
+    )
+    .filter((requirement) => {
+      const key = requirement.label.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 14);
+
+  let highCount = 0;
+  return deduped.map((requirement) => {
+    if (requirement.importance !== "high") return requirement;
+    highCount += 1;
+    return highCount <= 8 ? requirement : { ...requirement, importance: "medium" };
+  });
 }
 
-function resolveGapQuestionRequirementId(args: {
-  question: {
-    targetRequirementId: string | null;
-    question: string;
-    reason: string;
-    whyItMatters: string;
-    answerGuidance: string;
+function questionJson(question: {
+  question: string;
+  shortQuestion: string;
+  linkedJobRequirement: string | null;
+  whyThisMatters: string;
+  howYourAnswerHelps: string;
+  quickOptions: string[];
+  selectedOptionRequiresDetail: boolean;
+  followUpPrompt: string | null;
+  dynamicGuidance: string;
+  questionType: string;
+}) {
+  return {
+    shortQuestion: question.shortQuestion,
+    linkedJobRequirement: question.linkedJobRequirement,
+    whyThisMatters: question.whyThisMatters,
+    howYourAnswerHelps: question.howYourAnswerHelps,
+    quickOptions: question.quickOptions.slice(0, 4),
+    selectedOptionRequiresDetail: question.selectedOptionRequiresDetail,
+    followUpPrompt: question.followUpPrompt,
+    dynamicGuidance: question.dynamicGuidance,
+    questionType: question.questionType,
   };
-  evidenceMap: RequirementEvidenceMapRow[];
-  assignedRequirementIds: Set<string>;
-}) {
-  const validRequirementIds = new Set(
-    args.evidenceMap.map((row) => row.requirementId)
-  );
-  const requestedId = args.question.targetRequirementId?.trim() ?? "";
-
-  if (validRequirementIds.has(requestedId)) return requestedId;
-
-  const searchableText = normalizedText(
-    [
-      requestedId,
-      args.question.question,
-      args.question.reason,
-      args.question.whyItMatters,
-      args.question.answerGuidance,
-    ].join(" ")
-  );
-  const searchableTokens = textTokens(searchableText);
-  let bestMatch: { requirementId: string; score: number } | null = null;
-
-  for (const row of args.evidenceMap) {
-    const labelText = normalizedText(row.requirementLabel);
-    if (labelText && searchableText.includes(labelText)) {
-      return row.requirementId;
-    }
-
-    const labelTokens = textTokens(row.requirementLabel);
-    if (labelTokens.size === 0) continue;
-
-    let overlap = 0;
-    for (const token of labelTokens) {
-      if (searchableTokens.has(token)) overlap += 1;
-    }
-
-    const score = overlap / labelTokens.size;
-    if (score >= 0.5 && (!bestMatch || score > bestMatch.score)) {
-      bestMatch = { requirementId: row.requirementId, score };
-    }
-  }
-
-  if (bestMatch) return bestMatch.requirementId;
-
-  return (
-    gapCandidateRows(args.evidenceMap).find(
-      (row) => !args.assignedRequirementIds.has(row.requirementId)
-    )?.requirementId ?? null
-  );
 }
 
-function fallbackGapQuestions(evidenceMap: RequirementEvidenceMapRow[]) {
-  return gapCandidateRows(evidenceMap).map((row) => ({
-    targetRequirementId: row.requirementId,
-    question: `Can you give one real example that proves ${row.requirementLabel}? What happened, what did you personally do, and what changed?`,
-    reason: row.reason,
-    whyItMatters: `This role appears to care about ${row.requirementLabel}, but the current evidence is only ${row.overallConfidence}.`,
-    answerGuidance:
-      "Mention the situation, your action, any tools or people involved, and the clearest honest result.",
-    exampleAngles: [
-      "a class or club project",
-      "a work shift or internship",
-      "a small project you organized or improved",
-      "feedback, numbers, or a visible outcome",
-    ],
-  }));
-}
-
-function prepareGapQuestionsForInsert(args: {
-  questions: Array<{
-    targetRequirementId: string | null;
-    question: string;
-    reason: string;
-    whyItMatters: string;
-    answerGuidance: string;
-    exampleAngles: string[];
-  }>;
-  evidenceMap: RequirementEvidenceMapRow[];
-}) {
-  const sourceQuestions =
-    args.questions.length > 0
-      ? args.questions
-      : fallbackGapQuestions(args.evidenceMap);
-  const assignedRequirementIds = new Set<string>();
-  const seenQuestions = new Set<string>();
-  const prepared = [];
-
-  for (const question of sourceQuestions) {
-    const questionText = question.question.trim();
-    if (!questionText) continue;
-
-    const targetRequirementId = resolveGapQuestionRequirementId({
-      question,
-      evidenceMap: args.evidenceMap,
-      assignedRequirementIds,
-    });
-    if (targetRequirementId) assignedRequirementIds.add(targetRequirementId);
-
-    const key = `${targetRequirementId ?? "unlinked"}:${normalizedText(
-      questionText
-    )}`;
-    if (seenQuestions.has(key)) continue;
-    seenQuestions.add(key);
-
-    prepared.push({
-      targetRequirementId,
-      question: questionText,
-      reason: question.reason.trim() || "Taylor needs a little more evidence.",
-      whyItMatters:
-        question.whyItMatters.trim() ||
-        "This could help make the CV more specific and truthful.",
-      answerGuidance:
-        question.answerGuidance.trim() ||
-        "Share what happened, what you did, and any honest result.",
-      exampleAnglesJson: question.exampleAngles
-        .map((angle) => angle.trim())
-        .filter(Boolean) as Prisma.InputJsonValue,
-      status: "unanswered" as const,
-    });
-  }
-
-  if (prepared.length > 0) return prepared.slice(0, 5);
-
-  return fallbackGapQuestions(args.evidenceMap)
-    .slice(0, 5)
-    .map((question) => ({
-      targetRequirementId: question.targetRequirementId,
-      question: question.question,
-      reason: question.reason,
-      whyItMatters: question.whyItMatters,
-      answerGuidance: question.answerGuidance,
-      exampleAnglesJson: question.exampleAngles as Prisma.InputJsonValue,
-      status: "unanswered" as const,
-    }));
+async function clearGeneratedWork(applicationId: string) {
+  await db.cvDraft.deleteMany({ where: { applicationId } });
+  await db.cvStrategy.deleteMany({ where: { applicationId } });
+  await db.gapAnswer.deleteMany({ where: { applicationId } });
+  await db.gapQuestion.deleteMany({ where: { applicationId } });
+  await db.gapCoachInsight.deleteMany({ where: { applicationId } });
+  await db.evidenceMatch.deleteMany({ where: { applicationId } });
+  await db.requirementFitScore.deleteMany({ where: { applicationId } });
 }
 
 export async function assertApplicationForSession(args: {
@@ -305,14 +184,99 @@ async function getOrCreateUser(args: {
 }) {
   return db.user.upsert({
     where: { clerkUserId: args.clerkUserId },
-    update: {
-      email: optionalText(args.email),
-      name: optionalText(args.name),
-    },
+    update: { email: optionalText(args.email), name: optionalText(args.name) },
     create: {
       clerkUserId: args.clerkUserId,
       email: optionalText(args.email),
       name: optionalText(args.name),
+    },
+  });
+}
+
+async function fetchLinkedInPublicText(url: string) {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (compatible; TaylorCV/1.0; +https://taylorcv.local)",
+      },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!response.ok) return null;
+    const text = (await response.text())
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/\s+/g, " ")
+      .trim();
+    return text.length >= 300 ? text.slice(0, MAX_CANDIDATE_BACKGROUND_CHARS) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function upsertCandidateProfileFromOutput(args: {
+  anonymousSessionId: string;
+  applicationId: string;
+  profileOutput: CandidateProfilerOutput;
+  rawCvText?: string | null;
+  rawBackgroundText?: string | null;
+  profileSource?: string | null;
+  sourceSummary?: string | null;
+  sourceUrl?: string | null;
+}) {
+  const profile = args.profileOutput;
+  return db.candidateProfile.upsert({
+    where: { applicationId: args.applicationId },
+    update: {
+      rawCvText: args.rawCvText,
+      rawBackgroundText: args.rawBackgroundText,
+      contactInfoJson: inputJson(profile.contactInfo),
+      linksJson: inputJson(profile.links),
+      profileSource: args.profileSource,
+      sourceSummary: args.sourceSummary ?? profile.sourceSummary,
+      sourceUrl: args.sourceUrl,
+      profileConfirmedAt: null,
+      summary: profile.summary,
+      skillsJson: inputJson(profile.skills),
+      projectsJson: inputJson(profile.projects),
+      educationJson: inputJson(profile.education),
+      certificationsJson: inputJson(profile.certifications),
+      experienceJson: inputJson(profile.experience),
+      toolsJson: inputJson(profile.tools),
+      achievementsJson: inputJson(profile.achievements),
+      cautionNotesJson: inputJson(profile.cautionNotes ?? []),
+      metricOpportunitiesJson: inputJson(profile.metricOpportunities ?? []),
+      strongProofCandidatesJson: inputJson(profile.strongProofCandidates ?? []),
+      scopeOpportunitiesJson: inputJson(profile.scopeOpportunities ?? []),
+      likelyTopEvidenceJson: inputJson(profile.likelyTopEvidence ?? []),
+    },
+    create: {
+      anonymousSessionId: args.anonymousSessionId,
+      applicationId: args.applicationId,
+      rawCvText: args.rawCvText,
+      rawBackgroundText: args.rawBackgroundText,
+      contactInfoJson: inputJson(profile.contactInfo),
+      linksJson: inputJson(profile.links),
+      profileSource: args.profileSource,
+      sourceSummary: args.sourceSummary ?? profile.sourceSummary,
+      sourceUrl: args.sourceUrl,
+      profileConfirmedAt: null,
+      summary: profile.summary,
+      skillsJson: inputJson(profile.skills),
+      projectsJson: inputJson(profile.projects),
+      educationJson: inputJson(profile.education),
+      certificationsJson: inputJson(profile.certifications),
+      experienceJson: inputJson(profile.experience),
+      toolsJson: inputJson(profile.tools),
+      achievementsJson: inputJson(profile.achievements),
+      cautionNotesJson: inputJson(profile.cautionNotes ?? []),
+      metricOpportunitiesJson: inputJson(profile.metricOpportunities ?? []),
+      strongProofCandidatesJson: inputJson(profile.strongProofCandidates ?? []),
+      scopeOpportunitiesJson: inputJson(profile.scopeOpportunities ?? []),
+      likelyTopEvidenceJson: inputJson(profile.likelyTopEvidence ?? []),
     },
   });
 }
@@ -349,488 +313,254 @@ async function loadCandidateChunks(args: {
       metadata_json AS "metadataJson",
       created_at AS "createdAt"
     FROM candidate_chunks
-    WHERE
-      application_id = ${args.applicationId}
+    WHERE application_id = ${args.applicationId}
       AND anonymous_session_id = ${args.anonymousSessionId}
     ORDER BY created_at ASC
   `;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === "object" && !Array.isArray(value);
-}
-
-function formatCvSection(value: unknown): string {
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => formatCvSection(item))
-      .filter(Boolean)
-      .join("\n");
-  }
-  if (isRecord(value)) {
-    if (Array.isArray(value.groups)) return formatCvSection(value.groups);
-    const title = [
-      formatCvSection(value.name),
-      formatCvSection(value.descriptor),
-      formatCvSection(value.title),
-      formatCvSection(value.company),
-      formatCvSection(value.degree),
-      formatCvSection(value.institution),
-      formatCvSection(value.dates),
-    ]
-      .filter(Boolean)
-      .join(" - ");
-    const bullets = formatCvSection(value.bullets);
-    const details = formatCvSection(value.details);
-    const items = formatCvSection(value.items);
-    const label = formatCvSection(value.label);
-
-    if (label && items) return `${label}: ${items}`;
-    return [title, bullets, details].filter(Boolean).join("\n");
-  }
-  return typeof value === "string" ? value : "";
-}
-
-function cvSectionValue(sectionId: string, text: string) {
-  const cleaned = text
-    .split("\n")
-    .map((line) => line.trim().replace(/^[-*•]\s*/, ""))
-    .filter(Boolean);
-
-  if (["header", "summary"].includes(sectionId)) {
-    return cleaned.join(" ");
-  }
-
-  if (sectionId === "skills") {
-    const groups = text
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const [label, ...items] = line.split(":");
-        return {
-          label: label?.trim() || "Skills",
-          items: (items.join(":") || line)
-            .split(",")
-            .map((item) => item.trim().replace(/^[-*•]\s*/, ""))
-            .filter(Boolean),
-        };
-      })
-      .filter((group) => group.items.length > 0);
-
-    return { groups };
-  }
-
-  if (sectionId === "projects") {
-    return [
-      {
-        name: "Selected Projects",
-        descriptor: null,
-        dates: null,
-        bullets: cleaned,
-      },
-    ];
-  }
-
-  if (sectionId === "experience") {
-    return [
-      {
-        title: "Experience",
-        company: null,
-        dates: null,
-        location: null,
-        bullets: cleaned,
-      },
-    ];
-  }
-
-  if (sectionId === "education") {
-    return [
-      {
-        institution: null,
-        degree: cleaned[0] ?? null,
-        dates: null,
-        details: cleaned.slice(1),
-      },
-    ];
-  }
-
-  return cleaned;
-}
-
-function parseCvTarget(sectionId: string) {
-  const [section, indexText] = sectionId.split(".");
-  const index =
-    typeof indexText === "string" && indexText.trim() !== ""
-      ? Number(indexText)
-      : null;
-
-  return {
-    section: section ?? sectionId,
-    index: Number.isInteger(index) ? index : null,
-  };
-}
-
-function readCvTarget(cvJson: unknown, sectionId: string) {
-  if (!isRecord(cvJson)) return "";
-  const target = parseCvTarget(sectionId);
-  const value = cvJson[target.section];
-
-  if (target.index !== null && Array.isArray(value)) {
-    return formatCvSection(value[target.index]);
-  }
-
-  return formatCvSection(value);
-}
-
-function writeCvTarget(
-  cvJson: Record<string, unknown>,
-  sectionId: string,
-  text: string
-) {
-  const target = parseCvTarget(sectionId);
-  const nextCvJson = { ...cvJson };
-
-  if (target.index !== null) {
-    const current = nextCvJson[target.section];
-    const currentItems = Array.isArray(current) ? [...current] : [];
-    currentItems[target.index] = text.trim();
-    nextCvJson[target.section] = currentItems.filter(Boolean);
-    return nextCvJson;
-  }
-
-  nextCvJson[target.section] = cvSectionValue(target.section, text);
-  return nextCvJson;
-}
-
-type CvSectionId =
-  | "summary"
-  | "projects"
-  | "experience"
-  | "skills"
-  | "education"
-  | "certifications";
-
-const defaultCvSectionOrder: CvSectionId[] = [
-  "summary",
-  "projects",
-  "experience",
-  "skills",
-  "education",
-  "certifications",
-];
-
-function normalizeCvSectionId(section: string): CvSectionId | null {
-  const normalized = section.toLowerCase().replace(/[^a-z]+/g, " ").trim();
-
-  if (!normalized || normalized === "header") return null;
-  if (normalized === "summary" || normalized === "professional summary") {
-    return "summary";
-  }
-  if (
-    normalized === "project" ||
-    normalized === "projects" ||
-    normalized === "selected project" ||
-    normalized === "selected projects"
-  ) {
-    return "projects";
-  }
-  if (normalized === "experience" || normalized === "work experience") {
-    return "experience";
-  }
-  if (normalized === "skill" || normalized === "skills") return "skills";
-  if (normalized === "education") return "education";
-  if (normalized === "certification" || normalized === "certifications") {
-    return "certifications";
-  }
-
-  return null;
-}
-
-function orderedCvSections(sectionOrder: string[]) {
-  const sections: CvSectionId[] = [];
-
-  for (const section of sectionOrder) {
-    const normalized = normalizeCvSectionId(section);
-    if (normalized && !sections.includes(normalized)) sections.push(normalized);
-  }
-
-  for (const section of defaultCvSectionOrder) {
-    if (!sections.includes(section)) sections.push(section);
-  }
-
-  return sections;
-}
-
-function strategySectionOrder(value: unknown) {
-  return Array.isArray(value)
-    ? value
-        .map((section) => (typeof section === "string" ? section.trim() : ""))
-        .filter(Boolean)
-    : [];
-}
-
-function applyStrategySectionOrder<
-  TOutput extends { cvJson: { sectionOrder: string[] } },
->(cvOutput: TOutput, strategy: { sectionOrderJson: unknown }) {
-  const sectionOrder = strategySectionOrder(strategy.sectionOrderJson);
-
-  if (sectionOrder.length === 0) return cvOutput;
-
-  return {
-    ...cvOutput,
-    cvJson: {
-      ...cvOutput.cvJson,
-      sectionOrder,
-    },
-  };
-}
-
-function cvLayoutRendererConstraints() {
-  return {
-    pageTarget: "one_page",
-    controlledOutputOnly: true,
-    noContentChanges: true,
-    canonicalSectionIds: [
-      "summary",
-      "experience",
-      "projects",
-      "skills",
-      "education",
-      "certifications",
-      "achievements",
-      "links",
-    ],
-    accentUsage:
-      "Accent may only be used for headings, dividers, selected labels, links, and small emphasis. Body text stays dark and metadata stays grey.",
-    availableTemplates: [
-      "technical_compact",
-      "modern_professional",
-      "creative_marketing",
-      "graduate_clean",
-      "executive_clean",
-      "trades_practical",
-      "retail_service",
-      "analytical_finance",
-      "project_heavy_builder",
-    ],
-  };
-}
-
-function buildCvTextFromJson(cvJson: Record<string, unknown>) {
-  const lines: string[] = [];
-
-  const textOrNull = (value: unknown) =>
-    typeof value === "string" && value.trim() ? value.trim() : null;
-  const textArray = (value: unknown) =>
-    Array.isArray(value)
-      ? value
-          .map((item) => (typeof item === "string" ? item.trim() : ""))
-          .filter(Boolean)
-      : [];
-
-  const header = cvJson.header;
-  if (isRecord(header)) {
-    const links = Array.isArray(header.links)
-      ? header.links
-          .filter(isRecord)
-          .map((link) => {
-            const label = textOrNull(link.label);
-            const url = textOrNull(link.url);
-            if (!url) return null;
-            return label && label !== url ? `${label}: ${url}` : url;
-          })
-          .filter((link): link is string => Boolean(link))
-      : [];
-    const headerMeta = [
-      textOrNull(header.targetTitle),
-      textOrNull(header.location),
-      textOrNull(header.phone),
-      textOrNull(header.email),
-      ...links,
-    ].filter(Boolean);
-
-    const name = textOrNull(header.name);
-    if (name) lines.push(name);
-    if (headerMeta.length > 0) lines.push(headerMeta.join(" | "));
-    if (name || headerMeta.length > 0) lines.push("");
-  } else {
-    const legacyHeader = formatCvSection(header);
-    if (legacyHeader) lines.push(legacyHeader, "");
-  }
-
-  const appendSection: Record<CvSectionId, () => void> = {
-    summary: () => {
-      const summary = formatCvSection(cvJson.summary);
-      if (summary) lines.push("SUMMARY", summary, "");
-    },
-    projects: () => {
-      const projects = Array.isArray(cvJson.projects)
-        ? cvJson.projects.filter(isRecord)
-        : [];
-      if (projects.length === 0) return;
-
-      lines.push("SELECTED PROJECTS");
-      for (const project of projects) {
-        const title = [
-          textOrNull(project.name),
-          textOrNull(project.descriptor),
-          textOrNull(project.dates),
-        ]
-          .filter(Boolean)
-          .join(" | ");
-        if (title) lines.push(title);
-        lines.push(
-          ...textArray(project.bullets).map((bullet) => `- ${bullet}`)
-        );
-      }
-      lines.push("");
-    },
-    experience: () => {
-      const experience = Array.isArray(cvJson.experience)
-        ? cvJson.experience.filter(isRecord)
-        : [];
-      if (experience.length === 0) return;
-
-      lines.push("EXPERIENCE");
-      for (const item of experience) {
-        const title = [
-          textOrNull(item.title),
-          textOrNull(item.company),
-          textOrNull(item.dates),
-          textOrNull(item.location),
-        ]
-          .filter(Boolean)
-          .join(" | ");
-        if (title) lines.push(title);
-        lines.push(...textArray(item.bullets).map((bullet) => `- ${bullet}`));
-      }
-      lines.push("");
-    },
-    skills: () => {
-      const skills = cvJson.skills;
-      if (!isRecord(skills) || !Array.isArray(skills.groups)) return;
-
-      const skillLines = skills.groups
-        .filter(isRecord)
-        .map((group) => {
-          const label = textOrNull(group.label);
-          const items = textArray(group.items);
-          return label && items.length > 0
-            ? `${label}: ${items.join(", ")}`
-            : null;
-        })
-        .filter((line): line is string => Boolean(line));
-
-      if (skillLines.length > 0) lines.push("SKILLS", ...skillLines, "");
-    },
-    education: () => {
-      const education = Array.isArray(cvJson.education)
-        ? cvJson.education.filter(isRecord)
-        : [];
-      if (education.length === 0) return;
-
-      lines.push("EDUCATION");
-      for (const item of education) {
-        const title = [
-          textOrNull(item.degree),
-          textOrNull(item.institution),
-          textOrNull(item.dates),
-        ]
-          .filter(Boolean)
-          .join(" | ");
-        if (title) lines.push(title);
-        const details = textArray(item.details);
-        if (details.length > 0) lines.push(details.join("; "));
-      }
-      lines.push("");
-    },
-    certifications: () => {
-      const certifications = textArray(cvJson.certifications);
-      if (certifications.length > 0) {
-        lines.push("CERTIFICATIONS", certifications.join("; "), "");
-      }
-    },
-  };
-
-  for (const section of orderedCvSections(textArray(cvJson.sectionOrder))) {
-    appendSection[section]();
-  }
-
-  return lines.join("\n").trim();
-}
-
-async function scoreRequirement(args: {
+async function persistBatchFit(args: {
   anonymousSessionId: string;
   applicationId: string;
-  requirement: {
-    id: string;
-    label: string;
-    description: string;
-    importance: string;
-  };
+  jobRequirements: Array<{ id: string; label: string; importance: string }>;
+  output: Awaited<ReturnType<typeof runBatchEvidenceFitAndGapPlannerAgent>>;
+  retrievedEvidenceByRequirement: Record<
+    string,
+    Array<{ id: string; similarityScore: number }>
+  >;
 }) {
-  const retrievedChunks = await retrieveCandidateEvidenceForRequirement({
-    anonymousSessionId: args.anonymousSessionId,
-    applicationId: args.applicationId,
-    requirement: args.requirement,
+  const persistedChunks = await db.candidateChunk.findMany({
+    where: {
+      applicationId: args.applicationId,
+      anonymousSessionId: args.anonymousSessionId,
+    },
+    select: { id: true },
   });
-
-  const scoring = await runEvidenceScoringAgent({
+  const validCandidateChunkIds = new Set(persistedChunks.map((chunk) => chunk.id));
+  const persistencePlan = buildEvidenceMatchPersistencePlan({
     applicationId: args.applicationId,
-    requirement: args.requirement,
-    retrievedChunks,
+    jobRequirements: args.jobRequirements,
+    output: args.output,
+    retrievedEvidenceByRequirement: args.retrievedEvidenceByRequirement,
+    validCandidateChunkIds,
   });
-
-  await replaceWithScoredEvidenceMatches({
-    applicationId: args.applicationId,
-    requirement: args.requirement,
-    retrievedChunks,
-    scoring,
-  });
-}
-
-export async function setDreamRole(args: {
-  anonymousSessionId: string;
-  applicationId: string;
-  clerkUserId?: string | null;
-  dreamRole: string;
-}) {
-  await assertApplicationForSession(args);
-
-  const dreamRole = args.dreamRole.trim();
-  if (!dreamRole) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Tell Taylor the role you want first.",
+  if (persistencePlan.rejectedMatches.length > 0) {
+    console.warn("taylor_rejected_evidence_matches", {
+      applicationId: args.applicationId,
+      rejectedMatches: persistencePlan.rejectedMatches,
     });
   }
 
-  const application = await db.application.update({
-    where: { id: args.applicationId },
-    data: {
-      dreamRole,
-      status: "started",
-      currentStep: "dream_role_added",
+  await db.$transaction(async (tx) => {
+    await tx.evidenceMatch.deleteMany({ where: { applicationId: args.applicationId } });
+    await tx.requirementFitScore.deleteMany({ where: { applicationId: args.applicationId } });
+    await tx.gapAnswer.deleteMany({ where: { applicationId: args.applicationId } });
+    await tx.gapQuestion.deleteMany({ where: { applicationId: args.applicationId } });
+    await tx.gapCoachInsight.deleteMany({ where: { applicationId: args.applicationId } });
+
+    for (const match of persistencePlan.evidenceMatches) {
+      await tx.evidenceMatch.create({
+        data: {
+          applicationId: match.applicationId,
+          jobRequirementId: match.jobRequirementId,
+          candidateChunkId: match.candidateChunkId,
+          similarityScore: match.similarityScore,
+          confidence: match.confidence,
+          cvUsefulness: match.cvUsefulness,
+          claimRisk: match.claimRisk,
+          reason: match.reason,
+        },
+      });
+    }
+    for (const fitScore of persistencePlan.requirementFitScores) {
+      await tx.requirementFitScore.create({
+        data: {
+          applicationId: fitScore.applicationId,
+          jobRequirementId: fitScore.jobRequirementId,
+          finalConfidence: fitScore.finalConfidence,
+          bestCandidateChunkId: fitScore.bestCandidateChunkId,
+          reason: fitScore.reason,
+          importanceWeight: fitScore.importanceWeight,
+          confidenceValue: fitScore.confidenceValue,
+          earnedPoints: fitScore.earnedPoints,
+          possiblePoints: fitScore.possiblePoints,
+        },
+      });
+    }
+
+    await tx.gapCoachInsight.create({
+      data: {
+        applicationId: args.applicationId,
+        openingMessage:
+          args.output.recommendedGapQuestions.length > 0
+            ? "Taylor found a few quick questions that could make the final CV stronger."
+            : "Taylor found enough evidence to build the CV now.",
+        jobWants: args.output.cvAngle,
+        candidateStrengthsJson: inputJson(args.output.topStrengths),
+        candidateConcernsJson: inputJson(args.output.weakSpots),
+      },
+    });
+
+    if (args.output.recommendedGapQuestions.length > 0) {
+      const liveRequirementIds = new Set(args.jobRequirements.map((item) => item.id));
+      await tx.gapQuestion.createMany({
+        data: args.output.recommendedGapQuestions.slice(0, 4).map((question) => ({
+          applicationId: args.applicationId,
+          targetRequirementId:
+            question.targetRequirementId && liveRequirementIds.has(question.targetRequirementId)
+              ? question.targetRequirementId
+              : null,
+          question: question.question,
+          reason: question.dynamicGuidance,
+          whyItMatters: question.whyThisMatters,
+          answerGuidance: question.howYourAnswerHelps,
+          exampleAnglesJson: inputJson([question.dynamicGuidance]),
+          questionJson: inputJson(questionJson(question)),
+          status: "unanswered" as const,
+        })),
+      });
+    }
+  });
+}
+
+async function prepareFastMatch(args: {
+  anonymousSessionId: string;
+  applicationId: string;
+  candidateProfileId: string;
+  profileOutput: CandidateProfilerOutput;
+}) {
+  const job = await db.job.findUnique({
+    where: { applicationId: args.applicationId },
+    include: { requirements: true },
+  });
+  if (!job) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Add a job before scanning your background.",
+    });
+  }
+
+  await db.evidenceMatch.deleteMany({ where: { applicationId: args.applicationId } });
+  await db.requirementFitScore.deleteMany({ where: { applicationId: args.applicationId } });
+  await db.gapAnswer.deleteMany({ where: { applicationId: args.applicationId } });
+  await db.gapQuestion.deleteMany({ where: { applicationId: args.applicationId } });
+  await db.gapCoachInsight.deleteMany({ where: { applicationId: args.applicationId } });
+  await db.cvDraft.deleteMany({ where: { applicationId: args.applicationId } });
+  await db.candidateChunk.deleteMany({
+    where: {
+      applicationId: args.applicationId,
+      anonymousSessionId: args.anonymousSessionId,
     },
   });
 
-  return { application };
-}
+  const chunks = await timedStep(
+    "deterministic chunk builder",
+    async () =>
+      buildEvidenceChunksFromProfile({
+        anonymousSessionId: args.anonymousSessionId,
+        applicationId: args.applicationId,
+        candidateProfileId: args.candidateProfileId,
+        profile: args.profileOutput,
+      }),
+    { applicationId: args.applicationId }
+  );
 
-export async function resetApplication(args: {
-  anonymousSessionId: string;
-  applicationId: string;
-  clerkUserId?: string | null;
-}) {
-  await assertApplicationForSession(args);
+  await timedStep(
+    "batch embedding call",
+    () => insertCandidateChunksWithEmbeddings(chunks),
+    { applicationId: args.applicationId, chunkCount: chunks.length }
+  );
 
-  await db.application.delete({ where: { id: args.applicationId } });
+  const rankedRequirements = [...job.requirements]
+    .sort((a, b) => {
+      const rank = { high: 0, medium: 1, low: 2 } as const;
+      return rank[a.importance] - rank[b.importance];
+    })
+    .slice(0, 14);
+  const requirementsForRetrieval = rankedRequirements.filter(
+    (requirement) => requirement.importance !== "low"
+  );
 
-  return createApplication({
+  const retrievalMap = await timedStep(
+    "retrieval",
+    () =>
+      searchCandidateChunksForRequirements({
+        anonymousSessionId: args.anonymousSessionId,
+        applicationId: args.applicationId,
+        requirements: requirementsForRetrieval,
+        topK: 4,
+      }),
+    { applicationId: args.applicationId, requirementCount: requirementsForRetrieval.length }
+  );
+  const retrievedEvidenceByRequirement = Object.fromEntries(
+    rankedRequirements.map((requirement) => [
+      requirement.id,
+      (retrievalMap.get(requirement.id) ?? []).map((chunk) => ({
+        id: chunk.id,
+        content: chunk.content,
+        similarityScore: Number(chunk.similarityScore),
+        chunkType: chunk.chunkType,
+        sourceType: chunk.sourceType,
+        tagsJson: chunk.tagsJson,
+        metadataJson: chunk.metadataJson,
+      })),
+    ])
+  );
+
+  const fitOutput = await timedStep(
+    "Batch Evidence Fit + Gap Planner",
+    () =>
+      runBatchEvidenceFitAndGapPlannerAgent({
+        applicationId: args.applicationId,
+        input: {
+          parsedJob: {
+            title: job.title,
+            company: job.company,
+            seniority: job.seniority,
+            summary: job.summary,
+            roleDomain: job.roleDomain,
+            archetypeHint: job.archetypeHint,
+          },
+          requirements: rankedRequirements.map((requirement) => ({
+            id: requirement.id,
+            label: requirement.label,
+            description: requirement.description,
+            importance: requirement.importance,
+          })),
+          candidateProfileSummary: args.profileOutput.summary,
+          retrievedEvidenceByRequirement,
+          metricOpportunities: args.profileOutput.metricOpportunities ?? [],
+          scopeOpportunities: args.profileOutput.scopeOpportunities ?? [],
+          roleDomain: job.roleDomain,
+          archetypeHint: job.archetypeHint,
+        },
+      }),
+    { applicationId: args.applicationId }
+  );
+
+  await persistBatchFit({
     anonymousSessionId: args.anonymousSessionId,
-    clerkUserId: args.clerkUserId,
+    applicationId: args.applicationId,
+    jobRequirements: rankedRequirements,
+    output: fitOutput,
+    retrievedEvidenceByRequirement,
   });
+
+  await db.application.update({
+    where: { id: args.applicationId },
+    data: {
+      status: "questions_ready",
+      currentStep: "match_ready",
+      originalEvidenceMatchScore: fitOutput.currentMatchScore,
+      updatedEvidenceMatchScore: fitOutput.currentMatchScore,
+      matchLabel: fitOutput.matchLabel,
+      cvAngle: fitOutput.cvAngle,
+      roleArchetype: fitOutput.roleArchetype,
+      matchAnalysisJson: inputJson(fitOutput),
+    },
+  });
+
+  return fitOutput;
 }
 
 export async function createApplication(args: {
@@ -848,11 +578,20 @@ export async function createApplication(args: {
       currentStep: "started",
     },
   });
+  return { applicationId: application.id, anonymousSessionId: args.anonymousSessionId };
+}
 
-  return {
-    applicationId: application.id,
+export async function resetApplication(args: {
+  anonymousSessionId: string;
+  applicationId: string;
+  clerkUserId?: string | null;
+}) {
+  await assertApplicationForSession(args);
+  await db.application.delete({ where: { id: args.applicationId } });
+  return createApplication({
     anonymousSessionId: args.anonymousSessionId,
-  };
+    clerkUserId: args.clerkUserId,
+  });
 }
 
 export async function submitJob(args: {
@@ -862,7 +601,6 @@ export async function submitJob(args: {
   rawJobText: string;
 }) {
   await assertApplicationForSession(args);
-
   if (args.rawJobText.length > MAX_JOB_DESCRIPTION_CHARS) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -870,17 +608,17 @@ export async function submitJob(args: {
     });
   }
 
-  const parsedJob = await runJobParserAgent({
-    applicationId: args.applicationId,
-    rawJobText: args.rawJobText,
-  });
-
+  const parsedJob = await timedStep(
+    "Job Parser",
+    () => runJobParserAgent({ applicationId: args.applicationId, rawJobText: args.rawJobText }),
+    { applicationId: args.applicationId }
+  );
+  const requirements = normalizeJobRequirements(parsedJob.requirements);
   const existingJob = await db.job.findUnique({
     where: { applicationId: args.applicationId },
   });
 
   await clearGeneratedWork(args.applicationId);
-
   if (existingJob) {
     await db.jobRequirement.deleteMany({ where: { jobId: existingJob.id } });
   }
@@ -894,6 +632,8 @@ export async function submitJob(args: {
           company: parsedJob.company,
           seniority: parsedJob.seniority,
           summary: parsedJob.summary,
+          roleDomain: parsedJob.roleDomain ?? null,
+          archetypeHint: parsedJob.archetypeHint ?? null,
         },
       })
     : await db.job.create({
@@ -904,11 +644,13 @@ export async function submitJob(args: {
           company: parsedJob.company,
           seniority: parsedJob.seniority,
           summary: parsedJob.summary,
+          roleDomain: parsedJob.roleDomain ?? null,
+          archetypeHint: parsedJob.archetypeHint ?? null,
         },
       });
 
   await db.jobRequirement.createMany({
-    data: parsedJob.requirements.map((requirement) => ({
+    data: requirements.map((requirement) => ({
       jobId: job.id,
       type: requirement.type,
       label: requirement.label,
@@ -916,7 +658,6 @@ export async function submitJob(args: {
       importance: requirement.importance,
     })),
   });
-
   await db.application.update({
     where: { id: args.applicationId },
     data: {
@@ -924,159 +665,42 @@ export async function submitJob(args: {
       currentStep: "job_added",
       originalEvidenceMatchScore: null,
       updatedEvidenceMatchScore: null,
+      matchLabel: null,
+      cvAngle: null,
+      roleArchetype: null,
+      matchAnalysisJson: undefined,
     },
   });
-
   const jobRequirements = await db.jobRequirement.findMany({
     where: { jobId: job.id },
     orderBy: { label: "asc" },
   });
-
   return { job, jobRequirements };
-}
-
-async function fetchLinkedInPublicText(url: string) {
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (compatible; TaylorCV/1.0; +https://taylorcv.local)",
-      },
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!response.ok) return null;
-
-    const html = await response.text();
-    const text = html
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    return text.length >= 300 ? text.slice(0, MAX_CANDIDATE_BACKGROUND_CHARS) : null;
-  } catch {
-    return null;
-  }
-}
-
-async function upsertCandidateProfileFromOutput(args: {
-  anonymousSessionId: string;
-  applicationId: string;
-  profileOutput: CandidateProfilerOutput;
-  rawCvText?: string | null;
-  rawBackgroundText?: string | null;
-  profileSource?: string | null;
-  sourceSummary?: string | null;
-  sourceUrl?: string | null;
-  profileConfirmedAt?: Date | null;
-}) {
-  return db.candidateProfile.upsert({
-    where: { applicationId: args.applicationId },
-    update: {
-      rawCvText: args.rawCvText,
-      rawBackgroundText: args.rawBackgroundText,
-      contactInfoJson: inputJson(args.profileOutput.contactInfo),
-      linksJson: inputJson(args.profileOutput.links),
-      profileSource: args.profileSource,
-      sourceSummary: args.sourceSummary ?? args.profileOutput.sourceSummary,
-      sourceUrl: args.sourceUrl,
-      profileConfirmedAt: args.profileConfirmedAt,
-      summary: args.profileOutput.summary,
-      skillsJson: inputJson(args.profileOutput.skills),
-      projectsJson: inputJson(args.profileOutput.projects),
-      educationJson: inputJson(args.profileOutput.education),
-      certificationsJson: inputJson(args.profileOutput.certifications),
-      experienceJson: inputJson(args.profileOutput.experience),
-      toolsJson: inputJson(args.profileOutput.tools),
-      achievementsJson: inputJson(args.profileOutput.achievements),
-    },
-    create: {
-      anonymousSessionId: args.anonymousSessionId,
-      applicationId: args.applicationId,
-      rawCvText: args.rawCvText,
-      rawBackgroundText: args.rawBackgroundText,
-      contactInfoJson: inputJson(args.profileOutput.contactInfo),
-      linksJson: inputJson(args.profileOutput.links),
-      profileSource: args.profileSource,
-      sourceSummary: args.sourceSummary ?? args.profileOutput.sourceSummary,
-      sourceUrl: args.sourceUrl,
-      profileConfirmedAt: args.profileConfirmedAt,
-      summary: args.profileOutput.summary,
-      skillsJson: inputJson(args.profileOutput.skills),
-      projectsJson: inputJson(args.profileOutput.projects),
-      educationJson: inputJson(args.profileOutput.education),
-      certificationsJson: inputJson(args.profileOutput.certifications),
-      experienceJson: inputJson(args.profileOutput.experience),
-      toolsJson: inputJson(args.profileOutput.tools),
-      achievementsJson: inputJson(args.profileOutput.achievements),
-    },
-  });
-}
-
-async function replaceCandidateProfileChunks(args: {
-  anonymousSessionId: string;
-  applicationId: string;
-  candidateProfileId: string;
-  profileOutput: CandidateProfilerOutput;
-}) {
-  await db.candidateChunk.deleteMany({
-    where: {
-      applicationId: args.applicationId,
-      anonymousSessionId: args.anonymousSessionId,
-    },
-  });
-
-  const chunkOutput = await runEvidenceChunkCreatorAgent({
-    applicationId: args.applicationId,
-    input: { mode: "profile", profile: args.profileOutput },
-  });
-
-  const candidateChunks = [];
-  for (const chunk of chunkOutput.chunks) {
-    candidateChunks.push(
-      await insertCandidateChunkWithEmbedding({
-        anonymousSessionId: args.anonymousSessionId,
-        applicationId: args.applicationId,
-        candidateProfileId: args.candidateProfileId,
-        sourceType: chunk.sourceType,
-        sourceId: chunk.sourceId,
-        chunkType: chunk.chunkType,
-        content: chunk.content,
-        tags: chunk.tags,
-        metadata: { candidateProfileId: args.candidateProfileId },
-      })
-    );
-  }
-
-  return candidateChunks;
 }
 
 export async function submitCandidateProfileSource(args: {
   anonymousSessionId: string;
   applicationId: string;
   clerkUserId?: string | null;
-  source: "cv_upload" | "linkedin_url" | "linkedin_paste" | "manual";
+  source: "cv_upload" | "linkedin_url";
   rawCvText?: string | null;
   rawBackgroundText?: string | null;
   sourceUrl?: string | null;
-  manualProfile?: CandidateProfilerOutput | null;
 }) {
   await assertApplicationForSession(args);
-
   const sourceUrl = optionalText(args.sourceUrl);
   let rawCvText = args.rawCvText ?? null;
   let rawBackgroundText = args.rawBackgroundText ?? null;
 
-  if (args.source === "linkedin_url" && sourceUrl && !optionalText(rawBackgroundText)) {
+  if (args.source === "linkedin_url") {
+    if (!sourceUrl) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Add a LinkedIn URL first." });
+    }
     const importedText = await fetchLinkedInPublicText(sourceUrl);
     if (!importedText) {
       return {
-        importStatus: "needs_paste" as const,
-        message:
-          "LinkedIn import did not work. Paste your LinkedIn About/Experience/Education text here instead.",
+        importStatus: "needs_upload" as const,
+        message: LINKEDIN_FAILURE_MESSAGE,
       };
     }
     rawBackgroundText = importedText;
@@ -1092,19 +716,20 @@ export async function submitCandidateProfileSource(args: {
   if (combinedLength === 0) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: "Add candidate information before Taylor scans your profile.",
+      message: "Upload your CV before Taylor scans your background.",
     });
   }
 
-  const profileOutput =
-    args.source === "manual" && args.manualProfile
-      ? args.manualProfile
-      : await runCandidateProfilerAgent({
-          applicationId: args.applicationId,
-          rawCvText,
-          rawBackgroundText,
-        });
-
+  const profileOutput = await timedStep(
+    "Candidate Profiler",
+    () =>
+      runCandidateProfilerAgent({
+        applicationId: args.applicationId,
+        rawCvText,
+        rawBackgroundText,
+      }),
+    { applicationId: args.applicationId }
+  );
   const candidateProfile = await upsertCandidateProfileFromOutput({
     anonymousSessionId: args.anonymousSessionId,
     applicationId: args.applicationId,
@@ -1114,287 +739,39 @@ export async function submitCandidateProfileSource(args: {
     profileSource: args.source,
     sourceSummary: profileOutput.sourceSummary,
     sourceUrl,
-    profileConfirmedAt: null,
   });
-
-  await clearGeneratedWork(args.applicationId);
-  await db.candidateChunk.deleteMany({
-    where: {
-      applicationId: args.applicationId,
-      anonymousSessionId: args.anonymousSessionId,
-    },
-  });
-
-  await db.application.update({
-    where: { id: args.applicationId },
-    data: {
-      status: "candidate_added",
-      currentStep: "profile_needs_confirmation",
-      originalEvidenceMatchScore: null,
-      updatedEvidenceMatchScore: null,
-    },
-  });
-
-  return {
-    importStatus: "profile_ready" as const,
-    candidateProfile,
-    missingEssentials: profileMissingEssentials(profileOutput),
-  };
-}
-
-export async function confirmCandidateProfile(args: {
-  anonymousSessionId: string;
-  applicationId: string;
-  clerkUserId?: string | null;
-  profile: CandidateProfilerOutput;
-}) {
-  await assertApplicationForSession(args);
-
-  const missingEssentials = profileMissingEssentials(args.profile);
-  if (missingEssentials.length > 0) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: `Confirm these required details before continuing: ${missingEssentials.join(", ")}.`,
-    });
-  }
-
-  const existingProfile = await db.candidateProfile.findUnique({
-    where: { applicationId: args.applicationId },
-  });
-  if (!existingProfile) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Scan your profile before confirming details.",
-    });
-  }
-
-  await clearGeneratedWork(args.applicationId);
-
-  const candidateProfile = await upsertCandidateProfileFromOutput({
-    anonymousSessionId: args.anonymousSessionId,
-    applicationId: args.applicationId,
-    rawCvText: existingProfile.rawCvText,
-    rawBackgroundText: existingProfile.rawBackgroundText,
-    profileOutput: args.profile,
-    profileSource: existingProfile.profileSource,
-    sourceSummary: existingProfile.sourceSummary,
-    sourceUrl: existingProfile.sourceUrl,
-    profileConfirmedAt: new Date(),
-  });
-  const candidateChunks = await replaceCandidateProfileChunks({
-    anonymousSessionId: args.anonymousSessionId,
-    applicationId: args.applicationId,
-    candidateProfileId: candidateProfile.id,
-    profileOutput: args.profile,
-  });
-
-  await db.application.update({
-    where: { id: args.applicationId },
-    data: {
-      status: "candidate_added",
-      currentStep: "profile_confirmed",
-      originalEvidenceMatchScore: null,
-      updatedEvidenceMatchScore: null,
-    },
-  });
-
-  return { candidateProfile, candidateChunks };
-}
-
-export async function submitCandidateInfo(args: {
-  anonymousSessionId: string;
-  applicationId: string;
-  clerkUserId?: string | null;
-  rawCvText?: string | null;
-  rawBackgroundText?: string | null;
-}) {
-  return submitCandidateProfileSource({
-    anonymousSessionId: args.anonymousSessionId,
-    applicationId: args.applicationId,
-    clerkUserId: args.clerkUserId,
-    source: "cv_upload",
-    rawCvText: args.rawCvText,
-    rawBackgroundText: args.rawBackgroundText,
-  });
-}
-
-export async function runEvidenceMatching(args: {
-  anonymousSessionId: string;
-  applicationId: string;
-  clerkUserId?: string | null;
-}) {
-  const application = await assertApplicationForSession(args);
-
-  const job = await db.job.findUnique({
-    where: { applicationId: args.applicationId },
-    include: { requirements: true },
-  });
-  const candidateProfile = await db.candidateProfile.findUnique({
-    where: { applicationId: args.applicationId },
-  });
-  const candidateChunkCount = await db.candidateChunk.count({
-    where: {
-      applicationId: args.applicationId,
-      anonymousSessionId: args.anonymousSessionId,
-    },
-  });
-
-  if (!candidateProfile?.profileConfirmedAt) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Confirm your profile details before Taylor matches evidence.",
-    });
-  }
-
-  if (!job || job.requirements.length === 0 || candidateChunkCount === 0) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Evidence matching requires a job and candidate chunks",
-    });
-  }
-
-  for (const requirement of job.requirements) {
-    await scoreRequirement({
+  let matchAnalysis: Awaited<ReturnType<typeof prepareFastMatch>>;
+  try {
+    matchAnalysis = await prepareFastMatch({
       anonymousSessionId: args.anonymousSessionId,
       applicationId: args.applicationId,
-      requirement,
+      candidateProfileId: candidateProfile.id,
+      profileOutput,
     });
-  }
-
-  const score = await calculateEvidenceMatchScore(args.applicationId);
-
-  await db.application.update({
-    where: { id: args.applicationId },
-    data: {
-      status: "evidence_ready",
-      currentStep: "evidence_ready",
-      originalEvidenceMatchScore:
-        application.originalEvidenceMatchScore ?? score.score,
-      updatedEvidenceMatchScore: score.score,
-    },
-  });
-
-  return {
-    evidenceMap: await buildRequirementEvidenceMap(args.applicationId),
-    evidenceMatchScore: score,
-  };
-}
-
-export async function generateGapQuestions(args: {
-  anonymousSessionId: string;
-  applicationId: string;
-  clerkUserId?: string | null;
-}) {
-  await assertApplicationForSession(args);
-
-  const evidenceMatchCount = await db.evidenceMatch.count({
-    where: { applicationId: args.applicationId },
-  });
-  if (evidenceMatchCount === 0) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Gap questions require evidence matches",
+  } catch (error) {
+    console.error("taylor_candidate_scan_failed", {
+      applicationId: args.applicationId,
+      error: safeErrorMessage(error),
     });
-  }
-
-  const candidateProfile = await db.candidateProfile.findUnique({
-    where: { applicationId: args.applicationId },
-  });
-  const evidenceMap = await buildRequirementEvidenceMap(args.applicationId);
-
-  if (evidenceMap.length === 0 || !candidateProfile) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Gap questions require a job and candidate profile",
-    });
-  }
-
-  const questionOutput = await runGapQuestionAgent({
-    applicationId: args.applicationId,
-    evidenceMap,
-    candidateProfileSummary: candidateProfile.summary,
-  });
-
-  const questionsToCreate = prepareGapQuestionsForInsert({
-    questions: questionOutput.questions,
-    evidenceMap,
-  });
-
-  await db.$transaction(async (tx) => {
-    await tx.gapCoachInsight.upsert({
-      where: { applicationId: args.applicationId },
-      update: {
-        openingMessage: questionOutput.coachInsight.openingMessage,
-        jobWants: questionOutput.coachInsight.jobWants,
-        candidateStrengthsJson: questionOutput.coachInsight
-          .candidateStrengths as Prisma.InputJsonValue,
-        candidateConcernsJson: questionOutput.coachInsight
-          .candidateConcerns as Prisma.InputJsonValue,
-      },
-      create: {
-        applicationId: args.applicationId,
-        openingMessage: questionOutput.coachInsight.openingMessage,
-        jobWants: questionOutput.coachInsight.jobWants,
-        candidateStrengthsJson: questionOutput.coachInsight
-          .candidateStrengths as Prisma.InputJsonValue,
-        candidateConcernsJson: questionOutput.coachInsight
-          .candidateConcerns as Prisma.InputJsonValue,
-      },
-    });
-
-    await tx.gapQuestion.deleteMany({
-      where: { applicationId: args.applicationId, status: "unanswered" },
-    });
-
-    if (questionsToCreate.length > 0) {
-      const targetIds = questionsToCreate
-        .map((question) => question.targetRequirementId)
-        .filter((id): id is string => Boolean(id));
-      const liveTargetIds =
-        targetIds.length > 0
-          ? new Set(
-              (
-                await tx.jobRequirement.findMany({
-                  where: {
-                    id: { in: targetIds },
-                    job: { applicationId: args.applicationId },
-                  },
-                  select: { id: true },
-                })
-              ).map((requirement) => requirement.id)
-            )
-          : new Set<string>();
-
-      await tx.gapQuestion.createMany({
-        data: questionsToCreate.map((question) => ({
-          applicationId: args.applicationId,
-          targetRequirementId:
-            question.targetRequirementId &&
-            liveTargetIds.has(question.targetRequirementId)
-              ? question.targetRequirementId
-              : null,
-          question: question.question,
-          reason: question.reason,
-          whyItMatters: question.whyItMatters,
-          answerGuidance: question.answerGuidance,
-          exampleAnglesJson: question.exampleAnglesJson,
-          status: question.status,
-        })),
-      });
-    }
-
-    await tx.application.update({
+    await db.application.update({
       where: { id: args.applicationId },
-      data: { status: "questions_ready", currentStep: "questions_ready" },
+      data: {
+        status: "candidate_added",
+        currentStep: "candidate_scan_failed",
+      },
     });
-  });
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Something went wrong while scanning your background. Please try again.",
+    });
+  }
 
-  const gapQuestions = await db.gapQuestion.findMany({
-    where: { applicationId: args.applicationId },
-    orderBy: { createdAt: "asc" },
-  });
-
-  return { gapQuestions };
+  return {
+    importStatus: "match_ready" as const,
+    candidateProfile,
+    matchAnalysis,
+    missingEssentials: [],
+  };
 }
 
 export async function answerGapQuestions(args: {
@@ -1404,469 +781,421 @@ export async function answerGapQuestions(args: {
   answers: Array<{
     gapQuestionId: string;
     answerText?: string | null;
+    selectedOption?: string | null;
+    followUpText?: string | null;
+    metricText?: string | null;
     skipped?: boolean | null;
   }>;
 }) {
   await assertApplicationForSession(args);
 
-  const newCandidateChunks = [];
-  const affectedRequirementIds = new Set<string>();
-  let hasUntargetedUsefulAnswer = false;
-
-  for (const answer of args.answers) {
-    const gapQuestion = await db.gapQuestion.findFirst({
-      where: {
-        id: answer.gapQuestionId,
-        applicationId: args.applicationId,
-      },
-      include: { targetRequirement: true },
-    });
-
-    if (!gapQuestion) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Gap question does not belong to this application",
-      });
-    }
-
-    const answerText = answer.answerText?.trim() ?? "";
-    const isSkipped = !!answer.skipped;
-
-    if (!isSkipped && answerText.length < 60) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: "Add a little more detail before saving this answer.",
-      });
-    }
-
-    const gapAnswer = await db.gapAnswer.create({
-      data: {
-        gapQuestionId: answer.gapQuestionId,
-        applicationId: args.applicationId,
-        buttonAnswer: isSkipped ? "skip" : "yes",
-        elaboration: isSkipped ? null : answerText,
-      },
-    });
-
-    await db.gapQuestion.update({
-      where: { id: answer.gapQuestionId },
-      data: {
-        status: isSkipped ? "skipped" : "answered",
-      },
-    });
-
-    if (!isSkipped && gapQuestion.targetRequirementId) {
-      affectedRequirementIds.add(gapQuestion.targetRequirementId);
-    } else if (!isSkipped && answerText) {
-      hasUntargetedUsefulAnswer = true;
-    }
-
-    if (!isSkipped && answerText) {
-      const chunkOutput = await runEvidenceChunkCreatorAgent({
-        applicationId: args.applicationId,
-        input: {
-          mode: "gap_answer",
-          question: gapQuestion.question,
-          targetRequirement: gapQuestion.targetRequirement
-            ? {
-                id: gapQuestion.targetRequirement.id,
-                label: gapQuestion.targetRequirement.label,
-                description: gapQuestion.targetRequirement.description,
-              }
-            : null,
-          buttonAnswer: "yes",
-          elaboration: answerText,
-          gapAnswerId: gapAnswer.id,
-        },
-      });
-
-      for (const chunk of chunkOutput.chunks) {
-        newCandidateChunks.push(
-          await insertCandidateChunkWithEmbedding({
-            anonymousSessionId: args.anonymousSessionId,
+  const chunks = await timedStep(
+    "gap answer processing",
+    async () => {
+      const newChunks = [];
+      for (const answer of args.answers) {
+        const gapQuestion = await db.gapQuestion.findFirst({
+          where: { id: answer.gapQuestionId, applicationId: args.applicationId },
+          include: { targetRequirement: true },
+        });
+        if (!gapQuestion) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Gap question does not belong to this application",
+          });
+        }
+        const selectedOption = optionalText(answer.selectedOption);
+        const followUpText = optionalText(answer.followUpText);
+        const metricText = optionalText(answer.metricText);
+        const answerText = optionalText(answer.answerText);
+        const skipped =
+          !!answer.skipped ||
+          selectedOption?.toLowerCase() === "skip" ||
+          (!selectedOption && !followUpText && !metricText && !answerText);
+        const gapAnswer = await db.gapAnswer.create({
+          data: {
+            gapQuestionId: gapQuestion.id,
             applicationId: args.applicationId,
-            sourceType: chunk.sourceType,
-            sourceId: gapAnswer.id,
-            chunkType: chunk.chunkType,
-            content: chunk.content,
-            tags: chunk.tags,
-            metadata: { gapAnswerId: gapAnswer.id },
-          })
-        );
+            buttonAnswer: skipped ? "skip" : followUpText || metricText || answerText ? "yes" : "kind_of",
+            elaboration: skipped ? null : [followUpText, metricText, answerText].filter(Boolean).join(" "),
+            selectedOption,
+            followUpText,
+            metricText,
+            skipped,
+          },
+        });
+        await db.gapQuestion.update({
+          where: { id: gapQuestion.id },
+          data: { status: skipped ? "skipped" : "answered" },
+        });
+        if (skipped) continue;
+        const answerContent = [selectedOption, followUpText, metricText, answerText]
+          .filter(Boolean)
+          .join(" ");
+        const trustLevel = classifyGapAnswerTrust(answerContent);
+        if (trustLevel === "suspicious" || trustLevel === "do_not_use") {
+          console.warn("taylor_gap_answer_excluded", {
+            applicationId: args.applicationId,
+            gapAnswerId: gapAnswer.id,
+            trustLevel,
+          });
+          continue;
+        }
+        const chunk = buildGapAnswerEvidenceChunk({
+          anonymousSessionId: args.anonymousSessionId,
+          applicationId: args.applicationId,
+          gapAnswerId: gapAnswer.id,
+          gapQuestionId: gapQuestion.id,
+          targetRequirementId: gapQuestion.targetRequirementId,
+          targetRequirementLabel: gapQuestion.targetRequirement?.label ?? null,
+          selectedOption,
+          followUpText,
+          metricText,
+          answerText,
+          trustLevel,
+        });
+        if (chunk) newChunks.push(chunk);
       }
-    }
+      return newChunks;
+    },
+    { applicationId: args.applicationId }
+  );
+
+  if (chunks.length > 0) {
+    await timedStep(
+      "batch embedding call",
+      () => insertCandidateChunksWithEmbeddings(chunks),
+      { applicationId: args.applicationId, chunkCount: chunks.length, source: "gap_answers" }
+    );
   }
-
-  if (hasUntargetedUsefulAnswer) {
-    const openFitScores = await db.requirementFitScore.findMany({
-      where: {
-        applicationId: args.applicationId,
-        finalConfidence: { not: "high" },
-        jobRequirement: { importance: { not: "low" } },
-      },
-      select: { jobRequirementId: true },
-    });
-
-    for (const score of openFitScores) {
-      affectedRequirementIds.add(score.jobRequirementId);
-    }
-  }
-
-  if (affectedRequirementIds.size > 0) {
-    const requirements = await db.jobRequirement.findMany({
-      where: {
-        id: { in: [...affectedRequirementIds] },
-        job: { applicationId: args.applicationId },
-      },
-    });
-
-    for (const requirement of requirements) {
-      await scoreRequirement({
-        anonymousSessionId: args.anonymousSessionId,
-        applicationId: args.applicationId,
-        requirement,
-      });
-    }
-  }
-
-  const score = await calculateEvidenceMatchScore(args.applicationId);
-
   await db.application.update({
     where: { id: args.applicationId },
-    data: {
-      status: "answers_added",
-      currentStep: "answers_added",
-      updatedEvidenceMatchScore: score.score,
-    },
+    data: { status: "answers_added", currentStep: "answers_added" },
   });
 
   return {
     updatedEvidenceMap: await buildRequirementEvidenceMap(args.applicationId),
-    evidenceMatchScore: score,
-    newCandidateChunks,
+    evidenceMatchScore: await calculateEvidenceMatchScore(args.applicationId),
+    newCandidateChunks: chunks,
   };
 }
 
-export async function generateCvStrategy(args: {
-  anonymousSessionId: string;
-  applicationId: string;
-  clerkUserId?: string | null;
-}) {
-  await assertApplicationForSession(args);
-
-  const evidenceMatchCount = await db.evidenceMatch.count({
-    where: { applicationId: args.applicationId },
-  });
-  if (evidenceMatchCount === 0) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "CV strategy requires evidence matches",
-    });
-  }
-
-  const context = await buildCvStrategyContext(args.applicationId);
-  const strategyOutput = await runCvStrategyAgent({
-    applicationId: args.applicationId,
-    context,
-  });
-
-  const strategy = await db.cvStrategy.create({
-    data: {
-      applicationId: args.applicationId,
-      strategySummary: strategyOutput.strategySummary,
-      targetPositioning: strategyOutput.targetPositioning,
-      sectionOrderJson: strategyOutput.sectionOrder,
-      emphasisJson: strategyOutput.emphasis,
-      deEmphasisJson: strategyOutput.deEmphasis,
-      evidenceToUseJson: strategyOutput.evidenceToUse,
-      warningsJson: strategyOutput.warnings,
-    },
-  });
-
-  await db.application.update({
-    where: { id: args.applicationId },
-    data: { status: "strategy_ready", currentStep: "strategy_ready" },
-  });
-
-  return { strategy };
+function matchAnalysisObject(value: unknown) {
+  return isRecord(value) ? value : {};
 }
 
 export async function generateCv(args: {
   anonymousSessionId: string;
   applicationId: string;
   clerkUserId?: string | null;
-  strategyId: string;
+  strategyId?: string | null;
 }) {
-  await assertApplicationForSession(args);
-
-  const [job, candidateProfile, candidateChunkCount, evidenceMap, strategy] =
-    await Promise.all([
-      db.job.findUnique({
-        where: { applicationId: args.applicationId },
-      }),
-      db.candidateProfile.findUnique({
-        where: { applicationId: args.applicationId },
-      }),
-      db.candidateChunk.count({
-        where: {
-          applicationId: args.applicationId,
-          anonymousSessionId: args.anonymousSessionId,
-        },
-      }),
-      buildRequirementEvidenceMap(args.applicationId),
-      db.cvStrategy.findFirst({
-        where: { id: args.strategyId, applicationId: args.applicationId },
-      }),
-    ]);
-
-  if (!job) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Add a job before generating the CV.",
-    });
-  }
-  if (!candidateProfile || candidateChunkCount === 0) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Add your background before generating the CV.",
-    });
-  }
-  if (!candidateProfile.profileConfirmedAt) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Confirm your profile details before generating the CV.",
-    });
-  }
-  const missingEssentials = profileMissingEssentials({
-    contactInfo: isRecord(candidateProfile.contactInfoJson)
-      ? {
-          fullName: optionalText(candidateProfile.contactInfoJson.fullName as string),
-          professionalTitle: optionalText(
-            candidateProfile.contactInfoJson.professionalTitle as string
-          ),
-          location: optionalText(candidateProfile.contactInfoJson.location as string),
-          email: optionalText(candidateProfile.contactInfoJson.email as string),
-          phone: optionalText(candidateProfile.contactInfoJson.phone as string),
-        }
-      : {
-          fullName: null,
-          professionalTitle: null,
-          location: null,
-          email: null,
-          phone: null,
-        },
-    links: isRecord(candidateProfile.linksJson)
-      ? {
-          linkedin: optionalText(candidateProfile.linksJson.linkedin as string),
-          github: optionalText(candidateProfile.linksJson.github as string),
-          portfolio: optionalText(candidateProfile.linksJson.portfolio as string),
-          other: Array.isArray(candidateProfile.linksJson.other)
-            ? (candidateProfile.linksJson.other as Array<{
-                label: string | null;
-                url: string;
-              }>)
-            : [],
-        }
-      : { linkedin: null, github: null, portfolio: null, other: [] },
-    sourceSummary:
-      typeof candidateProfile.sourceSummary === "string"
-        ? candidateProfile.sourceSummary
-        : null,
-    summary: candidateProfile.summary,
-    skills: stringArray(candidateProfile.skillsJson),
-    projects: [],
-    experience: [],
-    education: [],
-    certifications: [],
-    tools: stringArray(candidateProfile.toolsJson),
-    achievements: stringArray(candidateProfile.achievementsJson),
-  }).filter((field) => field !== "phone");
-  if (missingEssentials.length > 0) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: `Confirm these required details before generating the CV: ${missingEssentials.join(", ")}.`,
-    });
-  }
-  if (evidenceMap.length === 0) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Run job fit matching before generating the CV.",
-    });
-  }
-  if (
-    !evidenceMap.some(
-      (row) =>
-        row.overallConfidence === "high" || row.overallConfidence === "medium"
-    )
-  ) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message:
-        "The CV needs at least one strong or partial job fit result before generation. Answer the clarification questions or add more background.",
-    });
-  }
-  if (!strategy) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Create a CV plan before generating the CV.",
-    });
-  }
-
-  const context = await buildCvWriterContext({
-    applicationId: args.applicationId,
-    strategyId: args.strategyId,
-  });
-  const firstCvOutput = applyStrategySectionOrder(
-    await runCvWriterAgent({
-      applicationId: args.applicationId,
-      context,
+  const application = await assertApplicationForSession(args);
+  const [job, candidateProfile, candidateChunks, gapAnswers] = await Promise.all([
+    db.job.findUnique({ where: { applicationId: args.applicationId } }),
+    db.candidateProfile.findUnique({ where: { applicationId: args.applicationId } }),
+    loadCandidateChunks(args),
+    db.gapAnswer.findMany({
+      where: { applicationId: args.applicationId, skipped: false },
+      include: { gapQuestion: true },
     }),
-    strategy
+  ]);
+  if (!job || !candidateProfile || candidateChunks.length === 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Taylor needs a job and background scan before generating the CV.",
+    });
+  }
+
+  const matchAnalysis = matchAnalysisObject(application.matchAnalysisJson);
+  const trustedGapEvidence = candidateChunks.filter(
+    (chunk) =>
+      chunk.sourceType === "gap_answer" &&
+      (chunkTrustLevel(chunk) === "usable" || chunkTrustLevel(chunk) === "use_carefully")
   );
-  const cvReview = await runCvQualityReviewAgent({
-    applicationId: args.applicationId,
-    context,
-    cvOutput: firstCvOutput,
-  });
-  const cvOutput =
-    !cvReview.passed && cvReview.revisionInstructions.trim()
-      ? applyStrategySectionOrder(
-          await runCvWriterAgent({
+  const cvBuilderContext = {
+    job,
+    candidateProfile,
+    candidateChunks,
+    matchAnalysis,
+    gapEvidence: trustedGapEvidence,
+    gapAnswers,
+    gapAnswerTrust: gapAnswers.map((answer) => ({
+      id: answer.id,
+      trustLevel: classifyGapAnswerTrust(
+        [answer.selectedOption, answer.followUpText, answer.metricText, answer.elaboration]
+          .filter(Boolean)
+          .join(" ")
+      ),
+    })),
+  };
+  const draftGeneration = await (async () => {
+    try {
+      let cvOutput = await timedStep(
+        "CV Builder",
+        () =>
+          runCvBuilderAgent({
             applicationId: args.applicationId,
-            context: {
-              ...context,
-              previousCvOutput: firstCvOutput,
-              qualityReviewRevisionInstructions: cvReview.revisionInstructions,
-              qualityReviewIssues: cvReview.issues,
-            },
+            context: cvBuilderContext,
           }),
-          strategy
-        )
-      : firstCvOutput;
-  const cvText = buildCvTextFromJson(cvOutput.cvJson);
-  const layoutOutput = await runCvLayoutStyleAgent({
-    applicationId: args.applicationId,
-    context: {
-      ...context,
-      cvJson: cvOutput.cvJson,
-      cvText,
-      rendererConstraints: cvLayoutRendererConstraints(),
-      optionalDesignPreferences: null,
-    },
-  });
-  const structuredCv = parseStructuredCv(cvOutput.cvJson);
-  const presentationJson = structuredCv
-    ? normalizeCvPresentation(layoutOutput, structuredCv, context)
-    : layoutOutput;
+        { applicationId: args.applicationId }
+      );
+      const qaContext = { job, candidateChunks, gapAnswers, matchAnalysis };
+      let qa = await timedStep(
+        "deterministic QA",
+        async () => runDeterministicCvQa(cvOutput, qaContext),
+        { applicationId: args.applicationId }
+      );
+      if (!qa.passed) {
+        const repairedOutput = repairCvOutput(cvOutput);
+        const repairedQa = await timedStep(
+          "deterministic QA repair",
+          async () => runDeterministicCvQa(repairedOutput, qaContext),
+          { applicationId: args.applicationId }
+        );
+        cvOutput = repairedOutput;
+        qa = repairedQa;
+      }
+      if (!qa.passed) {
+        const repairInstructions = compactCvRepairInstructions(qa.issues);
+        cvOutput = await timedStep(
+          "CV Builder repair",
+          () =>
+            runCvBuilderAgent({
+              applicationId: args.applicationId,
+              context: {
+                repairInstructions,
+                originalCvJson: cvOutput.cvJson,
+                job: {
+                  title: job.title,
+                  company: job.company,
+                  roleDomain: job.roleDomain,
+                  archetypeHint: job.archetypeHint,
+                },
+                candidateProfile: {
+                  summary: candidateProfile.summary,
+                  skillsJson: candidateProfile.skillsJson,
+                  experienceJson: candidateProfile.experienceJson,
+                  projectsJson: candidateProfile.projectsJson,
+                  educationJson: candidateProfile.educationJson,
+                },
+                candidateChunks,
+                matchAnalysis,
+                gapEvidence: trustedGapEvidence,
+              },
+            }),
+          { applicationId: args.applicationId }
+        );
+        qa = await timedStep(
+          "deterministic QA repair check",
+          async () => runDeterministicCvQa(cvOutput, qaContext),
+          { applicationId: args.applicationId }
+        );
+      }
+      if (!qa.passed) {
+        throw new Error(`CV QA failed: ${qa.issues.slice(0, 5).join("; ")}`);
+      }
+      const finalAfterScore = calculateDeterministicAfterScore({
+        output: cvOutput,
+        qaPassed: qa.passed,
+        context: qaContext,
+      });
+      const presentationJson = await timedStep(
+        "layout/page composer",
+        async () => composeDeterministicPresentation({ cvOutput, context: { job, matchAnalysis } }),
+        { applicationId: args.applicationId }
+      );
+      return { cvOutput, finalAfterScore, presentationJson };
+    } catch (error) {
+      console.error("taylor_cv_draft_generation_failed", {
+        applicationId: args.applicationId,
+        error: safeErrorMessage(error),
+      });
+      await db.application
+        .update({
+          where: { id: args.applicationId },
+          data: {
+            status: "strategy_ready",
+            currentStep: "draft_failed",
+          },
+        })
+        .catch((updateError) =>
+          console.error("taylor_cv_draft_failure_state_update_failed", {
+            applicationId: args.applicationId,
+            error: safeErrorMessage(updateError),
+          })
+        );
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Taylor created the CV strategy, but had trouble writing the final CV. Try again.",
+      });
+    }
+  })();
+  const { cvOutput, finalAfterScore, presentationJson } = draftGeneration;
   const latestDraft = await db.cvDraft.findFirst({
     where: { applicationId: args.applicationId },
     orderBy: { version: "desc" },
   });
-
   const cvDraft = await db.cvDraft.create({
     data: {
       applicationId: args.applicationId,
-      strategyId: args.strategyId,
+      strategyId: null,
       version: (latestDraft?.version ?? 0) + 1,
-      cvJson: cvOutput.cvJson,
-      cvText,
-      presentationJson: presentationJson as Prisma.InputJsonValue,
+      cvJson: inputJson(cvOutput.cvJson),
+      cvText: cvOutput.cvText,
+      presentationJson: inputJson(presentationJson),
+      builderOutputJson: inputJson(cvOutput),
     },
   });
-
   await db.application.update({
     where: { id: args.applicationId },
-    data: { status: "cv_ready", currentStep: "cv_ready" },
+    data: {
+      status: "cv_ready",
+      currentStep: "draft_ready",
+      updatedEvidenceMatchScore: finalAfterScore,
+      cvAngle: cvOutput.cvAngle,
+      roleArchetype: cvOutput.roleArchetype,
+    },
   });
-
   return { cvDraft };
 }
 
-export async function rewriteCvSection(args: {
+export async function getApplicationState(args: {
   anonymousSessionId: string;
   applicationId: string;
   clerkUserId?: string | null;
-  cvDraftId: string;
-  sectionId: string;
-  instruction: string;
 }) {
-  await assertApplicationForSession(args);
+  const application = await assertApplicationForSession(args);
 
-  const draft = await db.cvDraft.findFirst({
-    where: { id: args.cvDraftId, applicationId: args.applicationId },
+  const [
+    job,
+    candidateProfile,
+    candidateChunks,
+    evidenceMatches,
+    requirementFitScores,
+    evidenceMatchScore,
+    gapQuestions,
+    gapAnswers,
+    gapCoachInsight,
+    cvDraft,
+    agentRuns,
+  ] = await Promise.all([
+    db.job.findUnique({
+      where: { applicationId: args.applicationId },
+      include: { requirements: true },
+    }),
+    db.candidateProfile.findUnique({ where: { applicationId: args.applicationId } }),
+    loadCandidateChunks(args),
+    buildRequirementEvidenceMap(args.applicationId),
+    db.requirementFitScore.findMany({
+      where: { applicationId: args.applicationId },
+      include: {
+        bestCandidateChunk: { select: { id: true, content: true } },
+        jobRequirement: true,
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+    calculateEvidenceMatchScore(args.applicationId),
+    db.gapQuestion.findMany({
+      where: { applicationId: args.applicationId },
+      orderBy: { createdAt: "asc" },
+    }),
+    db.gapAnswer.findMany({
+      where: { applicationId: args.applicationId },
+      orderBy: { createdAt: "asc" },
+    }),
+    db.gapCoachInsight.findUnique({ where: { applicationId: args.applicationId } }),
+    db.cvDraft.findFirst({
+      where: { applicationId: args.applicationId },
+      orderBy: { version: "desc" },
+    }),
+    db.agentRun.findMany({
+      where: { applicationId: args.applicationId },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+    }),
+  ]);
+  const sortedRequirements = [...(job?.requirements ?? [])].sort((a, b) => {
+    const rank = { high: 0, medium: 1, low: 2 } as const;
+    return rank[a.importance] - rank[b.importance];
   });
-  if (!draft) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "CV draft does not belong to this application",
-    });
-  }
-
-  const output = await runCvRewriteAgent({
-    applicationId: args.applicationId,
-    sectionId: args.sectionId,
-    currentSection: readCvTarget(draft.cvJson, args.sectionId),
-    instruction: args.instruction,
-    context: await buildCvWriterContext({
-      applicationId: args.applicationId,
-      strategyId: draft.strategyId ?? "",
-    }).catch(() => ({})),
-  });
-
-  const cvJson = writeCvTarget(
-    isRecord(draft.cvJson) ? draft.cvJson : {},
-    args.sectionId,
-    output.updatedSection
+  const topRequirements = sortedRequirements.slice(0, 6);
+  const strongMatches = evidenceMatches.filter(
+    (match) => match.overallConfidence === "high" || match.overallConfidence === "medium"
   );
+  const matchAnalysis = matchAnalysisObject(application.matchAnalysisJson);
+  const weakSpots = Array.isArray(matchAnalysis.weakSpots)
+    ? stringArray(matchAnalysis.weakSpots).map((spot, index) => ({
+        id: `weak-${index}`,
+        targetRequirementId: null,
+        label: spot,
+        reason: spot,
+        question: spot,
+      }))
+    : gapQuestions.map((question) => ({
+        id: question.id,
+        targetRequirementId: question.targetRequirementId,
+        label:
+          job?.requirements.find((requirement) => requirement.id === question.targetRequirementId)
+            ?.label ?? "Clarification needed",
+        reason: question.reason,
+        question: question.question,
+      }));
+  const clientCvDraft = cvDraft
+    ? { ...cvDraft, presentationJson: stripCvPresentationDebug(cvDraft.presentationJson) }
+    : null;
 
-  const updatedCvDraft = await db.cvDraft.update({
-    where: { id: draft.id },
-    data: {
-      version: draft.version + 1,
-      cvJson: cvJson as Prisma.InputJsonValue,
-      cvText: buildCvTextFromJson(cvJson),
-    },
-  });
-
-  return { updatedCvDraft };
-}
-
-export async function updateCvSection(args: {
-  anonymousSessionId: string;
-  applicationId: string;
-  clerkUserId?: string | null;
-  cvDraftId: string;
-  sectionId: string;
-  content: string;
-}) {
-  await assertApplicationForSession(args);
-
-  const draft = await db.cvDraft.findFirst({
-    where: { id: args.cvDraftId, applicationId: args.applicationId },
-  });
-  if (!draft) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "CV draft does not belong to this application",
-    });
-  }
-
-  const cvJson = writeCvTarget(
-    isRecord(draft.cvJson) ? draft.cvJson : {},
-    args.sectionId,
-    args.content
-  );
-
-  const updatedCvDraft = await db.cvDraft.update({
-    where: { id: draft.id },
-    data: {
-      version: draft.version + 1,
-      cvJson: cvJson as Prisma.InputJsonValue,
-      cvText: buildCvTextFromJson(cvJson),
-    },
-  });
-
-  return { updatedCvDraft };
+  return {
+    application,
+    job,
+    jobRequirements: job?.requirements ?? [],
+    dreamRole: application.dreamRole,
+    jobProfileSummary: job
+      ? {
+          role: job.title,
+          company: job.company,
+          summary: job.summary,
+          hiddenHiringSignal: job.archetypeHint ?? job.roleDomain ?? job.summary,
+          topRequirements,
+        }
+      : null,
+    topRequirements,
+    hiddenHiringSignal: job?.archetypeHint ?? job?.roleDomain ?? null,
+    candidateProfile,
+    candidateDiscoverySummary: candidateProfile
+      ? {
+          summary: candidateProfile.summary,
+          projectsFound: jsonArrayLength(candidateProfile.projectsJson),
+          skillsFound: stringArray(candidateProfile.skillsJson).length,
+          toolsFound: stringArray(candidateProfile.toolsJson).length,
+          experienceFound: jsonArrayLength(candidateProfile.experienceJson),
+          educationFound: jsonArrayLength(candidateProfile.educationJson),
+          certificationsFound: jsonArrayLength(candidateProfile.certificationsJson),
+          strongEvidenceSignalsFound: candidateChunks.length,
+        }
+      : null,
+    candidateChunks,
+    evidenceMatches,
+    requirementFitScores,
+    evidenceMatchScore,
+    originalEvidenceMatchScore: application.originalEvidenceMatchScore,
+    updatedEvidenceMatchScore:
+      application.updatedEvidenceMatchScore ?? evidenceMatchScore.score,
+    matchLabel: application.matchLabel,
+    cvAngle: application.cvAngle,
+    roleArchetype: application.roleArchetype,
+    matchAnalysis,
+    strongMatches,
+    weakSpots,
+    gapQuestions,
+    gapAnswers,
+    gapCoachInsight,
+    cvStrategy: null,
+    cvDraft: clientCvDraft,
+    cvJson: cvDraft?.cvJson ?? null,
+    cvText: cvDraft?.cvText ?? null,
+    agentRuns,
+  };
 }
 
 export async function claimApplication(args: {
@@ -1881,26 +1210,15 @@ export async function claimApplication(args: {
       OR: [{ anonymousSessionId: args.anonymousSessionId }, { userId: user.id }],
     },
   });
-
   if (!application) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "Application does not belong to this session.",
-    });
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Application does not belong to this session." });
   }
-  if (application.userId && application.userId !== user.id) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "This application is already saved to another account.",
-    });
-  }
-
-  const updatedApplication = await db.application.update({
-    where: { id: args.applicationId },
-    data: { userId: user.id },
-  });
-
-  return { application: updatedApplication };
+  return {
+    application: await db.application.update({
+      where: { id: args.applicationId },
+      data: { userId: user.id },
+    }),
+  };
 }
 
 export async function listUserApplications(args: { clerkUserId: string }) {
@@ -1909,15 +1227,10 @@ export async function listUserApplications(args: { clerkUserId: string }) {
     where: { userId: user.id },
     include: {
       job: true,
-      requirementFitScores: true,
-      cvDrafts: {
-        orderBy: { version: "desc" },
-        take: 1,
-      },
+      cvDrafts: { orderBy: { version: "desc" }, take: 1 },
     },
     orderBy: { updatedAt: "desc" },
   });
-
   return {
     applications: applications.map((application) => ({
       id: application.id,
@@ -1942,12 +1255,8 @@ export async function getApplicationExportData(args: {
     where: { id: args.applicationId, userId: user.id },
   });
   if (!application) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "Application does not belong to your account.",
-    });
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Application does not belong to your account." });
   }
-
   const cvDraft = await db.cvDraft.findFirst({
     where: { applicationId: args.applicationId },
     orderBy: { version: "desc" },
@@ -1958,177 +1267,7 @@ export async function getApplicationExportData(args: {
       message: "This application does not have a generated CV yet.",
     });
   }
-
   return {
-    cvDraft: {
-      ...cvDraft,
-      presentationJson: stripCvPresentationDebug(cvDraft.presentationJson),
-    },
-  };
-}
-
-export async function getApplicationState(args: {
-  anonymousSessionId: string;
-  applicationId: string;
-  clerkUserId?: string | null;
-}) {
-  const user = args.clerkUserId
-    ? await db.user.findUnique({ where: { clerkUserId: args.clerkUserId } })
-    : null;
-  const application = await db.application.findFirst({
-    where: {
-      id: args.applicationId,
-      OR: [
-        { anonymousSessionId: args.anonymousSessionId },
-        ...(user ? [{ userId: user.id }] : []),
-      ],
-    },
-  });
-
-  if (!application) {
-    return null;
-  }
-
-  const [
-    job,
-    candidateProfile,
-    candidateChunks,
-    evidenceMatches,
-    requirementFitScores,
-    evidenceMatchScore,
-    gapQuestions,
-    gapAnswers,
-    gapCoachInsight,
-    cvStrategy,
-    cvDraft,
-    agentRuns,
-  ] = await Promise.all([
-    db.job.findUnique({
-      where: { applicationId: args.applicationId },
-      include: { requirements: true },
-    }),
-    db.candidateProfile.findUnique({
-      where: { applicationId: args.applicationId },
-    }),
-    loadCandidateChunks(args),
-    buildRequirementEvidenceMap(args.applicationId),
-    db.requirementFitScore.findMany({
-      where: { applicationId: args.applicationId },
-      include: {
-        bestCandidateChunk: {
-          select: { id: true, content: true },
-        },
-        jobRequirement: true,
-      },
-      orderBy: { createdAt: "asc" },
-    }),
-    calculateEvidenceMatchScore(args.applicationId),
-    db.gapQuestion.findMany({
-      where: { applicationId: args.applicationId },
-      orderBy: { createdAt: "asc" },
-    }),
-    db.gapAnswer.findMany({
-      where: { applicationId: args.applicationId },
-      orderBy: { createdAt: "asc" },
-    }),
-    db.gapCoachInsight.findUnique({
-      where: { applicationId: args.applicationId },
-    }),
-    db.cvStrategy.findFirst({
-      where: { applicationId: args.applicationId },
-      orderBy: { createdAt: "desc" },
-    }),
-    db.cvDraft.findFirst({
-      where: { applicationId: args.applicationId },
-      orderBy: { version: "desc" },
-    }),
-    db.agentRun.findMany({
-      where: { applicationId: args.applicationId },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    }),
-  ]);
-  const sortedRequirements = [...(job?.requirements ?? [])].sort((a, b) => {
-    const rank = { high: 0, medium: 1, low: 2 } as const;
-    return rank[a.importance] - rank[b.importance];
-  });
-  const topRequirements = sortedRequirements.slice(0, 5);
-  const hiddenHiringSignal =
-    sortedRequirements.find((requirement) =>
-      ["soft_skill", "domain", "responsibility"].includes(requirement.type)
-    )?.description ??
-    job?.summary ??
-    null;
-  const candidateDiscoverySummary = candidateProfile
-    ? {
-        summary: candidateProfile.summary,
-        projectsFound: jsonArrayLength(candidateProfile.projectsJson),
-        skillsFound: stringArray(candidateProfile.skillsJson).length,
-        toolsFound: stringArray(candidateProfile.toolsJson).length,
-        experienceFound: jsonArrayLength(candidateProfile.experienceJson),
-        educationFound: jsonArrayLength(candidateProfile.educationJson),
-        certificationsFound: jsonArrayLength(candidateProfile.certificationsJson),
-        strongEvidenceSignalsFound: candidateChunks.length,
-      }
-    : null;
-  const strongMatches = evidenceMatches.filter(
-    (match) =>
-      match.overallConfidence === "high" || match.overallConfidence === "medium"
-  );
-  const weakSpots =
-    gapQuestions.length > 0
-      ? gapQuestions.map((question) => ({
-          id: question.id,
-          targetRequirementId: question.targetRequirementId,
-          label:
-            job?.requirements.find(
-              (requirement) => requirement.id === question.targetRequirementId
-            )?.label ?? "Clarification needed",
-          reason: question.reason,
-          question: question.question,
-        }))
-      : [];
-  const clientCvDraft = cvDraft
-    ? {
-        ...cvDraft,
-        presentationJson: stripCvPresentationDebug(cvDraft.presentationJson),
-      }
-    : null;
-
-  return {
-    application,
-    job,
-    jobRequirements: job?.requirements ?? [],
-    dreamRole: application.dreamRole,
-    jobProfileSummary: job
-      ? {
-          role: job.title,
-          company: job.company,
-          summary: job.summary,
-          hiddenHiringSignal,
-          topRequirements,
-        }
-      : null,
-    topRequirements,
-    hiddenHiringSignal,
-    candidateProfile,
-    candidateDiscoverySummary,
-    candidateChunks,
-    evidenceMatches,
-    requirementFitScores,
-    evidenceMatchScore,
-    originalEvidenceMatchScore: application.originalEvidenceMatchScore,
-    updatedEvidenceMatchScore:
-      application.updatedEvidenceMatchScore ?? evidenceMatchScore.score,
-    strongMatches,
-    weakSpots,
-    gapQuestions,
-    gapAnswers,
-    gapCoachInsight,
-    cvStrategy,
-    cvDraft: clientCvDraft,
-    cvJson: cvDraft?.cvJson ?? null,
-    cvText: cvDraft?.cvText ?? null,
-    agentRuns,
+    cvDraft: { ...cvDraft, presentationJson: stripCvPresentationDebug(cvDraft.presentationJson) },
   };
 }

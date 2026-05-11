@@ -10,6 +10,7 @@ import { LandingArtifact } from "./LandingArtifact";
 import { LandingBackground } from "./LandingBackground";
 
 type LandingPageProps = {
+  error?: string | null;
   isLoading: boolean;
   onGetStarted: () => void;
 };
@@ -57,7 +58,7 @@ function LandingNav(props: LandingPageProps) {
             whileHover={{ scale: 1.025 }}
             whileTap={{ scale: 0.985 }}
           >
-            Get started
+            {props.isLoading ? "Starting..." : "Get started"}
             <ArrowRight className="h-4 w-4" />
           </motion.button>
         </nav>
@@ -77,9 +78,14 @@ function LandingCta(props: LandingPageProps) {
         whileHover={{ scale: 1.025, y: -2 }}
         whileTap={{ scale: 0.985 }}
       >
-        Get started
+        {props.isLoading ? "Starting..." : "Get started"}
         <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
       </motion.button>
+      {props.error ? (
+        <p className="rounded-lg border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">
+          {props.error}
+        </p>
+      ) : null}
       <p className="text-sm font-medium text-zinc-300">
         First tailored CV free.
       </p>
@@ -236,7 +242,7 @@ export function LandingPage(props: LandingPageProps) {
                 whileHover={{ scale: 1.025 }}
                 whileTap={{ scale: 0.985 }}
               >
-                Get started
+                {props.isLoading ? "Starting..." : "Get started"}
                 <ArrowRight className="h-4 w-4" />
               </motion.button>
             </div>

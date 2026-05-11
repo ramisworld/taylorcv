@@ -15,7 +15,10 @@ enum ApplicationStatus {
   evidence_ready
   questions_ready
   answers_added
+  strategy_failed
   strategy_ready
+  draft_failed
+  draft_ready
   cv_ready
 }
 
@@ -73,6 +76,7 @@ enum ButtonAnswer {
 enum AgentRunStatus {
   success
   error
+  failed
 }
 
 model AnonymousSession {
@@ -107,6 +111,10 @@ model Application {
   dreamRole                  String?           @map("dream_role")
   originalEvidenceMatchScore Float?            @map("original_evidence_match_score")
   updatedEvidenceMatchScore  Float?            @map("updated_evidence_match_score")
+  matchLabel                 String?           @map("match_label")
+  cvAngle                    String?           @map("cv_angle")
+  roleArchetype              String?           @map("role_archetype")
+  matchAnalysisJson          Json?             @map("match_analysis_json")
   createdAt                  DateTime          @default(now()) @map("created_at")
   updatedAt                  DateTime          @updatedAt @map("updated_at")
 
@@ -137,6 +145,8 @@ model Job {
   company       String?
   seniority     String?
   summary       String           @db.Text
+  roleDomain    String?          @map("role_domain")
+  archetypeHint String?          @map("archetype_hint")
   createdAt     DateTime         @default(now()) @map("created_at")
   application   Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   requirements  JobRequirement[]
@@ -161,29 +171,34 @@ model JobRequirement {
 }
 
 model CandidateProfile {
-  id                 String           @id @default(cuid())
-  anonymousSessionId String           @map("anonymous_session_id")
-  applicationId      String           @unique @map("application_id")
-  rawCvText          String?          @map("raw_cv_text") @db.Text
-  rawBackgroundText  String?          @map("raw_background_text") @db.Text
-  contactInfoJson    Json?            @map("contact_info_json")
-  linksJson          Json?            @map("links_json")
-  profileSource      String?          @map("profile_source")
-  sourceSummary      String?          @map("source_summary") @db.Text
-  sourceUrl          String?          @map("source_url")
-  profileConfirmedAt DateTime?        @map("profile_confirmed_at")
-  summary            String           @db.Text
-  skillsJson         Json             @map("skills_json")
-  projectsJson       Json             @map("projects_json")
-  educationJson      Json             @map("education_json")
-  certificationsJson Json             @map("certifications_json")
-  experienceJson     Json             @map("experience_json")
-  toolsJson          Json             @map("tools_json")
-  achievementsJson   Json             @map("achievements_json")
-  createdAt          DateTime         @default(now()) @map("created_at")
-  anonymousSession   AnonymousSession @relation(fields: [anonymousSessionId], references: [id], onDelete: Cascade)
-  application        Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  candidateChunks    CandidateChunk[]
+  id                        String           @id @default(cuid())
+  anonymousSessionId        String           @map("anonymous_session_id")
+  applicationId             String           @unique @map("application_id")
+  rawCvText                 String?          @map("raw_cv_text") @db.Text
+  rawBackgroundText         String?          @map("raw_background_text") @db.Text
+  contactInfoJson           Json?            @map("contact_info_json")
+  linksJson                 Json?            @map("links_json")
+  profileSource             String?          @map("profile_source")
+  sourceSummary             String?          @map("source_summary") @db.Text
+  sourceUrl                 String?          @map("source_url")
+  profileConfirmedAt        DateTime?        @map("profile_confirmed_at")
+  summary                   String           @db.Text
+  skillsJson                Json             @map("skills_json")
+  projectsJson              Json             @map("projects_json")
+  educationJson             Json             @map("education_json")
+  certificationsJson        Json             @map("certifications_json")
+  experienceJson            Json             @map("experience_json")
+  toolsJson                 Json             @map("tools_json")
+  achievementsJson          Json             @map("achievements_json")
+  cautionNotesJson          Json?            @map("caution_notes_json")
+  metricOpportunitiesJson   Json?            @map("metric_opportunities_json")
+  strongProofCandidatesJson Json?            @map("strong_proof_candidates_json")
+  scopeOpportunitiesJson    Json?            @map("scope_opportunities_json")
+  likelyTopEvidenceJson     Json?            @map("likely_top_evidence_json")
+  createdAt                 DateTime         @default(now()) @map("created_at")
+  anonymousSession          AnonymousSession @relation(fields: [anonymousSessionId], references: [id], onDelete: Cascade)
+  application               Application      @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  candidateChunks           CandidateChunk[]
 
   @@index([anonymousSessionId])
   @@map("candidate_profiles")
@@ -220,6 +235,8 @@ model EvidenceMatch {
   candidateChunkId String?            @map("candidate_chunk_id")
   similarityScore  Float?             @map("similarity_score")
   confidence       EvidenceConfidence
+  cvUsefulness     String?            @map("cv_usefulness")
+  claimRisk        String?            @map("claim_risk")
   reason           String             @db.Text
   createdAt        DateTime           @default(now()) @map("created_at")
   application      Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
@@ -265,6 +282,7 @@ model GapQuestion {
   whyItMatters        String?           @map("why_it_matters") @db.Text
   answerGuidance      String?           @map("answer_guidance") @db.Text
   exampleAnglesJson   Json?             @map("example_angles_json")
+  questionJson        Json?             @map("question_json")
   status              GapQuestionStatus @default(unanswered)
   createdAt           DateTime          @default(now()) @map("created_at")
   application         Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
@@ -292,14 +310,18 @@ model GapCoachInsight {
 }
 
 model GapAnswer {
-  id            String       @id @default(cuid())
-  gapQuestionId String       @map("gap_question_id")
-  applicationId String       @map("application_id")
-  buttonAnswer  ButtonAnswer @map("button_answer")
-  elaboration   String?      @db.Text
-  createdAt     DateTime     @default(now()) @map("created_at")
-  gapQuestion   GapQuestion  @relation(fields: [gapQuestionId], references: [id], onDelete: Cascade)
-  application   Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  gapQuestionId  String       @map("gap_question_id")
+  applicationId  String       @map("application_id")
+  buttonAnswer   ButtonAnswer @map("button_answer")
+  elaboration    String?      @db.Text
+  selectedOption String?      @map("selected_option")
+  followUpText   String?      @map("follow_up_text") @db.Text
+  metricText     String?      @map("metric_text") @db.Text
+  skipped        Boolean      @default(false)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  gapQuestion    GapQuestion  @relation(fields: [gapQuestionId], references: [id], onDelete: Cascade)
+  application    Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
   @@index([applicationId])
   @@index([gapQuestionId])
@@ -316,6 +338,7 @@ model CvStrategy {
   deEmphasisJson    Json        @map("de_emphasis_json")
   evidenceToUseJson Json        @map("evidence_to_use_json")
   warningsJson      Json        @map("warnings_json")
+  strategyJson      Json?       @map("strategy_json")
   createdAt         DateTime    @default(now()) @map("created_at")
   application       Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   cvDrafts          CvDraft[]
@@ -325,17 +348,18 @@ model CvStrategy {
 }
 
 model CvDraft {
-  id               String      @id @default(cuid())
-  applicationId    String      @map("application_id")
-  strategyId       String?     @map("strategy_id")
-  version          Int         @default(1)
-  cvJson           Json        @map("cv_json")
-  cvText           String      @map("cv_text") @db.Text
-  presentationJson Json?       @map("presentation_json")
-  createdAt        DateTime    @default(now()) @map("created_at")
-  updatedAt        DateTime    @updatedAt @map("updated_at")
-  application      Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  strategy         CvStrategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+  id                String      @id @default(cuid())
+  applicationId     String      @map("application_id")
+  strategyId        String?     @map("strategy_id")
+  version           Int         @default(1)
+  cvJson            Json        @map("cv_json")
+  cvText            String      @map("cv_text") @db.Text
+  presentationJson  Json?       @map("presentation_json")
+  builderOutputJson Json?       @map("builder_output_json")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+  application       Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  strategy          CvStrategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
 
   @@index([applicationId])
   @@index([strategyId])

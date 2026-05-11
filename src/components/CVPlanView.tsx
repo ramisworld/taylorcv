@@ -2,12 +2,6 @@
 
 import type { Ref } from "react";
 
-import type { RouterOutputs } from "~/trpc/react";
-
-type ApplicationState = NonNullable<
-  RouterOutputs["application"]["getApplicationState"]
->;
-
 function stringArray(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
@@ -15,13 +9,22 @@ function stringArray(value: unknown) {
 }
 
 export function CVPlanView(props: {
-  strategy: ApplicationState["cvStrategy"] | null;
+  strategy: unknown;
   sectionRef?: Ref<HTMLElement>;
 }) {
-  if (!props.strategy) return null;
+  if (!props.strategy || typeof props.strategy !== "object") return null;
+  const strategy = props.strategy as {
+    emphasisJson?: unknown;
+    warningsJson?: unknown;
+    targetPositioning?: unknown;
+  };
 
-  const emphasis = stringArray(props.strategy.emphasisJson).slice(0, 3);
-  const warnings = stringArray(props.strategy.warningsJson).slice(0, 2);
+  const emphasis = stringArray(strategy.emphasisJson).slice(0, 3);
+  const warnings = stringArray(strategy.warningsJson).slice(0, 2);
+  const targetPositioning =
+    typeof strategy.targetPositioning === "string"
+      ? strategy.targetPositioning
+      : "Taylor positioned the CV around the strongest verified evidence.";
 
   return (
     <section className="border-b border-zinc-200 py-4" ref={props.sectionRef}>
@@ -32,7 +35,7 @@ export function CVPlanView(props: {
         <div className="mt-4 border-t border-zinc-100 pt-4">
           <p className="text-sm font-medium text-zinc-950">Positioning</p>
           <p className="mt-1 text-sm text-zinc-700">
-            {props.strategy.targetPositioning}
+            {targetPositioning}
           </p>
 
           {emphasis.length > 0 ? (

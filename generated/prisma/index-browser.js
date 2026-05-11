@@ -145,6 +145,10 @@ exports.Prisma.ApplicationScalarFieldEnum = {
   dreamRole: 'dreamRole',
   originalEvidenceMatchScore: 'originalEvidenceMatchScore',
   updatedEvidenceMatchScore: 'updatedEvidenceMatchScore',
+  matchLabel: 'matchLabel',
+  cvAngle: 'cvAngle',
+  roleArchetype: 'roleArchetype',
+  matchAnalysisJson: 'matchAnalysisJson',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -157,6 +161,8 @@ exports.Prisma.JobScalarFieldEnum = {
   company: 'company',
   seniority: 'seniority',
   summary: 'summary',
+  roleDomain: 'roleDomain',
+  archetypeHint: 'archetypeHint',
   createdAt: 'createdAt'
 };
 
@@ -189,6 +195,11 @@ exports.Prisma.CandidateProfileScalarFieldEnum = {
   experienceJson: 'experienceJson',
   toolsJson: 'toolsJson',
   achievementsJson: 'achievementsJson',
+  cautionNotesJson: 'cautionNotesJson',
+  metricOpportunitiesJson: 'metricOpportunitiesJson',
+  strongProofCandidatesJson: 'strongProofCandidatesJson',
+  scopeOpportunitiesJson: 'scopeOpportunitiesJson',
+  likelyTopEvidenceJson: 'likelyTopEvidenceJson',
   createdAt: 'createdAt'
 };
 
@@ -213,6 +224,8 @@ exports.Prisma.EvidenceMatchScalarFieldEnum = {
   candidateChunkId: 'candidateChunkId',
   similarityScore: 'similarityScore',
   confidence: 'confidence',
+  cvUsefulness: 'cvUsefulness',
+  claimRisk: 'claimRisk',
   reason: 'reason',
   createdAt: 'createdAt'
 };
@@ -241,6 +254,7 @@ exports.Prisma.GapQuestionScalarFieldEnum = {
   whyItMatters: 'whyItMatters',
   answerGuidance: 'answerGuidance',
   exampleAnglesJson: 'exampleAnglesJson',
+  questionJson: 'questionJson',
   status: 'status',
   createdAt: 'createdAt'
 };
@@ -262,6 +276,10 @@ exports.Prisma.GapAnswerScalarFieldEnum = {
   applicationId: 'applicationId',
   buttonAnswer: 'buttonAnswer',
   elaboration: 'elaboration',
+  selectedOption: 'selectedOption',
+  followUpText: 'followUpText',
+  metricText: 'metricText',
+  skipped: 'skipped',
   createdAt: 'createdAt'
 };
 
@@ -275,6 +293,7 @@ exports.Prisma.CvStrategyScalarFieldEnum = {
   deEmphasisJson: 'deEmphasisJson',
   evidenceToUseJson: 'evidenceToUseJson',
   warningsJson: 'warningsJson',
+  strategyJson: 'strategyJson',
   createdAt: 'createdAt'
 };
 
@@ -286,6 +305,7 @@ exports.Prisma.CvDraftScalarFieldEnum = {
   cvJson: 'cvJson',
   cvText: 'cvText',
   presentationJson: 'presentationJson',
+  builderOutputJson: 'builderOutputJson',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -337,7 +357,10 @@ exports.ApplicationStatus = exports.$Enums.ApplicationStatus = {
   evidence_ready: 'evidence_ready',
   questions_ready: 'questions_ready',
   answers_added: 'answers_added',
+  strategy_failed: 'strategy_failed',
   strategy_ready: 'strategy_ready',
+  draft_failed: 'draft_failed',
+  draft_ready: 'draft_ready',
   cv_ready: 'cv_ready'
 };
 
@@ -394,7 +417,8 @@ exports.ButtonAnswer = exports.$Enums.ButtonAnswer = {
 
 exports.AgentRunStatus = exports.$Enums.AgentRunStatus = {
   success: 'success',
-  error: 'error'
+  error: 'error',
+  failed: 'failed'
 };
 
 exports.Prisma.ModelName = {

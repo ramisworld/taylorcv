@@ -8,5 +8,6 @@ export const candidateProfilerPrompt = [
   "For education, preserve both credential and degree when useful. Include startYear/endYear/current/expected only when provided.",
   "For experience, preserve exact role, organization, dates/current status, provided bullets, tools, technologies, achievements, and outcomes. Use the candidate's wording where it carries factual specificity.",
   "For projects, preserve exact project names, tools, outcomes, and links when available. If a project has no name, use null.",
+  "Also identify strongProofCandidates, metricOpportunities, scopeOpportunities, cautionNotes, and likelyTopEvidence as short factual notes. These are planning hints only; do not invent missing metrics or scope.",
   "Return strict structured JSON only.",
 ].join(" ");

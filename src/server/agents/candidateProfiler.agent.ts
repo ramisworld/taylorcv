@@ -60,18 +60,17 @@ export async function runCandidateProfilerAgent(args: {
           links: [],
         },
         {
-          name: "Taylor CV",
+          name: "Document Q&A Assistant",
           description:
-            "Built an AI CV tailoring workflow using agents, PostgreSQL, pgvector, embeddings, tRPC, Prisma, Next.js, and TypeScript.",
+            "Built a document question-answering workflow using PostgreSQL, pgvector, embeddings, Prisma, Next.js, and TypeScript.",
           tools: [
-            "Agents",
             "PostgreSQL",
             "pgvector",
-            "OpenAI",
-            "tRPC",
             "Prisma",
+            "Next.js",
+            "TypeScript",
           ],
-          outcomes: ["Connected job requirements to candidate evidence chunks."],
+          outcomes: ["Connected source documents to concise grounded answers."],
           links: [],
         },
       ],
@@ -83,12 +82,12 @@ export async function runCandidateProfilerAgent(args: {
           endDate: null,
           current: false,
           description:
-            "Designed and deployed AI workflows with backend orchestration, model calls, database writes, and frontend display.",
+            "Designed AI application workflows with retrieval, database writes, and frontend display.",
           bullets: [],
           technologies: ["Next.js", "TypeScript", "OpenAI", "PostgreSQL"],
           tools: ["Next.js", "TypeScript", "OpenAI", "PostgreSQL"],
           achievements: [],
-          outcomes: ["Shipped working MVPs that connect AI workflows to users."],
+          outcomes: ["Shipped working MVPs that connect retrieval workflows to users."],
         },
       ],
       education: [],
@@ -105,6 +104,22 @@ export async function runCandidateProfilerAgent(args: {
       ],
       achievements: [
         "Deployed AI application workflows and connected model inference to frontends.",
+      ],
+      cautionNotes: [],
+      metricOpportunities: [
+        "User count, document count, or workflow frequency for AI projects",
+        "Response-quality improvement, retrieval scope, or deployment environment",
+      ],
+      strongProofCandidates: [
+        "Document Q&A workflow with retrieval and grounded response writing",
+        "RenovAI RAG application using domain-specific renovation data",
+      ],
+      scopeOpportunities: [
+        "Number of users, documents, or applications processed",
+        "Deployment environment and reliability checks",
+      ],
+      likelyTopEvidence: [
+        "Built a document Q&A assistant with PostgreSQL, pgvector, embeddings, Prisma, Next.js, and TypeScript",
       ],
     }),
   });

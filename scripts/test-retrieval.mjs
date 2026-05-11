@@ -1,8 +1,5 @@
 import { readFileSync } from "fs";
 
-import { PrismaClient } from "../generated/prisma/index.js";
-
-const prisma = new PrismaClient();
 const seedApplicationId = "seed-application";
 const seedAnonymousSessionId = "seed-anonymous-session";
 
@@ -52,16 +49,19 @@ function expectedChunkForRequirement(requirement) {
 async function main() {
   loadDotEnv();
   process.env.USE_MOCK_AI = "true";
+  const { PrismaClient } = await import("../generated/prisma/index.js");
+  const prisma = new PrismaClient();
 
-  if (process.env.USE_MOCK_AI !== "true") {
-    throw new Error("test:retrieval must run with USE_MOCK_AI=true");
-  }
+  try {
+    if (process.env.USE_MOCK_AI !== "true") {
+      throw new Error("test:retrieval must run with USE_MOCK_AI=true");
+    }
 
-  const { searchCandidateChunks } = await import(
-    "../src/server/tools/vectorSearch.tool.ts"
-  );
+    const { searchCandidateChunks } = await import(
+      "../src/server/tools/vectorSearch.tool.ts"
+    );
 
-  const application = await prisma.application.findFirst({
+    const application = await prisma.application.findFirst({
     where: {
       id: seedApplicationId,
       anonymousSessionId: seedAnonymousSessionId,
@@ -69,19 +69,19 @@ async function main() {
     include: { job: { include: { requirements: true } } },
   });
 
-  if (!application?.job) {
-    throw new Error(
-      "Seeded application/job not found. Run `npm run db:seed` first."
-    );
-  }
+    if (!application?.job) {
+      throw new Error(
+        "Seeded application/job not found. Run `npm run db:seed` first."
+      );
+    }
 
-  let failures = 0;
+    let failures = 0;
 
   console.log("Retrieval-only pgvector test");
   console.log(`Application: ${seedApplicationId}`);
   console.log("");
 
-  for (const requirement of application.job.requirements) {
+    for (const requirement of application.job.requirements) {
     const expectedChunkId = expectedChunkForRequirement(requirement);
     const results = await searchCandidateChunks({
       anonymousSessionId: seedAnonymousSessionId,
@@ -108,18 +108,18 @@ async function main() {
     console.log("");
   }
 
-  if (failures > 0) {
-    throw new Error(`${failures} retrieval expectation(s) failed`);
-  }
+    if (failures > 0) {
+      throw new Error(`${failures} retrieval expectation(s) failed`);
+    }
 
-  console.log("All retrieval expectations passed.");
+    console.log("All retrieval expectations passed.");
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 main()
   .catch((error) => {
     console.error(error);
     process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
   });

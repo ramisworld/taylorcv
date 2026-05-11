@@ -47,6 +47,7 @@ function labels(overrides = {}) {
 function validLayout(overrides = {}) {
   return {
     schemaVersion: 1,
+    layoutArchitecture: "premium_hybrid",
     templateId: "technical_compact",
     careerStyle: "technical",
     density: "balanced",
@@ -62,12 +63,11 @@ function validLayout(overrides = {}) {
       accentPalette: "navy",
       bodyText: "dark",
       mutedText: "grey",
-      dividerStyle: "accent_line",
+      dividerStyle: "light_rule",
     },
     accentUsageRules: {
       useAccentFor: [
         "section_headings",
-        "divider_lines",
         "selected_labels",
         "links",
         "small_emphasis",
@@ -97,7 +97,7 @@ function cvFixture({ title = "Applied AI Engineer", summary = "Applied AI engine
       "Certifications",
     ],
     header: {
-      name: "Taylor Candidate",
+      name: "Ben Smith",
       targetTitle: title,
       location: "Auckland",
       phone: null,
@@ -108,8 +108,8 @@ function cvFixture({ title = "Applied AI Engineer", summary = "Applied AI engine
     skills: {
       groups: [
         {
-          label: skillsLabel,
-          items: ["Python", "RAG", "OpenAI", "PostgreSQL", "React"],
+          group: skillsLabel,
+          skills: ["Python", "RAG", "OpenAI", "PostgreSQL", "React"],
         },
       ],
     },
@@ -118,18 +118,26 @@ function cvFixture({ title = "Applied AI Engineer", summary = "Applied AI engine
         name: "Role-focused project",
         descriptor: null,
         dates: null,
-        bullets: Array.from({ length: bulletCount }, (_, index) =>
-          `Built truthful project evidence bullet ${index + 1} with concrete scope and implementation detail.`
-        ),
+        bullets: Array.from({ length: bulletCount }, (_, index) => ({
+          text: `Built truthful project evidence bullet ${index + 1} with concrete scope and implementation detail.`,
+          sourceChunkIds: [`chunk-${index + 1}`],
+          gapAnswerIds: [],
+        })),
       },
     ],
     experience: [
       {
-        title: "Relevant Experience",
+        role: "Relevant Experience",
         company: null,
         dates: "2025",
         location: "Auckland",
-        bullets: ["Delivered customer-facing work with clear communication."],
+        bullets: [
+          {
+            text: "Delivered customer-facing work with clear communication.",
+            sourceChunkIds: ["chunk-experience"],
+            gapAnswerIds: [],
+          },
+        ],
       },
     ],
     education: [],
@@ -208,10 +216,17 @@ assert.equal(compact.skillsStyle, "compact_inline_groups");
 const ai = normalizeCvPresentation(null, cvFixture());
 const aiTokens = presentationToRendererTokens(ai);
 assert.equal(ai.careerStyle, "technical");
+assert.equal(ai.layoutArchitecture, "premium_hybrid");
+assert.equal(aiTokens.layoutArchitecture, "premium_hybrid");
+assert.equal(aiTokens.nameSize >= 29, true);
+assert.equal(aiTokens.headingSize >= 11.4, true);
 assert.match(["technical_compact", "project_heavy_builder"].join(" "), /technical_compact|project_heavy_builder/);
 assert.match(["blue", "navy"].join(" "), new RegExp(ai.colourSystem.accentPalette));
 assert.equal(aiTokens.bodyTextColor, "#18181b");
 assert.equal(aiTokens.mutedTextColor, "#52525b");
+assert.equal(aiTokens.dividerStyle, "light_rule");
+assert.equal(aiTokens.dividerColor, "#d4d4d8");
+assert.equal(ai.accentUsageRules.useAccentFor.includes("divider_lines"), false);
 assert.equal(aiTokens.labelFor("skills"), "Technical Skills");
 
 const marketing = normalizeCvPresentation(
@@ -234,6 +249,7 @@ const retail = normalizeCvPresentation(
   })
 );
 assert.equal(retail.templateId, "retail_service");
+assert.equal(retail.layoutArchitecture, "simple_practical");
 assert.equal(
   presentationToRendererTokens(retail).labelFor("skills"),
   "Customer Service Skills"
@@ -264,7 +280,7 @@ assert.equal(previewTokens.labelFor("skills"), pdfTokens.labelFor("skills"));
 assert.equal(pdfTokens.labelFor("skills"), docxTokens.labelFor("skills"));
 
 const cvText = [
-  "Taylor Candidate",
+  "Ben Smith",
   "Applied AI Engineer",
   "SUMMARY",
   cvFixture().summary,

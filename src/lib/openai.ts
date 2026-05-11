@@ -141,3 +141,41 @@ export async function createOpenAIEmbedding(text: string) {
 
   return embedding;
 }
+
+export async function createOpenAIEmbeddings(texts: string[]) {
+  if (!env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is required when USE_MOCK_AI is false");
+  }
+  if (texts.length === 0) return [];
+
+  const response = await fetch("https://api.openai.com/v1/embeddings", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: getEmbeddingModel(),
+      input: texts,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenAI Embeddings API failed: ${errorText}`);
+  }
+
+  const data = (await response.json()) as {
+    data?: Array<{ index?: number; embedding?: number[] }>;
+  };
+
+  const ordered = [...(data.data ?? [])].sort(
+    (a, b) => (a.index ?? 0) - (b.index ?? 0)
+  );
+  const embeddings = ordered.map((item) => item.embedding).filter(Boolean);
+  if (embeddings.length !== texts.length) {
+    throw new Error("OpenAI embedding response did not include all embeddings");
+  }
+
+  return embeddings as number[][];
+}

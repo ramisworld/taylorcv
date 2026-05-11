@@ -21,6 +21,8 @@ export async function runJobParserAgent(args: {
       seniority: "Mid-level",
       summary:
         "Build AI applications using RAG, agentic workflows, OpenAI models, PostgreSQL, pgvector, Next.js, and TypeScript.",
+      roleDomain: "software_ai_data",
+      archetypeHint: "applied_ai_engineering",
       requirements: [
         {
           type: "skill" as const,
