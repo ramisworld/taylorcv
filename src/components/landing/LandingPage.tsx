@@ -2,12 +2,17 @@
 
 import {
   ArrowRight,
+  BriefcaseBusiness,
   CheckCircle2,
   ClipboardList,
+  Flag,
+  HelpCircle,
   ShieldCheck,
   Sparkles,
+  Star,
   Trophy,
   TrendingUp,
+  UserRound,
   UsersRound,
 } from "lucide-react";
 import { motion } from "motion/react";
@@ -81,7 +86,7 @@ function LandingNav(props: LandingPageProps) {
   return (
     <motion.header
       animate="visible"
-      className="relative z-30 w-full border-b border-white/[0.075] bg-[#030813]/34 backdrop-blur-sm"
+      className="sticky top-0 z-50 w-full border-b border-white/[0.09] bg-[#030813]/58 shadow-[0_14px_42px_rgba(2,6,23,0.18)] backdrop-blur-xl supports-[backdrop-filter]:bg-[#030813]/42"
       initial="hidden"
       transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
       variants={entrance}
@@ -241,13 +246,311 @@ function TrustedCompaniesSection() {
   );
 }
 
+const howItWorksSteps = [
+  {
+    title: "Paste your job description",
+    body: "Taylor reads the role and extracts what really matters.",
+  },
+  {
+    title: "Add your background",
+    body: "Add your experience and Taylor builds a complete picture.",
+  },
+  {
+    title: "Taylor finds strong evidence and asks 1–3 high-ROI questions",
+    body: "You get targeted questions to surface the evidence that wins.",
+  },
+  {
+    title: "Get a tailored CV with a stronger match",
+    body: "Your CV is aligned to the role and ready to land interviews.",
+  },
+] as const;
+
+const backgroundRows = [
+  {
+    icon: BriefcaseBusiness,
+    title: "12+ years experience",
+    body: "Product Strategy",
+  },
+  {
+    icon: UserRound,
+    title: "Senior Product Manager",
+    body: "SaaS · B2B · Remote",
+  },
+  {
+    icon: Star,
+    title: "Key skills",
+    body: "Analytics, Roadmaps, Stakeholder Mgmt",
+  },
+  {
+    icon: Flag,
+    title: "Achievements",
+    body: "Led cross-functional teams, improved activation by 32%",
+  },
+] as const;
+
+const tailoredCvItems = [
+  "Stronger evidence",
+  "Keyword alignment",
+  "Impact statements",
+  "Skill coverage",
+  "Role relevance",
+] as const;
+
+function StepIntro(props: { body: string; index: number; title: string }) {
+  return (
+    <div className="grid grid-cols-[40px_minmax(0,1fr)] items-start gap-3.5 min-[2400px]:grid-cols-[48px_minmax(0,1fr)] min-[2400px]:gap-5">
+      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-[17px] font-semibold text-white shadow-[0_0_28px_rgba(37,99,235,0.58),inset_0_1px_0_rgba(255,255,255,0.24)] min-[2400px]:h-12 min-[2400px]:w-12 min-[2400px]:text-[20px]">
+        {props.index}
+      </span>
+      <div>
+        <h3 className="text-[16px] font-semibold leading-snug tracking-[-0.035em] text-white min-[2400px]:text-[20px]">
+          {props.title}
+        </h3>
+        <p className="mt-2.5 max-w-[250px] text-[13.5px] leading-6 text-slate-300/86 min-[2400px]:mt-3 min-[2400px]:max-w-[290px] min-[2400px]:text-[16px] min-[2400px]:leading-7">
+          {props.body}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function ProcessArrow() {
+  return (
+    <div className="hidden h-[320px] items-center justify-center pt-[156px] xl:flex 2xl:h-[330px] min-[2400px]:!h-[410px] min-[2400px]:pt-[196px]">
+      <ArrowRight className="h-8 w-8 text-slate-300/70 min-[2400px]:h-9 min-[2400px]:w-9" strokeWidth={1.65} />
+    </div>
+  );
+}
+
+function WhiteProcessCard(props: {
+  children: React.ReactNode;
+  className?: string;
+  title: string;
+}) {
+  return (
+    <div
+      className={[
+        "relative overflow-hidden rounded-xl border border-blue-100/80 bg-white p-5 text-slate-950 min-[2400px]:p-6",
+        "shadow-[0_28px_82px_rgba(2,6,23,0.42),0_0_0_1px_rgba(255,255,255,0.48),inset_0_1px_0_rgba(255,255,255,0.9)]",
+        "before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_85%_5%,rgba(59,130,246,0.08),transparent_30%)]",
+        props.className ?? "",
+      ].join(" ")}
+    >
+      <div className="relative">
+        <h4 className="text-[16px] font-semibold leading-none tracking-[-0.035em] text-slate-950 min-[2400px]:text-[18px]">
+          {props.title}
+        </h4>
+        {props.children}
+      </div>
+    </div>
+  );
+}
+
+function MiniScoreRing(props: { score: number; tone: "blue" | "green" }) {
+  const isGreen = props.tone === "green";
+  return (
+    <div
+      className={[
+        "relative grid place-items-center rounded-full",
+        isGreen
+          ? "h-[108px] w-[108px] min-[2400px]:h-[128px] min-[2400px]:w-[128px]"
+          : "h-[92px] w-[92px] min-[2400px]:h-[112px] min-[2400px]:w-[112px]",
+      ].join(" ")}
+      style={{
+        background: isGreen
+          ? `conic-gradient(#1fb874 ${props.score * 3.6}deg, #d9f3e8 0deg)`
+          : `conic-gradient(#1667f2 ${props.score * 3.6}deg, #cfe0fb 0deg)`,
+      }}
+    >
+      <div className="absolute inset-[9px] rounded-full bg-white shadow-[inset_0_0_0_1px_rgba(15,23,42,0.04)]" />
+      <div className="relative text-center">
+        <p className="text-[25px] font-bold leading-none tracking-[-0.05em] text-slate-950 min-[2400px]:text-[30px]">
+          {props.score}%
+        </p>
+        <p className="mt-1 text-[11px] font-semibold text-slate-800 min-[2400px]:text-[12px]">Match</p>
+      </div>
+    </div>
+  );
+}
+
+function JobDescriptionProcessCard(props: LandingPageProps) {
+  return (
+    <WhiteProcessCard className="h-[320px] 2xl:h-[330px] min-[2400px]:!h-[410px]" title="Job description">
+      <div className="mt-7 space-y-3.5 min-[2400px]:mt-8 min-[2400px]:space-y-4">
+        {[92, 78, 92, 78, 92, 78, 92].map((width, index) => (
+          <div className="flex items-center gap-3" key={`${width}-${index}`}>
+            <span className="h-2 w-2 shrink-0 rounded-full bg-slate-200 min-[2400px]:h-2.5 min-[2400px]:w-2.5" />
+            <span
+              className="h-2 rounded-full bg-slate-200 min-[2400px]:h-2.5"
+              style={{ width: `${width}%` }}
+            />
+          </div>
+        ))}
+      </div>
+
+      <button
+        className="absolute inset-x-6 bottom-9 inline-flex min-h-12 items-center justify-center gap-2.5 rounded-lg bg-blue-600 text-[13.5px] font-semibold text-white shadow-[0_14px_34px_rgba(37,99,235,0.28),inset_0_1px_0_rgba(255,255,255,0.28)] transition hover:bg-blue-500 min-[2400px]:inset-x-7 min-[2400px]:bottom-11 min-[2400px]:min-h-13 min-[2400px]:gap-3 min-[2400px]:text-[15px]"
+        disabled={props.isLoading}
+        onClick={props.onGetStarted}
+        type="button"
+      >
+        <ClipboardList className="h-5 w-5" />
+        {props.isLoading ? "Starting..." : "Paste job description"}
+      </button>
+    </WhiteProcessCard>
+  );
+}
+
+function BackgroundProcessCard() {
+  return (
+    <WhiteProcessCard className="h-[320px] 2xl:h-[330px] min-[2400px]:!h-[410px]" title="Your background">
+      <div className="mt-7 space-y-4.5 min-[2400px]:mt-8 min-[2400px]:space-y-6">
+        {backgroundRows.map((row) => {
+          const Icon = row.icon;
+          return (
+            <div className="grid grid-cols-[34px_minmax(0,1fr)] gap-3 min-[2400px]:grid-cols-[38px_minmax(0,1fr)]" key={row.title}>
+              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-50 text-blue-600 min-[2400px]:h-9 min-[2400px]:w-9">
+                <Icon className="h-4.5 w-4.5 min-[2400px]:h-5 min-[2400px]:w-5" />
+              </span>
+              <div>
+                <p className="text-[12.5px] font-semibold leading-tight tracking-[-0.02em] text-slate-950 min-[2400px]:text-[14px]">
+                  {row.title}
+                </p>
+                <p className="mt-1 text-[12px] leading-5 text-slate-600 min-[2400px]:text-[13px]">{row.body}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </WhiteProcessCard>
+  );
+}
+
+function EvidenceProcessCards() {
+  return (
+    <div className="grid gap-3 min-[2400px]:gap-4">
+      <WhiteProcessCard className="h-[150px] 2xl:h-[155px] min-[2400px]:!h-[204px]" title="Evidence found">
+        <div className="mt-4 grid grid-cols-[96px_minmax(0,1fr)] items-center gap-5 min-[2400px]:mt-5 min-[2400px]:grid-cols-[118px_minmax(0,1fr)] min-[2400px]:gap-6">
+          <MiniScoreRing score={55} tone="blue" />
+          <div className="space-y-3">
+            {[94, 94, 82, 95].map((width, index) => (
+              <span
+                className="block h-2 rounded-full bg-slate-200 min-[2400px]:h-2.5"
+                key={`${width}-${index}`}
+                style={{ width: `${width}%` }}
+              />
+            ))}
+          </div>
+        </div>
+      </WhiteProcessCard>
+
+      <WhiteProcessCard className="h-[170px] 2xl:h-[170px] min-[2400px]:!h-[190px]" title="">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[12px] font-bold text-white shadow-[0_0_16px_rgba(37,99,235,0.32)]">
+            ?
+          </span>
+          <h4 className="text-[16px] font-semibold leading-none tracking-[-0.035em] text-slate-950 min-[2400px]:text-[18px]">
+            High-ROI question
+          </h4>
+        </div>
+        <p className="mt-4 text-[12px] leading-5 text-slate-700 min-[2400px]:mt-5 min-[2400px]:text-[13px] min-[2400px]:leading-6">
+          What was the measurable impact of the activation strategy you led?
+        </p>
+        <div className="mt-3 min-h-11 rounded-md border border-slate-200 bg-white px-4 py-3 text-[12px] text-slate-400 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] min-[2400px]:mt-4 min-[2400px]:text-[13px]">
+          Type your answer...
+        </div>
+      </WhiteProcessCard>
+    </div>
+  );
+}
+
+function TailoredCvProcessCard() {
+  return (
+    <WhiteProcessCard className="h-[320px] 2xl:h-[330px] min-[2400px]:!h-[410px]" title="Your tailored CV">
+      <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-center gap-3 min-[2400px]:mt-7 min-[2400px]:gap-4">
+        <div className="flex justify-center text-emerald-500">
+          <Sparkles className="h-7 w-7 fill-emerald-500/18 min-[2400px]:h-8 min-[2400px]:w-8" />
+        </div>
+        <MiniScoreRing score={97} tone="green" />
+        <div className="flex justify-center text-emerald-500">
+          <Sparkles className="h-7 w-7 fill-emerald-500/18 min-[2400px]:h-8 min-[2400px]:w-8" />
+        </div>
+      </div>
+
+      <ul className="mt-5 space-y-2.5 min-[2400px]:mt-6 min-[2400px]:space-y-3">
+        {tailoredCvItems.map((item) => (
+          <li className="flex items-center gap-3 text-[12px] text-slate-700 min-[2400px]:text-[13px]" key={item}>
+            <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+            </span>
+            {item}
+          </li>
+        ))}
+      </ul>
+    </WhiteProcessCard>
+  );
+}
+
+function HowItWorksSection(props: LandingPageProps) {
+  return (
+    <section className="relative z-10 overflow-hidden px-5 pb-20 pt-8 sm:px-8 lg:px-10 xl:pb-24 xl:pt-8 2xl:px-14 min-[2400px]:pb-28 min-[2400px]:pt-16">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(37,99,235,0.17),transparent_38%),radial-gradient(circle_at_50%_88%,rgba(14,165,233,0.08),transparent_36%)]" />
+      <div className="relative mx-auto max-w-[1320px] min-[2400px]:max-w-[1880px]">
+        <div className="text-center">
+          <p className="text-[14px] font-semibold uppercase tracking-[0.42em] text-cyan-300">
+            How it works
+          </p>
+          <h2 className="mx-auto mt-6 max-w-[980px] text-balance text-[clamp(2.75rem,3.72vw,3.8rem)] font-semibold leading-[1.13] tracking-[-0.055em] text-white min-[2400px]:relative min-[2400px]:left-1/2 min-[2400px]:w-[2200px] min-[2400px]:max-w-none min-[2400px]:-translate-x-1/2 min-[2400px]:whitespace-nowrap min-[2400px]:text-[3rem]">
+            How Taylor turns your background
+            <br className="hidden md:block min-[2400px]:hidden" />
+            into a stronger CV
+          </h2>
+        </div>
+
+        <div className="mt-8 grid gap-8 lg:grid-cols-2 xl:grid-cols-[1fr_38px_1fr_38px_1.08fr_38px_1fr] xl:items-start xl:gap-3 min-[2400px]:mt-16 min-[2400px]:grid-cols-[1fr_58px_1fr_58px_1.1fr_58px_1fr] min-[2400px]:gap-5">
+          <div>
+            <StepIntro index={1} {...howItWorksSteps[0]} />
+            <div className="mt-5 min-[2400px]:mt-8">
+              <JobDescriptionProcessCard {...props} />
+            </div>
+          </div>
+          <ProcessArrow />
+
+          <div>
+            <StepIntro index={2} {...howItWorksSteps[1]} />
+            <div className="mt-5 min-[2400px]:mt-8">
+              <BackgroundProcessCard />
+            </div>
+          </div>
+          <ProcessArrow />
+
+          <div>
+            <StepIntro index={3} {...howItWorksSteps[2]} />
+            <div className="mt-5 min-[2400px]:mt-8">
+              <EvidenceProcessCards />
+            </div>
+          </div>
+          <ProcessArrow />
+
+          <div>
+            <StepIntro index={4} {...howItWorksSteps[3]} />
+            <div className="mt-5 min-[2400px]:mt-8">
+              <TailoredCvProcessCard />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function LandingPage(props: LandingPageProps) {
   return (
     <main className="relative min-h-screen max-w-[100vw] overflow-x-hidden bg-[#030813] text-white">
       <LandingBackground />
       <LandingNav {...props} />
 
-      <section className="relative z-10 mx-auto grid w-full max-w-[1920px] grid-cols-1 gap-10 px-5 pb-12 pt-8 sm:px-8 lg:px-10 xl:min-h-[calc(100vh-4rem)] xl:grid-cols-[minmax(360px,430px)_minmax(0,1fr)] xl:items-start xl:gap-6 xl:pb-6 xl:pt-9 2xl:grid-cols-[minmax(470px,570px)_minmax(0,1fr)] 2xl:gap-10 2xl:px-14 2xl:pt-11 min-[1900px]:max-w-[2060px] min-[1900px]:min-h-0 min-[1900px]:grid-cols-[minmax(540px,640px)_minmax(0,1fr)] min-[1900px]:pb-2">
+      <section className="relative z-10 mx-auto grid w-full max-w-[1920px] grid-cols-1 gap-10 px-5 pb-12 pt-8 sm:px-8 lg:px-10 xl:min-h-[calc(100vh-4rem)] xl:grid-cols-[minmax(360px,430px)_minmax(0,1fr)] xl:items-start xl:gap-6 xl:pb-6 xl:pt-9 2xl:grid-cols-[minmax(470px,570px)_minmax(0,1fr)] 2xl:gap-10 2xl:px-14 2xl:pt-11 min-[1900px]:max-w-[2060px] min-[1900px]:!min-h-0 min-[1900px]:grid-cols-[minmax(540px,640px)_minmax(0,1fr)] min-[1900px]:pb-2">
         <motion.div
           animate="visible"
           className="max-w-[590px] xl:max-w-[430px] 2xl:max-w-[570px] min-[1900px]:max-w-[640px]"
@@ -319,6 +622,7 @@ export function LandingPage(props: LandingPageProps) {
         </motion.div>
       </section>
       <TrustedCompaniesSection />
+      <HowItWorksSection {...props} />
     </main>
   );
 }

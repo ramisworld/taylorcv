@@ -574,22 +574,30 @@ function ConnectorLines() {
       </defs>
 
       {[
-        "M252 70 H284 C308 70 304 100 333 100",
-        "M252 175 H284 C308 175 304 194 333 194",
+        "M252 70 H292 C314 70 309 100 333 100",
+        "M252 175 H292 C314 175 309 194 333 194",
         "M252 292 H333",
-        "M252 425 H284 C308 425 304 384 333 384",
-        "M252 556 H284 C308 556 304 495 333 495",
+        "M252 425 H292 C314 425 309 384 333 384",
+        "M252 556 H292 C314 556 309 495 333 495",
         "M714 340 H790",
       ].map((path) => (
-        <path
-          d={path}
-          fill="none"
-          filter="url(#connectorGlow)"
-          key={path}
-          stroke="url(#connectorBlue)"
-          strokeLinecap="round"
-          strokeWidth="1.65"
-        />
+        <g key={path}>
+          <path
+            d={path}
+            fill="none"
+            stroke="rgba(14,165,233,0.16)"
+            strokeLinecap="round"
+            strokeWidth="5"
+          />
+          <path
+            d={path}
+            fill="none"
+            filter="url(#connectorGlow)"
+            stroke="url(#connectorBlue)"
+            strokeLinecap="round"
+            strokeWidth="2.35"
+          />
+        </g>
       ))}
     </svg>
   );
