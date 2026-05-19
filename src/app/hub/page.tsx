@@ -5,10 +5,11 @@ import {
   UserButton,
   useAuth,
 } from "@clerk/nextjs";
-import { Download, FileText, Loader2, Plus, Sparkles } from "lucide-react";
+import { Download, FileText, Loader2, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { TaylorLogoMark } from "~/components/TaylorBrand";
 import { parseStructuredCv } from "~/lib/cvDocument";
 import { exportCvDocx, exportCvPdf } from "~/lib/cvExport";
 import { api } from "~/trpc/react";
@@ -85,9 +86,7 @@ export default function ApplicationHubPage() {
       <div className="relative z-10 flex min-h-screen">
         <aside className="hidden w-72 shrink-0 border-r border-white/10 p-5 backdrop-blur-xl lg:block">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-200/20 bg-cyan-200/10 text-cyan-100">
-              <Sparkles className="h-4 w-4" />
-            </div>
+            <TaylorLogoMark className="h-10 w-10" />
             <div>
               <p className="text-sm font-semibold text-white">Taylor CV</p>
               <p className="text-xs text-zinc-400">Application Hub</p>
@@ -109,9 +108,12 @@ export default function ApplicationHubPage() {
 
         <section className="flex min-w-0 flex-1 flex-col">
           <header className="flex h-16 items-center justify-between border-b border-white/10 px-5 backdrop-blur-xl">
-            <div className="lg:hidden">
-              <p className="text-sm font-semibold text-white">Taylor CV</p>
-              <p className="text-xs text-zinc-400">Application Hub</p>
+            <div className="flex items-center gap-3 lg:hidden">
+              <TaylorLogoMark className="h-8 w-8" />
+              <div>
+                <p className="text-sm font-semibold text-white">Taylor CV</p>
+                <p className="text-xs text-zinc-400">Application Hub</p>
+              </div>
             </div>
             <div className="ml-auto flex items-center gap-3">
               <HubButton

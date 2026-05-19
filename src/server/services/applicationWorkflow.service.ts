@@ -4,14 +4,31 @@ import { TRPCError } from "@trpc/server";
 import type { Prisma } from "../../../generated/prisma/index.js";
 
 import type { CandidateProfilerOutput } from "~/lib/types";
+import { buildDeterministicMatchFraming } from "~/lib/deterministicMatchFraming";
 import { buildEvidenceMatchPersistencePlan } from "~/lib/evidenceMatchPersistence";
+import { selectGapQuestionTargets } from "~/lib/gapQuestionSelection";
+import { calculateEvidenceMatchScoreFromRows } from "~/lib/scoring";
 import { parseStructuredCv } from "~/lib/cvDocument";
 import { stripCvPresentationDebug } from "~/lib/cvPresentation";
-import { runBatchEvidenceFitAndGapPlannerAgent } from "~/server/agents/batchEvidenceFitAndGapPlanner.agent";
+import { runEvidenceFitScorerAgent } from "~/server/agents/evidenceFitScorer.agent";
+import { runGapQuestionAgent } from "~/server/agents/gapQuestion.agent";
 import { runCandidateProfilerAgent } from "~/server/agents/candidateProfiler.agent";
 import { runCvBuilderAgent } from "~/server/agents/cvBuilder.agent";
 import { runJobParserAgent } from "~/server/agents/jobParser.agent";
 import { db } from "~/server/db";
+import {
+  claimAnonymousCandidateMemory,
+  ensureRequirementQueryEmbeddings,
+  getCandidateMemorySummary,
+  loadCandidateMemoryChunks,
+  loadLatestCandidateProfile,
+  searchCandidateMemoryForRequirements,
+  sourceTypeFromProfileSource,
+  type CandidateMemoryChunkRow,
+  type CandidateMemoryOwner,
+  upsertCandidateMemoryChunks,
+  upsertCandidateProfileMemory,
+} from "~/server/services/candidateMemory.service";
 import {
   buildEvidenceChunksFromProfile,
   buildGapAnswerEvidenceChunk,
@@ -27,16 +44,44 @@ import {
   repairCvOutput,
   runDeterministicCvQa,
 } from "~/server/services/cvQa.service";
-import { timedStep } from "~/server/services/timing.service";
-import {
-  insertCandidateChunksWithEmbeddings,
-  searchCandidateChunksForRequirements,
-} from "~/server/tools/vectorSearch.tool";
+import { runWithTimingSummary, timedStep } from "~/server/services/timing.service";
 
 const MAX_JOB_DESCRIPTION_CHARS = 20_000;
 const MAX_CANDIDATE_BACKGROUND_CHARS = 30_000;
 const LINKEDIN_FAILURE_MESSAGE =
   "We couldn’t read this LinkedIn profile automatically. Please upload your CV instead.";
+
+type CandidateScanStep =
+  | "parsing_profile"
+  | "saving_profile"
+  | "building_candidate_evidence"
+  | "creating_evidence_map"
+  | "matching_requirements"
+  | "validating_scores"
+  | "generating_questions"
+  | "finalizing_match"
+  | "match_ready"
+  | "candidate_scan_failed";
+
+type CandidateScanStatus =
+  | "job_added"
+  | "candidate_added"
+  | "evidence_ready"
+  | "questions_ready";
+
+async function markCandidateScanStep(args: {
+  applicationId: string;
+  currentStep: CandidateScanStep;
+  status?: CandidateScanStatus;
+}) {
+  await db.application.update({
+    where: { id: args.applicationId },
+    data: {
+      currentStep: args.currentStep,
+      ...(args.status ? { status: args.status } : {}),
+    },
+  });
+}
 
 function inputJson(value: unknown) {
   return value as Prisma.InputJsonValue;
@@ -114,28 +159,33 @@ function normalizeJobRequirements<T extends { label: string; description: string
   });
 }
 
+function compactText(value: string, maxLength: number) {
+  const text = value.replace(/\s+/g, " ").trim();
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength - 1).trimEnd().replace(/[.,;:!?-]+$/, "")}.`;
+}
+
 function questionJson(question: {
   question: string;
-  shortQuestion: string;
-  linkedJobRequirement: string | null;
-  whyThisMatters: string;
-  howYourAnswerHelps: string;
-  quickOptions: string[];
-  selectedOptionRequiresDetail: boolean;
-  followUpPrompt: string | null;
-  dynamicGuidance: string;
-  questionType: string;
+  targetRequirementLabel: string | null;
+  whyItMatters?: string | null;
+  answerGuidance?: string | null;
+  reason?: string | null;
+  exampleAnswer?: string | null;
 }) {
+  const whyThisMatters = question.whyItMatters ?? "";
+  const howYourAnswerHelps = question.answerGuidance ?? "";
+  const dynamicGuidance = question.reason ?? "";
   return {
-    shortQuestion: question.shortQuestion,
-    linkedJobRequirement: question.linkedJobRequirement,
-    whyThisMatters: question.whyThisMatters,
-    howYourAnswerHelps: question.howYourAnswerHelps,
-    quickOptions: question.quickOptions.slice(0, 4),
-    selectedOptionRequiresDetail: question.selectedOptionRequiresDetail,
-    followUpPrompt: question.followUpPrompt,
-    dynamicGuidance: question.dynamicGuidance,
-    questionType: question.questionType,
+    shortQuestion: question.question,
+    linkedJobRequirement: question.targetRequirementLabel,
+    whyThisMatters,
+    howYourAnswerHelps,
+    quickOptions: ["Yes", "Somewhat", "Not yet", "Skip"],
+    selectedOptionRequiresDetail: true,
+    followUpPrompt: "One short paragraph is enough: what did you do, where did it happen, and what changed?",
+    dynamicGuidance,
+    exampleAnswer: question.exampleAnswer ?? null,
   };
 }
 
@@ -193,6 +243,22 @@ async function getOrCreateUser(args: {
   });
 }
 
+async function resolveMemoryOwnerForApplication(args: {
+  application: { userId: string | null };
+  anonymousSessionId: string;
+  clerkUserId?: string | null;
+}): Promise<CandidateMemoryOwner> {
+  const user = args.application.userId
+    ? { id: args.application.userId }
+    : args.clerkUserId
+      ? await getOrCreateUser({ clerkUserId: args.clerkUserId })
+      : null;
+  return {
+    anonymousSessionId: args.anonymousSessionId,
+    userId: user?.id ?? null,
+  };
+}
+
 async function fetchLinkedInPublicText(url: string) {
   try {
     const response = await fetch(url, {
@@ -217,282 +283,480 @@ async function fetchLinkedInPublicText(url: string) {
   }
 }
 
-async function upsertCandidateProfileFromOutput(args: {
-  anonymousSessionId: string;
-  applicationId: string;
-  profileOutput: CandidateProfilerOutput;
-  rawCvText?: string | null;
-  rawBackgroundText?: string | null;
-  profileSource?: string | null;
-  sourceSummary?: string | null;
-  sourceUrl?: string | null;
+async function loadCandidateChunks(args: {
+  owner: CandidateMemoryOwner;
 }) {
-  const profile = args.profileOutput;
-  return db.candidateProfile.upsert({
-    where: { applicationId: args.applicationId },
-    update: {
-      rawCvText: args.rawCvText,
-      rawBackgroundText: args.rawBackgroundText,
-      contactInfoJson: inputJson(profile.contactInfo),
-      linksJson: inputJson(profile.links),
-      profileSource: args.profileSource,
-      sourceSummary: args.sourceSummary ?? profile.sourceSummary,
-      sourceUrl: args.sourceUrl,
-      profileConfirmedAt: null,
-      summary: profile.summary,
-      skillsJson: inputJson(profile.skills),
-      projectsJson: inputJson(profile.projects),
-      educationJson: inputJson(profile.education),
-      certificationsJson: inputJson(profile.certifications),
-      experienceJson: inputJson(profile.experience),
-      toolsJson: inputJson(profile.tools),
-      achievementsJson: inputJson(profile.achievements),
-      cautionNotesJson: inputJson(profile.cautionNotes ?? []),
-      metricOpportunitiesJson: inputJson(profile.metricOpportunities ?? []),
-      strongProofCandidatesJson: inputJson(profile.strongProofCandidates ?? []),
-      scopeOpportunitiesJson: inputJson(profile.scopeOpportunities ?? []),
-      likelyTopEvidenceJson: inputJson(profile.likelyTopEvidence ?? []),
-    },
-    create: {
-      anonymousSessionId: args.anonymousSessionId,
-      applicationId: args.applicationId,
-      rawCvText: args.rawCvText,
-      rawBackgroundText: args.rawBackgroundText,
-      contactInfoJson: inputJson(profile.contactInfo),
-      linksJson: inputJson(profile.links),
-      profileSource: args.profileSource,
-      sourceSummary: args.sourceSummary ?? profile.sourceSummary,
-      sourceUrl: args.sourceUrl,
-      profileConfirmedAt: null,
-      summary: profile.summary,
-      skillsJson: inputJson(profile.skills),
-      projectsJson: inputJson(profile.projects),
-      educationJson: inputJson(profile.education),
-      certificationsJson: inputJson(profile.certifications),
-      experienceJson: inputJson(profile.experience),
-      toolsJson: inputJson(profile.tools),
-      achievementsJson: inputJson(profile.achievements),
-      cautionNotesJson: inputJson(profile.cautionNotes ?? []),
-      metricOpportunitiesJson: inputJson(profile.metricOpportunities ?? []),
-      strongProofCandidatesJson: inputJson(profile.strongProofCandidates ?? []),
-      scopeOpportunitiesJson: inputJson(profile.scopeOpportunities ?? []),
-      likelyTopEvidenceJson: inputJson(profile.likelyTopEvidence ?? []),
-    },
-  });
+  return loadCandidateMemoryChunks(args.owner);
 }
 
-async function loadCandidateChunks(args: {
-  anonymousSessionId: string;
-  applicationId: string;
+type RetrievedEvidenceItem = {
+  id: string;
+  content: string;
+  similarityScore: number;
+  chunkType: string;
+  sourceType: string;
+  tagsJson: unknown;
+  metadataJson: unknown;
+};
+
+type EvidenceRefItem = RetrievedEvidenceItem & {
+  displayLabel: string;
+};
+
+const explicitEvidenceTerms = [
+  "docker",
+  "ci/cd",
+  "cicd",
+  "gitlab",
+  "github actions",
+  "typescript",
+  "python",
+  "postgresql",
+  "pgvector",
+  "ollama",
+  "vllm",
+  "qlora",
+  "unsloth",
+  "fine-tuning",
+  "finetuning",
+  "openai",
+  "azure openai",
+  "llm",
+  "rag",
+] as const;
+
+function tokenizeRequirementText(requirement: { label: string; description: string }) {
+  const text = `${requirement.label} ${requirement.description}`.toLowerCase();
+  const terms = new Set<string>();
+  for (const explicitTerm of explicitEvidenceTerms) {
+    if (text.includes(explicitTerm)) terms.add(explicitTerm);
+  }
+  for (const token of text.match(/[a-z0-9+#.\/-]{3,}/g) ?? []) {
+    if (
+      ![
+        "and",
+        "the",
+        "with",
+        "for",
+        "from",
+        "using",
+        "experience",
+        "ability",
+        "skills",
+        "knowledge",
+      ].includes(token)
+    ) {
+      terms.add(token);
+    }
+  }
+  return [...terms];
+}
+
+function lexicalRescueCandidates(args: {
+  requirement: { label: string; description: string };
+  candidateChunks: RetrievedEvidenceItem[];
+  existingIds: Set<string>;
+  limit?: number;
 }) {
-  return db.$queryRaw<
-    Array<{
-      id: string;
-      anonymousSessionId: string;
-      applicationId: string;
-      candidateProfileId: string | null;
-      sourceType: string;
-      sourceId: string | null;
-      chunkType: string;
-      content: string;
-      tagsJson: unknown;
-      metadataJson: unknown;
-      createdAt: Date;
-    }>
-  >`
-    SELECT
-      id,
-      anonymous_session_id AS "anonymousSessionId",
-      application_id AS "applicationId",
-      candidate_profile_id AS "candidateProfileId",
-      source_type AS "sourceType",
-      source_id AS "sourceId",
-      chunk_type AS "chunkType",
-      content,
-      tags_json AS "tagsJson",
-      metadata_json AS "metadataJson",
-      created_at AS "createdAt"
-    FROM candidate_chunks
-    WHERE application_id = ${args.applicationId}
-      AND anonymous_session_id = ${args.anonymousSessionId}
-    ORDER BY created_at ASC
-  `;
+  const terms = tokenizeRequirementText(args.requirement);
+  if (terms.length === 0) return [];
+  return args.candidateChunks
+    .filter((chunk) => !args.existingIds.has(chunk.id))
+    .map((chunk) => {
+      const text = `${chunk.content} ${JSON.stringify(chunk.tagsJson)} ${JSON.stringify(
+        chunk.metadataJson
+      )}`.toLowerCase();
+      const hits = terms.filter((term) => text.includes(term));
+      return {
+        chunk,
+        hits: hits.length,
+      };
+    })
+    .filter((item) => item.hits > 0)
+    .sort((a, b) => b.hits - a.hits || b.chunk.similarityScore - a.chunk.similarityScore)
+    .slice(0, args.limit ?? 2)
+    .map((item) => item.chunk);
+}
+
+function buildEvidenceRefsByRequirement(args: {
+  requirements: Array<{ id: string; label: string; description: string }>;
+  retrievalMap: Map<string, RetrievedEvidenceItem[]>;
+  candidateChunks: RetrievedEvidenceItem[];
+  maxPerRequirement?: number;
+}) {
+  const maxPerRequirement = args.maxPerRequirement ?? 6;
+  return Object.fromEntries(
+    args.requirements.map((requirement, requirementIndex) => {
+      const vectorRows = args.retrievalMap.get(requirement.id) ?? [];
+      const existingIds = new Set(vectorRows.map((chunk) => chunk.id));
+      const rescued = lexicalRescueCandidates({
+        requirement,
+        candidateChunks: args.candidateChunks,
+        existingIds,
+      });
+      const merged = [...vectorRows, ...rescued]
+        .filter(
+          (chunk, index, chunks) =>
+            chunks.findIndex((candidate) => candidate.id === chunk.id) === index
+        )
+        .slice(0, maxPerRequirement);
+      return [
+        requirement.id,
+        merged.map((chunk, evidenceIndex) => ({
+          ...chunk,
+          displayLabel: `R${requirementIndex + 1}E${evidenceIndex + 1}`,
+        })),
+      ];
+    })
+  ) as Record<string, EvidenceRefItem[]>;
 }
 
 async function persistBatchFit(args: {
   anonymousSessionId: string;
   applicationId: string;
-  jobRequirements: Array<{ id: string; label: string; importance: string }>;
-  output: Awaited<ReturnType<typeof runBatchEvidenceFitAndGapPlannerAgent>>;
-  retrievedEvidenceByRequirement: Record<
-    string,
-    Array<{ id: string; similarityScore: number }>
-  >;
+  job: {
+    title: string;
+    company: string | null;
+    summary: string;
+    roleDomain?: string | null;
+    archetypeHint?: string | null;
+  };
+  candidateProfileSummary: string;
+  metricOpportunities: string[];
+  scopeOpportunities: string[];
+  jobRequirements: Array<{
+    id: string;
+    label: string;
+    description: string;
+    importance: string;
+  }>;
+  output: Awaited<ReturnType<typeof runEvidenceFitScorerAgent>>;
+  evidenceRefsByRequirement: Record<string, EvidenceRefItem[]>;
+  writeGapQuestions?: boolean;
 }) {
-  const persistedChunks = await db.candidateChunk.findMany({
-    where: {
-      applicationId: args.applicationId,
-      anonymousSessionId: args.anonymousSessionId,
-    },
-    select: { id: true },
+  const writeGapQuestions = args.writeGapQuestions ?? true;
+  await markCandidateScanStep({
+    applicationId: args.applicationId,
+    currentStep: "validating_scores",
+    status: "evidence_ready",
   });
-  const validCandidateChunkIds = new Set(persistedChunks.map((chunk) => chunk.id));
-  const persistencePlan = buildEvidenceMatchPersistencePlan({
+  const {
+    persistencePlan,
+    scoreSummary,
+    validatedQuestions,
+    matchAnalysis,
+  } = await timedStep(
+    "score validation / persistence preparation",
+    async () => {
+      const validCandidateChunkIds = new Set(
+        Object.values(args.evidenceRefsByRequirement)
+          .flat()
+          .map((chunk) => chunk.id)
+      );
+      const plan = buildEvidenceMatchPersistencePlan({
+        applicationId: args.applicationId,
+        jobRequirements: args.jobRequirements,
+        output: args.output,
+        evidenceRefsByRequirement: args.evidenceRefsByRequirement,
+        validCandidateChunkIds,
+      });
+      if (plan.rejectedMatches.length > 0) {
+        console.warn("taylor_rejected_evidence_selections", {
+          applicationId: args.applicationId,
+          rejectedMatches: plan.rejectedMatches,
+        });
+        throw new Error("Evidence scorer returned invalid candidate chunk selections.");
+      }
+      const summary = calculateEvidenceMatchScoreFromRows(plan.requirementFitScores);
+      const requirementById = new Map(
+        args.jobRequirements.map((requirement) => [requirement.id, requirement])
+      );
+      const evidenceByChunkId = new Map(
+        Object.values(args.evidenceRefsByRequirement)
+          .flat()
+          .map((item) => [item.id, item])
+      );
+      const gapTargets = selectGapQuestionTargets(
+        plan.requirementFitScores.flatMap((fitScore) => {
+          const requirement = requirementById.get(fitScore.jobRequirementId);
+          if (!requirement) return [];
+          const selectedEvidence = fitScore.bestCandidateChunkId
+            ? evidenceByChunkId.get(fitScore.bestCandidateChunkId)
+            : null;
+          return {
+            jobRequirementId: requirement.id,
+            label: requirement.label,
+            description: requirement.description,
+            importance: requirement.importance,
+            finalConfidence: fitScore.finalConfidence,
+            reason: fitScore.reason,
+            selectedEvidenceSnippet:
+              fitScore.finalConfidence === "low" && selectedEvidence
+                ? compactText(selectedEvidence.content, 260)
+                : null,
+          };
+        })
+      );
+      await markCandidateScanStep({
+        applicationId: args.applicationId,
+        currentStep: "generating_questions",
+        status: "evidence_ready",
+      });
+      const strongestAreas = plan.requirementFitScores
+        .filter(
+          (fitScore) =>
+            fitScore.finalConfidence === "high" || fitScore.finalConfidence === "medium"
+        )
+        .slice(0, 4)
+        .map((fitScore) => requirementById.get(fitScore.jobRequirementId)?.label)
+        .filter((label): label is string => !!label);
+      const gapQuestionOutput =
+        writeGapQuestions && gapTargets.length > 0
+          ? await timedStep(
+              "Gap Question Agent",
+              () =>
+                runGapQuestionAgent({
+                  applicationId: args.applicationId,
+                  input: {
+                    job: args.job,
+                    candidateContext: {
+                      summary: compactText(args.candidateProfileSummary, 420),
+                      strongestAreas,
+                    },
+                    targets: gapTargets,
+                  },
+                }),
+              { applicationId: args.applicationId, targetCount: gapTargets.length }
+            )
+          : { questions: [] };
+      const questions = gapQuestionOutput.questions;
+      const evidenceCards = plan.requirementFitScores.flatMap((fitScore) => {
+        if (!fitScore.bestCandidateChunkId || fitScore.finalConfidence === "missing") return [];
+        const requirement = requirementById.get(fitScore.jobRequirementId);
+        const evidence = evidenceByChunkId.get(fitScore.bestCandidateChunkId);
+        return {
+          requirementId: fitScore.jobRequirementId,
+          requirementLabel: requirement?.label ?? "Role requirement",
+          candidateChunkId: fitScore.bestCandidateChunkId,
+          content: evidence?.content ?? "Relevant candidate evidence found.",
+          confidence: fitScore.finalConfidence,
+          reason: fitScore.reason,
+          claimRisk:
+            plan.evidenceMatches.find(
+              (match) => match.jobRequirementId === fitScore.jobRequirementId
+            )?.claimRisk ?? "careful_wording",
+        };
+      });
+      const deterministicFraming = await timedStep(
+        "deterministic match framing generation",
+        async () =>
+          buildDeterministicMatchFraming({
+            job: args.job,
+            candidateProfileSummary: args.candidateProfileSummary,
+            metricOpportunities: args.metricOpportunities,
+            scopeOpportunities: args.scopeOpportunities,
+            requirements: args.jobRequirements,
+            fitScores: plan.requirementFitScores,
+            evidenceMatches: plan.evidenceMatches,
+            gapTargets,
+            scoreSummary: summary,
+          }),
+        {
+          applicationId: args.applicationId,
+          strengthCandidateCount: plan.requirementFitScores.length,
+          gapQuestionCount: questions.length,
+        }
+      );
+      return {
+        persistencePlan: plan,
+        scoreSummary: summary,
+        validatedQuestions: questions,
+        matchAnalysis: {
+          ...args.output,
+          ...deterministicFraming,
+          currentMatchScore: summary.score,
+          evidenceCards,
+          recommendedGapQuestions: questions,
+        },
+      };
+    },
+    { applicationId: args.applicationId }
+  );
+
+  await markCandidateScanStep({
+    applicationId: args.applicationId,
+    currentStep: "finalizing_match",
+    status: "evidence_ready",
+  });
+  await db.$transaction(async (tx) => {
+	    await timedStep(
+	      "evidence match persistence",
+	      async () => {
+	        await tx.evidenceMatch.deleteMany({ where: { applicationId: args.applicationId } });
+	        if (persistencePlan.evidenceMatches.length > 0) {
+	          await tx.evidenceMatch.createMany({
+	            data: persistencePlan.evidenceMatches.map((match) => ({
+	              applicationId: match.applicationId,
+	              jobRequirementId: match.jobRequirementId,
+	              candidateChunkId: match.candidateChunkId,
+	              similarityScore: match.similarityScore,
+	              confidence: match.confidence,
+	              cvUsefulness: match.cvUsefulness,
+	              claimRisk: match.claimRisk,
+	              reason: match.reason,
+	            })),
+	          });
+	        }
+	      },
+      { applicationId: args.applicationId, rowCount: persistencePlan.evidenceMatches.length }
+    );
+
+	    await timedStep(
+	      "requirement fit score persistence",
+	      async () => {
+	        await tx.requirementFitScore.deleteMany({ where: { applicationId: args.applicationId } });
+	        await tx.cvDraft.deleteMany({ where: { applicationId: args.applicationId } });
+	        if (persistencePlan.requirementFitScores.length > 0) {
+	          await tx.requirementFitScore.createMany({
+	            data: persistencePlan.requirementFitScores.map((fitScore) => ({
+	              applicationId: fitScore.applicationId,
+	              jobRequirementId: fitScore.jobRequirementId,
+	              finalConfidence: fitScore.finalConfidence,
+	              bestCandidateChunkId: fitScore.bestCandidateChunkId,
+	              reason: fitScore.reason,
+	              importanceWeight: fitScore.importanceWeight,
+	              confidenceValue: fitScore.confidenceValue,
+	              earnedPoints: fitScore.earnedPoints,
+	              possiblePoints: fitScore.possiblePoints,
+	            })),
+	          });
+	        }
+	      },
+      { applicationId: args.applicationId, rowCount: persistencePlan.requirementFitScores.length }
+    );
+
+    await timedStep(
+      "gap question persistence",
+      async () => {
+        if (!writeGapQuestions) return;
+        await tx.gapAnswer.deleteMany({ where: { applicationId: args.applicationId } });
+        await tx.gapQuestion.deleteMany({ where: { applicationId: args.applicationId } });
+        await tx.gapCoachInsight.deleteMany({ where: { applicationId: args.applicationId } });
+        await tx.gapCoachInsight.create({
+          data: {
+            applicationId: args.applicationId,
+            openingMessage: matchAnalysis.coachInsight.openingMessage,
+            jobWants: matchAnalysis.coachInsight.jobWants,
+            candidateStrengthsJson: inputJson(matchAnalysis.coachInsight.candidateStrengths),
+            candidateConcernsJson: inputJson(matchAnalysis.coachInsight.candidateConcerns),
+          },
+        });
+        if (validatedQuestions.length > 0) {
+          const targetLabelById = new Map(
+            args.jobRequirements.map((requirement) => [requirement.id, requirement.label])
+          );
+          await tx.gapQuestion.createMany({
+            data: validatedQuestions.map((question) => ({
+              applicationId: args.applicationId,
+              targetRequirementId: question.targetRequirementId,
+              question: question.question,
+              reason: question.reason,
+              whyItMatters: question.whyItMatters,
+              answerGuidance: question.answerGuidance,
+              exampleAnglesJson: inputJson(question.exampleAngles),
+              questionJson: inputJson(
+                questionJson({
+                  ...question,
+                  targetRequirementLabel: question.targetRequirementId
+                    ? targetLabelById.get(question.targetRequirementId) ?? null
+                    : null,
+                })
+              ),
+              status: "unanswered" as const,
+            })),
+          });
+        }
+      },
+      { applicationId: args.applicationId, rowCount: validatedQuestions.length }
+    );
+  });
+
+  return {
+    scoreSummary,
+    matchAnalysis,
+    gapQuestionCount: validatedQuestions.length,
+  };
+}
+
+function rejectedEvidenceSelectionsForOutput(args: {
+  applicationId: string;
+  jobRequirements: Array<{ id: string; label: string; importance: string }>;
+  output: Awaited<ReturnType<typeof runEvidenceFitScorerAgent>>;
+  evidenceRefsByRequirement: Record<string, EvidenceRefItem[]>;
+}) {
+  const validCandidateChunkIds = new Set(
+    Object.values(args.evidenceRefsByRequirement)
+      .flat()
+      .map((chunk) => chunk.id)
+  );
+  return buildEvidenceMatchPersistencePlan({
     applicationId: args.applicationId,
     jobRequirements: args.jobRequirements,
     output: args.output,
-    retrievedEvidenceByRequirement: args.retrievedEvidenceByRequirement,
+    evidenceRefsByRequirement: args.evidenceRefsByRequirement,
     validCandidateChunkIds,
-  });
-  if (persistencePlan.rejectedMatches.length > 0) {
-    console.warn("taylor_rejected_evidence_matches", {
-      applicationId: args.applicationId,
-      rejectedMatches: persistencePlan.rejectedMatches,
-    });
-  }
-
-  await db.$transaction(async (tx) => {
-    await tx.evidenceMatch.deleteMany({ where: { applicationId: args.applicationId } });
-    await tx.requirementFitScore.deleteMany({ where: { applicationId: args.applicationId } });
-    await tx.gapAnswer.deleteMany({ where: { applicationId: args.applicationId } });
-    await tx.gapQuestion.deleteMany({ where: { applicationId: args.applicationId } });
-    await tx.gapCoachInsight.deleteMany({ where: { applicationId: args.applicationId } });
-
-    for (const match of persistencePlan.evidenceMatches) {
-      await tx.evidenceMatch.create({
-        data: {
-          applicationId: match.applicationId,
-          jobRequirementId: match.jobRequirementId,
-          candidateChunkId: match.candidateChunkId,
-          similarityScore: match.similarityScore,
-          confidence: match.confidence,
-          cvUsefulness: match.cvUsefulness,
-          claimRisk: match.claimRisk,
-          reason: match.reason,
-        },
-      });
-    }
-    for (const fitScore of persistencePlan.requirementFitScores) {
-      await tx.requirementFitScore.create({
-        data: {
-          applicationId: fitScore.applicationId,
-          jobRequirementId: fitScore.jobRequirementId,
-          finalConfidence: fitScore.finalConfidence,
-          bestCandidateChunkId: fitScore.bestCandidateChunkId,
-          reason: fitScore.reason,
-          importanceWeight: fitScore.importanceWeight,
-          confidenceValue: fitScore.confidenceValue,
-          earnedPoints: fitScore.earnedPoints,
-          possiblePoints: fitScore.possiblePoints,
-        },
-      });
-    }
-
-    await tx.gapCoachInsight.create({
-      data: {
-        applicationId: args.applicationId,
-        openingMessage:
-          args.output.recommendedGapQuestions.length > 0
-            ? "Taylor found a few quick questions that could make the final CV stronger."
-            : "Taylor found enough evidence to build the CV now.",
-        jobWants: args.output.cvAngle,
-        candidateStrengthsJson: inputJson(args.output.topStrengths),
-        candidateConcernsJson: inputJson(args.output.weakSpots),
-      },
-    });
-
-    if (args.output.recommendedGapQuestions.length > 0) {
-      const liveRequirementIds = new Set(args.jobRequirements.map((item) => item.id));
-      await tx.gapQuestion.createMany({
-        data: args.output.recommendedGapQuestions.slice(0, 4).map((question) => ({
-          applicationId: args.applicationId,
-          targetRequirementId:
-            question.targetRequirementId && liveRequirementIds.has(question.targetRequirementId)
-              ? question.targetRequirementId
-              : null,
-          question: question.question,
-          reason: question.dynamicGuidance,
-          whyItMatters: question.whyThisMatters,
-          answerGuidance: question.howYourAnswerHelps,
-          exampleAnglesJson: inputJson([question.dynamicGuidance]),
-          questionJson: inputJson(questionJson(question)),
-          status: "unanswered" as const,
-        })),
-      });
-    }
-  });
+  }).rejectedMatches;
 }
 
 async function prepareFastMatch(args: {
   anonymousSessionId: string;
   applicationId: string;
-  candidateProfileId: string;
-  profileOutput: CandidateProfilerOutput;
+  owner: CandidateMemoryOwner;
+  writeGapQuestions?: boolean;
 }) {
-  const job = await db.job.findUnique({
+  const writeGapQuestions = args.writeGapQuestions ?? true;
+  await markCandidateScanStep({
+    applicationId: args.applicationId,
+    currentStep: "creating_evidence_map",
+    status: "candidate_added",
+  });
+  const jobPromise = db.job.findUnique({
     where: { applicationId: args.applicationId },
     include: { requirements: true },
   });
+  const candidateProfilePromise = loadLatestCandidateProfile(args.owner);
+  const candidateChunksPromise = loadCandidateMemoryChunks(args.owner);
+  const job = await jobPromise;
   if (!job) {
     throw new TRPCError({
       code: "BAD_REQUEST",
       message: "Add a job before scanning your background.",
     });
   }
-
-  await db.evidenceMatch.deleteMany({ where: { applicationId: args.applicationId } });
-  await db.requirementFitScore.deleteMany({ where: { applicationId: args.applicationId } });
-  await db.gapAnswer.deleteMany({ where: { applicationId: args.applicationId } });
-  await db.gapQuestion.deleteMany({ where: { applicationId: args.applicationId } });
-  await db.gapCoachInsight.deleteMany({ where: { applicationId: args.applicationId } });
-  await db.cvDraft.deleteMany({ where: { applicationId: args.applicationId } });
-  await db.candidateChunk.deleteMany({
-    where: {
-      applicationId: args.applicationId,
-      anonymousSessionId: args.anonymousSessionId,
-    },
-  });
-
-  const chunks = await timedStep(
-    "deterministic chunk builder",
-    async () =>
-      buildEvidenceChunksFromProfile({
-        anonymousSessionId: args.anonymousSessionId,
-        applicationId: args.applicationId,
-        candidateProfileId: args.candidateProfileId,
-        profile: args.profileOutput,
-      }),
-    { applicationId: args.applicationId }
-  );
-
-  await timedStep(
-    "batch embedding call",
-    () => insertCandidateChunksWithEmbeddings(chunks),
-    { applicationId: args.applicationId, chunkCount: chunks.length }
-  );
-
   const rankedRequirements = [...job.requirements]
     .sort((a, b) => {
       const rank = { high: 0, medium: 1, low: 2 } as const;
       return rank[a.importance] - rank[b.importance];
     })
     .slice(0, 14);
-  const requirementsForRetrieval = rankedRequirements.filter(
-    (requirement) => requirement.importance !== "low"
-  );
-
-  const retrievalMap = await timedStep(
-    "retrieval",
-    () =>
-      searchCandidateChunksForRequirements({
-        anonymousSessionId: args.anonymousSessionId,
-        applicationId: args.applicationId,
-        requirements: requirementsForRetrieval,
-        topK: 4,
-      }),
-    { applicationId: args.applicationId, requirementCount: requirementsForRetrieval.length }
-  );
-  const retrievedEvidenceByRequirement = Object.fromEntries(
+  const retrievalMapPromise = searchCandidateMemoryForRequirements({
+    owner: args.owner,
+    requirements: rankedRequirements,
+    topK: 5,
+    applicationId: args.applicationId,
+  });
+  const [candidateProfile, candidateChunks, retrievalMap] = await Promise.all([
+    candidateProfilePromise,
+    candidateChunksPromise,
+    retrievalMapPromise,
+  ]);
+  if (!candidateProfile || candidateChunks.length === 0) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Add or reuse candidate background before matching this role.",
+    });
+  }
+  const normalizedRetrievalMap = new Map(
     rankedRequirements.map((requirement) => [
       requirement.id,
       (retrievalMap.get(requirement.id) ?? []).map((chunk) => ({
@@ -506,61 +770,131 @@ async function prepareFastMatch(args: {
       })),
     ])
   );
+  const evidenceRefsByRequirement = buildEvidenceRefsByRequirement({
+    requirements: rankedRequirements,
+    retrievalMap: normalizedRetrievalMap,
+    candidateChunks: candidateChunks.map((chunk) => ({
+      id: chunk.id,
+      content: chunk.content,
+      similarityScore: 0,
+      chunkType: chunk.chunkType,
+      sourceType: chunk.sourceType,
+      tagsJson: chunk.tagsJson,
+      metadataJson: chunk.metadataJson,
+    })),
+  });
 
-  const fitOutput = await timedStep(
-    "Batch Evidence Fit + Gap Planner",
+  await markCandidateScanStep({
+    applicationId: args.applicationId,
+    currentStep: "matching_requirements",
+    status: "evidence_ready",
+  });
+  const scorerInput = {
+    parsedJob: {
+      title: job.title,
+      company: job.company,
+      seniority: job.seniority,
+      summary: job.summary,
+      roleDomain: job.roleDomain,
+      archetypeHint: job.archetypeHint,
+    },
+    requirements: rankedRequirements.map((requirement) => ({
+      id: requirement.id,
+      label: requirement.label,
+      description: requirement.description,
+      importance: requirement.importance,
+    })),
+    candidateProfileSummary: candidateProfile.summary,
+    retrievedEvidenceByRequirement: evidenceRefsByRequirement,
+    metricOpportunities: stringArray(candidateProfile.metricOpportunitiesJson),
+    scopeOpportunities: stringArray(candidateProfile.scopeOpportunitiesJson),
+    roleDomain: job.roleDomain,
+    archetypeHint: job.archetypeHint,
+  };
+
+  let fitOutput = await timedStep(
+    "Evidence Fit Scorer Agent",
     () =>
-      runBatchEvidenceFitAndGapPlannerAgent({
+      runEvidenceFitScorerAgent({
         applicationId: args.applicationId,
-        input: {
-          parsedJob: {
-            title: job.title,
-            company: job.company,
-            seniority: job.seniority,
-            summary: job.summary,
-            roleDomain: job.roleDomain,
-            archetypeHint: job.archetypeHint,
-          },
-          requirements: rankedRequirements.map((requirement) => ({
-            id: requirement.id,
-            label: requirement.label,
-            description: requirement.description,
-            importance: requirement.importance,
-          })),
-          candidateProfileSummary: args.profileOutput.summary,
-          retrievedEvidenceByRequirement,
-          metricOpportunities: args.profileOutput.metricOpportunities ?? [],
-          scopeOpportunities: args.profileOutput.scopeOpportunities ?? [],
-          roleDomain: job.roleDomain,
-          archetypeHint: job.archetypeHint,
+        input: scorerInput,
+      }),
+    { applicationId: args.applicationId }
+  );
+  const rejectedSelections = rejectedEvidenceSelectionsForOutput({
+    applicationId: args.applicationId,
+    jobRequirements: rankedRequirements,
+    output: fitOutput,
+    evidenceRefsByRequirement,
+  });
+  if (rejectedSelections.length > 0) {
+    console.warn("taylor_repairing_evidence_selections", {
+      applicationId: args.applicationId,
+      rejectedSelections,
+    });
+    fitOutput = await timedStep(
+      "repair scorer call",
+      () =>
+        runEvidenceFitScorerAgent({
+          applicationId: args.applicationId,
+          input: { ...scorerInput, repairInstructions: rejectedSelections },
+        }),
+      { applicationId: args.applicationId, rejectedSelectionCount: rejectedSelections.length }
+    );
+    const stillRejected = rejectedEvidenceSelectionsForOutput({
+      applicationId: args.applicationId,
+      jobRequirements: rankedRequirements,
+      output: fitOutput,
+      evidenceRefsByRequirement,
+    });
+    if (stillRejected.length > 0) {
+      console.warn("taylor_evidence_selection_repair_failed", {
+        applicationId: args.applicationId,
+        rejectedSelections: stillRejected,
+      });
+      throw new Error("Evidence scorer returned invalid candidate chunk selections after repair.");
+    }
+  }
+
+  const persistedFit = await persistBatchFit({
+    anonymousSessionId: args.anonymousSessionId,
+    applicationId: args.applicationId,
+    job: {
+      title: job.title,
+      company: job.company,
+      summary: job.summary,
+      roleDomain: job.roleDomain,
+      archetypeHint: job.archetypeHint,
+    },
+    candidateProfileSummary: candidateProfile.summary,
+    metricOpportunities: stringArray(candidateProfile.metricOpportunitiesJson),
+    scopeOpportunities: stringArray(candidateProfile.scopeOpportunitiesJson),
+    jobRequirements: rankedRequirements,
+    output: fitOutput,
+    evidenceRefsByRequirement,
+    writeGapQuestions,
+  });
+
+  await timedStep(
+    "application final status update",
+    () =>
+      db.application.update({
+        where: { id: args.applicationId },
+        data: {
+          status: "questions_ready",
+          currentStep: "match_ready",
+          originalEvidenceMatchScore: persistedFit.scoreSummary.score,
+          updatedEvidenceMatchScore: null,
+          matchLabel: persistedFit.matchAnalysis.matchLabel,
+          cvAngle: persistedFit.matchAnalysis.cvAngle,
+          roleArchetype: persistedFit.matchAnalysis.roleArchetype,
+          matchAnalysisJson: inputJson(persistedFit.matchAnalysis),
         },
       }),
     { applicationId: args.applicationId }
   );
 
-  await persistBatchFit({
-    anonymousSessionId: args.anonymousSessionId,
-    applicationId: args.applicationId,
-    jobRequirements: rankedRequirements,
-    output: fitOutput,
-    retrievedEvidenceByRequirement,
-  });
-
-  await db.application.update({
-    where: { id: args.applicationId },
-    data: {
-      status: "questions_ready",
-      currentStep: "match_ready",
-      originalEvidenceMatchScore: fitOutput.currentMatchScore,
-      updatedEvidenceMatchScore: fitOutput.currentMatchScore,
-      matchLabel: fitOutput.matchLabel,
-      cvAngle: fitOutput.cvAngle,
-      roleArchetype: fitOutput.roleArchetype,
-      matchAnalysisJson: inputJson(fitOutput),
-    },
-  });
-
-  return fitOutput;
+  return persistedFit.matchAnalysis;
 }
 
 export async function createApplication(args: {
@@ -600,7 +934,12 @@ export async function submitJob(args: {
   clerkUserId?: string | null;
   rawJobText: string;
 }) {
-  await assertApplicationForSession(args);
+  const application = await assertApplicationForSession(args);
+  const owner = await resolveMemoryOwnerForApplication({
+    application,
+    anonymousSessionId: args.anonymousSessionId,
+    clerkUserId: args.clerkUserId,
+  });
   if (args.rawJobText.length > MAX_JOB_DESCRIPTION_CHARS) {
     throw new TRPCError({
       code: "BAD_REQUEST",
@@ -658,6 +997,18 @@ export async function submitJob(args: {
       importance: requirement.importance,
     })),
   });
+  const jobRequirements = await db.jobRequirement.findMany({
+    where: { jobId: job.id },
+    orderBy: { label: "asc" },
+  });
+  await ensureRequirementQueryEmbeddings({
+    requirements: jobRequirements.map((requirement) => ({
+      id: requirement.id,
+      label: requirement.label,
+      description: requirement.description,
+    })),
+    applicationId: args.applicationId,
+  });
   await db.application.update({
     where: { id: args.applicationId },
     data: {
@@ -671,14 +1022,10 @@ export async function submitJob(args: {
       matchAnalysisJson: undefined,
     },
   });
-  const jobRequirements = await db.jobRequirement.findMany({
-    where: { jobId: job.id },
-    orderBy: { label: "asc" },
-  });
   return { job, jobRequirements };
 }
 
-export async function submitCandidateProfileSource(args: {
+type SubmitCandidateProfileSourceArgs = {
   anonymousSessionId: string;
   applicationId: string;
   clerkUserId?: string | null;
@@ -686,8 +1033,24 @@ export async function submitCandidateProfileSource(args: {
   rawCvText?: string | null;
   rawBackgroundText?: string | null;
   sourceUrl?: string | null;
-}) {
-  await assertApplicationForSession(args);
+};
+
+export async function submitCandidateProfileSource(args: SubmitCandidateProfileSourceArgs) {
+  return runWithTimingSummary({
+    applicationId: args.applicationId,
+    flow: "submitCandidateProfileSource",
+    totalStage: "total submitCandidateProfileSource time",
+    fn: () => submitCandidateProfileSourceTimed(args),
+  });
+}
+
+async function submitCandidateProfileSourceTimed(args: SubmitCandidateProfileSourceArgs) {
+  const application = await assertApplicationForSession(args);
+  const owner = await resolveMemoryOwnerForApplication({
+    application,
+    anonymousSessionId: args.anonymousSessionId,
+    clerkUserId: args.clerkUserId,
+  });
   const sourceUrl = optionalText(args.sourceUrl);
   let rawCvText = args.rawCvText ?? null;
   let rawBackgroundText = args.rawBackgroundText ?? null;
@@ -720,45 +1083,85 @@ export async function submitCandidateProfileSource(args: {
     });
   }
 
+  await markCandidateScanStep({
+    applicationId: args.applicationId,
+    currentStep: "parsing_profile",
+    status: "job_added",
+  });
   const profileOutput = await timedStep(
-    "Candidate Profiler",
+    "Candidate Profiler Agent",
     () =>
       runCandidateProfilerAgent({
         applicationId: args.applicationId,
         rawCvText,
         rawBackgroundText,
+    }),
+    { applicationId: args.applicationId }
+  );
+  await markCandidateScanStep({
+    applicationId: args.applicationId,
+    currentStep: "saving_profile",
+    status: "job_added",
+  });
+  const candidateProfile = await timedStep(
+    "candidate profile save",
+    () =>
+      upsertCandidateProfileMemory({
+        owner,
+        sourceApplicationId: args.applicationId,
+        rawCvText,
+        rawBackgroundText,
+        profileOutput,
+        profileSource: args.source,
+        sourceSummary: profileOutput.sourceSummary,
+        sourceUrl,
+    }),
+    { applicationId: args.applicationId }
+  );
+  await markCandidateScanStep({
+    applicationId: args.applicationId,
+    currentStep: "building_candidate_evidence",
+    status: "candidate_added",
+  });
+  const builtChunks = await timedStep(
+    "candidate memory chunk building",
+    async () =>
+      buildEvidenceChunksFromProfile({
+        anonymousSessionId: args.anonymousSessionId,
+        userId: owner.userId,
+        sourceApplicationId: args.applicationId,
+        candidateProfileId: candidateProfile.id,
+        sourceType: sourceTypeFromProfileSource(args.source),
+        profile: profileOutput,
       }),
     { applicationId: args.applicationId }
   );
-  const candidateProfile = await upsertCandidateProfileFromOutput({
-    anonymousSessionId: args.anonymousSessionId,
+  await upsertCandidateMemoryChunks({
+    owner,
+    chunks: builtChunks,
     applicationId: args.applicationId,
-    rawCvText,
-    rawBackgroundText,
-    profileOutput,
-    profileSource: args.source,
-    sourceSummary: profileOutput.sourceSummary,
-    sourceUrl,
+  });
+  await markCandidateScanStep({
+    applicationId: args.applicationId,
+    currentStep: "creating_evidence_map",
+    status: "candidate_added",
   });
   let matchAnalysis: Awaited<ReturnType<typeof prepareFastMatch>>;
   try {
     matchAnalysis = await prepareFastMatch({
       anonymousSessionId: args.anonymousSessionId,
       applicationId: args.applicationId,
-      candidateProfileId: candidateProfile.id,
-      profileOutput,
+      owner,
     });
   } catch (error) {
     console.error("taylor_candidate_scan_failed", {
       applicationId: args.applicationId,
       error: safeErrorMessage(error),
     });
-    await db.application.update({
-      where: { id: args.applicationId },
-      data: {
-        status: "candidate_added",
-        currentStep: "candidate_scan_failed",
-      },
+    await markCandidateScanStep({
+      applicationId: args.applicationId,
+      currentStep: "candidate_scan_failed",
+      status: "candidate_added",
     });
     throw new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
@@ -774,6 +1177,53 @@ export async function submitCandidateProfileSource(args: {
   };
 }
 
+export async function useSavedCandidateMemory(args: {
+  anonymousSessionId: string;
+  applicationId: string;
+  clerkUserId?: string | null;
+}) {
+  const application = await assertApplicationForSession(args);
+  const owner = await resolveMemoryOwnerForApplication({
+    application,
+    anonymousSessionId: args.anonymousSessionId,
+    clerkUserId: args.clerkUserId,
+  });
+  const summary = await getCandidateMemorySummary(owner);
+  if (!summary.hasMemory) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "No saved candidate profile is available yet.",
+    });
+  }
+
+  try {
+    const matchAnalysis = await prepareFastMatch({
+      anonymousSessionId: args.anonymousSessionId,
+      applicationId: args.applicationId,
+      owner,
+    });
+    return {
+      importStatus: "match_ready" as const,
+      candidateMemorySummary: summary,
+      matchAnalysis,
+    };
+  } catch (error) {
+    console.error("taylor_saved_memory_match_failed", {
+      applicationId: args.applicationId,
+      error: safeErrorMessage(error),
+    });
+    await markCandidateScanStep({
+      applicationId: args.applicationId,
+      currentStep: "candidate_scan_failed",
+      status: "candidate_added",
+    });
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Something went wrong while matching your saved profile. Please try again.",
+    });
+  }
+}
+
 export async function answerGapQuestions(args: {
   anonymousSessionId: string;
   applicationId: string;
@@ -787,7 +1237,12 @@ export async function answerGapQuestions(args: {
     skipped?: boolean | null;
   }>;
 }) {
-  await assertApplicationForSession(args);
+  const application = await assertApplicationForSession(args);
+  const owner = await resolveMemoryOwnerForApplication({
+    application,
+    anonymousSessionId: args.anonymousSessionId,
+    clerkUserId: args.clerkUserId,
+  });
 
   const chunks = await timedStep(
     "gap answer processing",
@@ -843,7 +1298,8 @@ export async function answerGapQuestions(args: {
         }
         const chunk = buildGapAnswerEvidenceChunk({
           anonymousSessionId: args.anonymousSessionId,
-          applicationId: args.applicationId,
+          userId: owner.userId,
+          sourceApplicationId: args.applicationId,
           gapAnswerId: gapAnswer.id,
           gapQuestionId: gapQuestion.id,
           targetRequirementId: gapQuestion.targetRequirementId,
@@ -861,12 +1317,19 @@ export async function answerGapQuestions(args: {
     { applicationId: args.applicationId }
   );
 
+  let upsertedChunks: Awaited<ReturnType<typeof upsertCandidateMemoryChunks>> | null = null;
   if (chunks.length > 0) {
-    await timedStep(
-      "batch embedding call",
-      () => insertCandidateChunksWithEmbeddings(chunks),
+    upsertedChunks = await timedStep(
+      "candidate memory upsert",
+      () => upsertCandidateMemoryChunks({ owner, chunks, applicationId: args.applicationId }),
       { applicationId: args.applicationId, chunkCount: chunks.length, source: "gap_answers" }
     );
+    await prepareFastMatch({
+      anonymousSessionId: args.anonymousSessionId,
+      applicationId: args.applicationId,
+      owner,
+      writeGapQuestions: false,
+    });
   }
   await db.application.update({
     where: { id: args.applicationId },
@@ -876,7 +1339,7 @@ export async function answerGapQuestions(args: {
   return {
     updatedEvidenceMap: await buildRequirementEvidenceMap(args.applicationId),
     evidenceMatchScore: await calculateEvidenceMatchScore(args.applicationId),
-    newCandidateChunks: chunks,
+    newCandidateChunks: upsertedChunks?.chunks ?? [],
   };
 }
 
@@ -891,10 +1354,15 @@ export async function generateCv(args: {
   strategyId?: string | null;
 }) {
   const application = await assertApplicationForSession(args);
+  const owner = await resolveMemoryOwnerForApplication({
+    application,
+    anonymousSessionId: args.anonymousSessionId,
+    clerkUserId: args.clerkUserId,
+  });
   const [job, candidateProfile, candidateChunks, gapAnswers] = await Promise.all([
     db.job.findUnique({ where: { applicationId: args.applicationId } }),
-    db.candidateProfile.findUnique({ where: { applicationId: args.applicationId } }),
-    loadCandidateChunks(args),
+    loadLatestCandidateProfile(owner),
+    loadCandidateChunks({ owner }),
     db.gapAnswer.findMany({
       where: { applicationId: args.applicationId, skipped: false },
       include: { gapQuestion: true },
@@ -1066,11 +1534,17 @@ export async function getApplicationState(args: {
   clerkUserId?: string | null;
 }) {
   const application = await assertApplicationForSession(args);
+  const owner = await resolveMemoryOwnerForApplication({
+    application,
+    anonymousSessionId: args.anonymousSessionId,
+    clerkUserId: args.clerkUserId,
+  });
 
   const [
     job,
     candidateProfile,
     candidateChunks,
+    candidateMemorySummary,
     evidenceMatches,
     requirementFitScores,
     evidenceMatchScore,
@@ -1084,8 +1558,9 @@ export async function getApplicationState(args: {
       where: { applicationId: args.applicationId },
       include: { requirements: true },
     }),
-    db.candidateProfile.findUnique({ where: { applicationId: args.applicationId } }),
-    loadCandidateChunks(args),
+    loadLatestCandidateProfile(owner),
+    loadCandidateChunks({ owner }),
+    getCandidateMemorySummary(owner),
     buildRequirementEvidenceMap(args.applicationId),
     db.requirementFitScore.findMany({
       where: { applicationId: args.applicationId },
@@ -1126,7 +1601,7 @@ export async function getApplicationState(args: {
   const matchAnalysis = matchAnalysisObject(application.matchAnalysisJson);
   const weakSpots = Array.isArray(matchAnalysis.weakSpots)
     ? stringArray(matchAnalysis.weakSpots).map((spot, index) => ({
-        id: `weak-${index}`,
+        id: `gap-${index}`,
         targetRequirementId: null,
         label: spot,
         reason: spot,
@@ -1162,6 +1637,7 @@ export async function getApplicationState(args: {
     topRequirements,
     hiddenHiringSignal: job?.archetypeHint ?? job?.roleDomain ?? null,
     candidateProfile,
+    candidateMemorySummary,
     candidateDiscoverySummary: candidateProfile
       ? {
           summary: candidateProfile.summary,
@@ -1179,8 +1655,7 @@ export async function getApplicationState(args: {
     requirementFitScores,
     evidenceMatchScore,
     originalEvidenceMatchScore: application.originalEvidenceMatchScore,
-    updatedEvidenceMatchScore:
-      application.updatedEvidenceMatchScore ?? evidenceMatchScore.score,
+    updatedEvidenceMatchScore: application.updatedEvidenceMatchScore,
     matchLabel: application.matchLabel,
     cvAngle: application.cvAngle,
     roleArchetype: application.roleArchetype,
@@ -1213,6 +1688,10 @@ export async function claimApplication(args: {
   if (!application) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: "Application does not belong to this session." });
   }
+  await claimAnonymousCandidateMemory({
+    anonymousSessionId: args.anonymousSessionId,
+    userId: user.id,
+  });
   return {
     application: await db.application.update({
       where: { id: args.applicationId },

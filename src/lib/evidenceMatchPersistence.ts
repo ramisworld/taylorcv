@@ -1,6 +1,6 @@
 import { confidenceValue, importanceWeight } from "./scoring.ts";
 
-type EvidenceConfidence = "high" | "medium" | "weak" | "missing";
+type EvidenceConfidence = "high" | "medium" | "low" | "missing";
 
 export type BatchFitRequirement = {
   id: string;
@@ -9,21 +9,22 @@ export type BatchFitRequirement = {
 };
 
 export type BatchFitSummaryItem = {
-  requirementId: string;
   confidence: EvidenceConfidence;
-  bestCandidateChunkId: string | null;
+  selectedEvidenceIndex: number | null;
   reason: string;
   claimRisk: string;
   cvUsefulness: string;
 };
 
 export type BatchFitPersistenceOutput = {
-  requirementFitSummary: BatchFitSummaryItem[];
+  requirementFitByRequirementId: Record<string, BatchFitSummaryItem>;
 };
 
 export type RetrievedEvidenceRef = {
+  displayLabel?: string | null;
   id: string;
   similarityScore: number;
+  content?: string;
 };
 
 export type EvidenceMatchPersistenceRow = {
@@ -50,8 +51,9 @@ export type RequirementFitPersistenceRow = {
 };
 
 export type RejectedEvidenceMatch = {
-  requirementId: string;
-  rejectedCandidateChunkId: string;
+  jobRequirementId: string;
+  selectedEvidenceIndex: number | null;
+  selectedCandidateChunkId?: string | null;
   reason: string;
 };
 
@@ -70,7 +72,7 @@ export function buildEvidenceMatchPersistencePlan(args: {
   applicationId: string;
   jobRequirements: BatchFitRequirement[];
   output: BatchFitPersistenceOutput;
-  retrievedEvidenceByRequirement: Record<string, RetrievedEvidenceRef[]>;
+  evidenceRefsByRequirement: Record<string, RetrievedEvidenceRef[]>;
   validCandidateChunkIds: Set<string>;
 }) {
   const evidenceMatches: EvidenceMatchPersistenceRow[] = [];
@@ -78,41 +80,62 @@ export function buildEvidenceMatchPersistencePlan(args: {
   const rejectedMatches: RejectedEvidenceMatch[] = [];
 
   for (const requirement of args.jobRequirements) {
-    const fit =
-      args.output.requirementFitSummary.find(
-        (item) => item.requirementId === requirement.id
-      ) ?? null;
-    const requestedChunkId =
-      fit?.confidence === "missing" ? null : fit?.bestCandidateChunkId ?? null;
-    const retrieved = args.retrievedEvidenceByRequirement[requirement.id] ?? [];
-    const retrievedIds = new Set(retrieved.map((item) => item.id));
+    const fit = args.output.requirementFitByRequirementId[requirement.id] ?? null;
+    const retrieved = args.evidenceRefsByRequirement[requirement.id] ?? [];
+    const requestedEvidenceIndex = fit?.selectedEvidenceIndex ?? null;
+    const selectedEvidence =
+      requestedEvidenceIndex === null ? null : retrieved[requestedEvidenceIndex] ?? null;
     const chunkIsPersisted =
-      !!requestedChunkId && args.validCandidateChunkIds.has(requestedChunkId);
-    const chunkWasRetrieved = !!requestedChunkId && retrievedIds.has(requestedChunkId);
-    const canPersistChunk = !!requestedChunkId && chunkIsPersisted && chunkWasRetrieved;
+      !!selectedEvidence && args.validCandidateChunkIds.has(selectedEvidence.id);
+    const canPersistChunk = !!selectedEvidence && chunkIsPersisted;
 
-    if (requestedChunkId && !canPersistChunk) {
+    if (fit && fit.confidence !== "missing" && requestedEvidenceIndex === null) {
       rejectedMatches.push({
-        requirementId: requirement.id,
-        rejectedCandidateChunkId: requestedChunkId,
-        reason: !chunkIsPersisted
-          ? "Candidate chunk ID does not exist for this application."
-          : "Candidate chunk ID was not retrieved for this requirement.",
+        jobRequirementId: requirement.id,
+        selectedEvidenceIndex: null,
+        selectedCandidateChunkId: null,
+        reason: "Non-missing confidence must include a selected evidence index.",
       });
+      continue;
+    }
+
+    if (fit && fit.confidence === "missing" && requestedEvidenceIndex !== null) {
+      rejectedMatches.push({
+        jobRequirementId: requirement.id,
+        selectedEvidenceIndex: requestedEvidenceIndex,
+        selectedCandidateChunkId: selectedEvidence?.id ?? null,
+        reason: "Missing confidence must use a null selected evidence index.",
+      });
+      continue;
+    }
+
+    if (requestedEvidenceIndex !== null && !canPersistChunk) {
+      rejectedMatches.push({
+        jobRequirementId: requirement.id,
+        selectedEvidenceIndex: requestedEvidenceIndex,
+        selectedCandidateChunkId: selectedEvidence?.id ?? null,
+        reason: !selectedEvidence
+          ? "Selected evidence index was not in the ordered evidence list for this requirement."
+          : "Selected evidence is outside the persisted candidate memory set.",
+      });
+      continue;
     }
 
     const confidence: EvidenceConfidence =
-      fit && (canPersistChunk || fit.confidence === "missing") ? fit.confidence : "missing";
-    const bestCandidateChunkId = canPersistChunk ? requestedChunkId : null;
+      fit?.confidence === "missing" ? "missing" : fit && canPersistChunk ? fit.confidence : "missing";
+    const bestCandidateChunkId = canPersistChunk ? selectedEvidence.id : null;
     const parts = scoreParts(requirement.importance, confidence);
-    const similarity = bestCandidateChunkId
-      ? retrieved.find((item) => item.id === bestCandidateChunkId)?.similarityScore
-      : null;
+    const similarity =
+      bestCandidateChunkId && selectedEvidence ? selectedEvidence.similarityScore : null;
     const reason =
       fit?.reason ??
       (bestCandidateChunkId
         ? "Relevant persisted candidate evidence found for this requirement."
         : "No usable persisted evidence found for this requirement.");
+    const persistedReason =
+      confidence === "missing" && requestedEvidenceIndex !== null
+        ? "No validated evidence could be confirmed for this requirement."
+        : reason;
 
     evidenceMatches.push({
       applicationId: args.applicationId,
@@ -122,11 +145,7 @@ export function buildEvidenceMatchPersistencePlan(args: {
       confidence,
       cvUsefulness: bestCandidateChunkId ? fit?.cvUsefulness ?? "keyword_only" : "do_not_use",
       claimRisk: bestCandidateChunkId ? fit?.claimRisk ?? "careful_wording" : "avoid_claim",
-      reason: bestCandidateChunkId
-        ? reason
-        : requestedChunkId
-          ? `${reason} Rejected invalid candidate chunk reference.`
-          : reason,
+      reason: persistedReason,
     });
     requirementFitScores.push({
       applicationId: args.applicationId,

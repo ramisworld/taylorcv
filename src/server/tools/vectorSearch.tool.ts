@@ -5,11 +5,15 @@ import { db } from "../db.ts";
 import { createEmbedding, createEmbeddings } from "./embedding.tool.ts";
 
 export type NewCandidateChunk = {
-  anonymousSessionId: string;
-  applicationId: string;
+  anonymousSessionId?: string | null;
+  userId?: string | null;
+  sourceApplicationId?: string | null;
   candidateProfileId?: string | null;
-  sourceType: "profile" | "gap_answer" | "manual";
+  sourceType: "profile" | "cv_upload" | "linkedin" | "background" | "gap_answer" | "manual";
   sourceId?: string | null;
+  sourceKey?: string | null;
+  sourceHash?: string | null;
+  contentHash?: string | null;
   chunkType:
     | "project"
     | "skill"
@@ -23,7 +27,7 @@ export type NewCandidateChunk = {
   metadata?: Record<string, unknown>;
 };
 
-function toVectorLiteral(embedding: number[]) {
+export function toVectorLiteral(embedding: number[]) {
   return `[${embedding.map((value) => value.toFixed(8)).join(",")}]`;
 }
 
@@ -35,28 +39,40 @@ export async function insertCandidateChunkWithEmbedding(chunk: NewCandidateChunk
     INSERT INTO candidate_chunks (
       id,
       anonymous_session_id,
-      application_id,
+      user_id,
+      source_application_id,
       candidate_profile_id,
       source_type,
       source_id,
+      source_key,
+      source_hash,
+      content_hash,
       chunk_type,
       content,
       embedding,
       tags_json,
-      metadata_json
+      metadata_json,
+      embedded_at,
+      last_seen_at
     )
     VALUES (
       ${id},
-      ${chunk.anonymousSessionId},
-      ${chunk.applicationId},
+      ${chunk.anonymousSessionId ?? null},
+      ${chunk.userId ?? null},
+      ${chunk.sourceApplicationId ?? null},
       ${chunk.candidateProfileId ?? null},
       ${chunk.sourceType}::"SourceType",
       ${chunk.sourceId ?? null},
+      ${chunk.sourceKey ?? null},
+      ${chunk.sourceHash ?? null},
+      ${chunk.contentHash ?? null},
       ${chunk.chunkType}::"ChunkType",
       ${chunk.content},
       ${toVectorLiteral(embedding)}::vector,
       ${JSON.stringify(chunk.tags)}::jsonb,
-      ${JSON.stringify(chunk.metadata ?? {})}::jsonb
+      ${JSON.stringify(chunk.metadata ?? {})}::jsonb,
+      NOW(),
+      NOW()
     )
   `;
 
@@ -64,7 +80,8 @@ export async function insertCandidateChunkWithEmbedding(chunk: NewCandidateChunk
     Array<{
       id: string;
       anonymousSessionId: string;
-      applicationId: string;
+      userId: string | null;
+      sourceApplicationId: string | null;
       candidateProfileId: string | null;
       sourceType: string;
       sourceId: string | null;
@@ -78,7 +95,8 @@ export async function insertCandidateChunkWithEmbedding(chunk: NewCandidateChunk
     SELECT
       id,
       anonymous_session_id AS "anonymousSessionId",
-      application_id AS "applicationId",
+      user_id AS "userId",
+      source_application_id AS "sourceApplicationId",
       candidate_profile_id AS "candidateProfileId",
       source_type AS "sourceType",
       source_id AS "sourceId",
@@ -118,28 +136,40 @@ export async function insertCandidateChunksWithEmbeddings(
       INSERT INTO candidate_chunks (
         id,
         anonymous_session_id,
-        application_id,
+        user_id,
+        source_application_id,
         candidate_profile_id,
         source_type,
         source_id,
+        source_key,
+        source_hash,
+        content_hash,
         chunk_type,
         content,
         embedding,
         tags_json,
-        metadata_json
+        metadata_json,
+        embedded_at,
+        last_seen_at
       )
       VALUES (
         ${id},
-        ${chunk.anonymousSessionId},
-        ${chunk.applicationId},
+        ${chunk.anonymousSessionId ?? null},
+        ${chunk.userId ?? null},
+        ${chunk.sourceApplicationId ?? null},
         ${chunk.candidateProfileId ?? null},
         ${chunk.sourceType}::"SourceType",
         ${chunk.sourceId ?? null},
+        ${chunk.sourceKey ?? null},
+        ${chunk.sourceHash ?? null},
+        ${chunk.contentHash ?? null},
         ${chunk.chunkType}::"ChunkType",
         ${chunk.content},
         ${toVectorLiteral(embedding)}::vector,
         ${JSON.stringify(chunk.tags)}::jsonb,
-        ${JSON.stringify(chunk.metadata ?? {})}::jsonb
+        ${JSON.stringify(chunk.metadata ?? {})}::jsonb,
+        NOW(),
+        NOW()
       )
     `;
     inserted.push(id);
@@ -151,7 +181,8 @@ export async function insertCandidateChunksWithEmbeddings(
     Array<{
       id: string;
       anonymousSessionId: string;
-      applicationId: string;
+      userId: string | null;
+      sourceApplicationId: string | null;
       candidateProfileId: string | null;
       sourceType: string;
       sourceId: string | null;
@@ -165,7 +196,8 @@ export async function insertCandidateChunksWithEmbeddings(
     SELECT
       id,
       anonymous_session_id AS "anonymousSessionId",
-      application_id AS "applicationId",
+      user_id AS "userId",
+      source_application_id AS "sourceApplicationId",
       candidate_profile_id AS "candidateProfileId",
       source_type AS "sourceType",
       source_id AS "sourceId",
@@ -182,7 +214,7 @@ export async function insertCandidateChunksWithEmbeddings(
 
 export async function searchCandidateChunks(args: {
   anonymousSessionId: string;
-  applicationId: string;
+  userId?: string | null;
   requirementText: string;
   topK?: number;
 }) {
@@ -200,8 +232,12 @@ export async function searchCandidateChunks(args: {
       1 - (embedding <=> ${toVectorLiteral(embedding)}::vector) AS "similarityScore"
     FROM candidate_chunks
     WHERE
-      application_id = ${args.applicationId}
-      AND anonymous_session_id = ${args.anonymousSessionId}
+      archived_at IS NULL
+      AND (
+        (${args.userId ?? null}::text IS NOT NULL AND user_id = ${args.userId ?? null})
+        OR (${args.userId ?? null}::text IS NULL AND anonymous_session_id = ${args.anonymousSessionId})
+        OR (${args.userId ?? null}::text IS NOT NULL AND user_id IS NULL AND anonymous_session_id = ${args.anonymousSessionId})
+      )
       AND embedding IS NOT NULL
     ORDER BY embedding <=> ${toVectorLiteral(embedding)}::vector
     LIMIT ${topK}
@@ -210,7 +246,7 @@ export async function searchCandidateChunks(args: {
 
 export async function searchCandidateChunksForRequirements(args: {
   anonymousSessionId: string;
-  applicationId: string;
+  userId?: string | null;
   requirements: Array<{
     id: string;
     label: string;
@@ -242,8 +278,12 @@ export async function searchCandidateChunksForRequirements(args: {
         1 - (embedding <=> ${toVectorLiteral(embedding)}::vector) AS "similarityScore"
       FROM candidate_chunks
       WHERE
-        application_id = ${args.applicationId}
-        AND anonymous_session_id = ${args.anonymousSessionId}
+        archived_at IS NULL
+        AND (
+          (${args.userId ?? null}::text IS NOT NULL AND user_id = ${args.userId ?? null})
+          OR (${args.userId ?? null}::text IS NULL AND anonymous_session_id = ${args.anonymousSessionId})
+          OR (${args.userId ?? null}::text IS NOT NULL AND user_id IS NULL AND anonymous_session_id = ${args.anonymousSessionId})
+        )
         AND embedding IS NOT NULL
       ORDER BY embedding <=> ${toVectorLiteral(embedding)}::vector
       LIMIT ${topK}

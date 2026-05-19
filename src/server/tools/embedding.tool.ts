@@ -1,6 +1,12 @@
 import { env } from "../../env.js";
 import { createMockEmbedding } from "./mockEmbedding.ts";
 
+export function getActiveEmbeddingModelName() {
+  return env.USE_MOCK_AI === "true"
+    ? "mock-embedding"
+    : env.OPENAI_EMBEDDING_MODEL;
+}
+
 export async function createEmbedding(text: string) {
   const embedding =
     env.USE_MOCK_AI === "true"

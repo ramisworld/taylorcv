@@ -172,20 +172,28 @@ exports.Prisma.JobRequirementScalarFieldEnum = {
   type: 'type',
   label: 'label',
   description: 'description',
-  importance: 'importance'
+  importance: 'importance',
+  queryEmbeddingModel: 'queryEmbeddingModel',
+  queryEmbeddingInputHash: 'queryEmbeddingInputHash',
+  queryEmbeddedAt: 'queryEmbeddedAt'
 };
 
 exports.Prisma.CandidateProfileScalarFieldEnum = {
   id: 'id',
   anonymousSessionId: 'anonymousSessionId',
-  applicationId: 'applicationId',
+  userId: 'userId',
+  sourceApplicationId: 'sourceApplicationId',
   rawCvText: 'rawCvText',
   rawBackgroundText: 'rawBackgroundText',
   contactInfoJson: 'contactInfoJson',
   linksJson: 'linksJson',
+  sourceType: 'sourceType',
   profileSource: 'profileSource',
   sourceSummary: 'sourceSummary',
   sourceUrl: 'sourceUrl',
+  sourceKey: 'sourceKey',
+  sourceHash: 'sourceHash',
+  contentHash: 'contentHash',
   profileConfirmedAt: 'profileConfirmedAt',
   summary: 'summary',
   skillsJson: 'skillsJson',
@@ -200,21 +208,32 @@ exports.Prisma.CandidateProfileScalarFieldEnum = {
   strongProofCandidatesJson: 'strongProofCandidatesJson',
   scopeOpportunitiesJson: 'scopeOpportunitiesJson',
   likelyTopEvidenceJson: 'likelyTopEvidenceJson',
-  createdAt: 'createdAt'
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  lastSeenAt: 'lastSeenAt',
+  archivedAt: 'archivedAt'
 };
 
 exports.Prisma.CandidateChunkScalarFieldEnum = {
   id: 'id',
   anonymousSessionId: 'anonymousSessionId',
-  applicationId: 'applicationId',
+  userId: 'userId',
+  sourceApplicationId: 'sourceApplicationId',
   candidateProfileId: 'candidateProfileId',
   sourceType: 'sourceType',
   sourceId: 'sourceId',
+  sourceKey: 'sourceKey',
+  sourceHash: 'sourceHash',
+  contentHash: 'contentHash',
   chunkType: 'chunkType',
   content: 'content',
   tagsJson: 'tagsJson',
   metadataJson: 'metadataJson',
-  createdAt: 'createdAt'
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  embeddedAt: 'embeddedAt',
+  lastSeenAt: 'lastSeenAt',
+  archivedAt: 'archivedAt'
 };
 
 exports.Prisma.EvidenceMatchScalarFieldEnum = {
@@ -381,6 +400,9 @@ exports.Importance = exports.$Enums.Importance = {
 
 exports.SourceType = exports.$Enums.SourceType = {
   profile: 'profile',
+  cv_upload: 'cv_upload',
+  linkedin: 'linkedin',
+  background: 'background',
   gap_answer: 'gap_answer',
   manual: 'manual'
 };
@@ -398,7 +420,7 @@ exports.ChunkType = exports.$Enums.ChunkType = {
 exports.EvidenceConfidence = exports.$Enums.EvidenceConfidence = {
   high: 'high',
   medium: 'medium',
-  weak: 'weak',
+  low: 'low',
   missing: 'missing'
 };
 

@@ -85,7 +85,6 @@ async function main() {
     const expectedChunkId = expectedChunkForRequirement(requirement);
     const results = await searchCandidateChunks({
       anonymousSessionId: seedAnonymousSessionId,
-      applicationId: seedApplicationId,
       requirementText: `${requirement.label}\n${requirement.description}`,
       topK: 3,
     });

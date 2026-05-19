@@ -2,6 +2,7 @@ import type { z } from "zod";
 
 import type {
   ButtonAnswerSchema,
+  CandidateProfilerAgentOutputSchema,
   CandidateProfilerOutputSchema,
   BatchEvidenceFitOutputSchema,
   CvBuilderOutputSchema,
@@ -10,13 +11,11 @@ import type {
   CvQualityReviewOutputSchema,
   CvStrategyOutputSchema,
   CvWriterOutputSchema,
-  EvidenceChunkCreatorOutputSchema,
   EvidenceConfidenceSchema,
   EvidenceMatchCvUsefulnessSchema,
   EvidenceScoringOutputSchema,
   ClaimRiskSchema,
-  GapQuestionOutputSchema,
-  GapQuestionTypeSchema,
+  GapQuestionAgentOutputSchema,
   ImportanceSchema,
   LayoutArchitectureSchema,
   ProofStyleSchema,
@@ -39,22 +38,21 @@ export type SectionBudgetTreatment = z.infer<
   typeof SectionBudgetTreatmentSchema
 >;
 export type LayoutArchitecture = z.infer<typeof LayoutArchitectureSchema>;
-export type GapQuestionType = z.infer<typeof GapQuestionTypeSchema>;
 export type ButtonAnswer = z.infer<typeof ButtonAnswerSchema>;
 
 export type JobParserOutput = z.infer<typeof JobParserOutputSchema>;
 export type CandidateProfilerOutput = z.infer<
   typeof CandidateProfilerOutputSchema
 >;
+export type CandidateProfilerAgentOutput = z.infer<
+  typeof CandidateProfilerAgentOutputSchema
+>;
 export type BatchEvidenceFitOutput = z.infer<
   typeof BatchEvidenceFitOutputSchema
 >;
+export type GapQuestionAgentOutput = z.infer<typeof GapQuestionAgentOutputSchema>;
 export type CvBuilderOutput = z.infer<typeof CvBuilderOutputSchema>;
-export type EvidenceChunkCreatorOutput = z.infer<
-  typeof EvidenceChunkCreatorOutputSchema
->;
 export type EvidenceScoringOutput = z.infer<typeof EvidenceScoringOutputSchema>;
-export type GapQuestionOutput = z.infer<typeof GapQuestionOutputSchema>;
 export type CvStrategyOutput = z.infer<typeof CvStrategyOutputSchema>;
 export type CvWriterOutput = z.infer<typeof CvWriterOutputSchema>;
 export type CvQualityReviewOutput = z.infer<

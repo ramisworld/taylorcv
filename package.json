@@ -18,7 +18,13 @@
     "test:acceptance": "NODE_ENV=test USE_MOCK_AI=true node scripts/test-acceptance.mjs",
     "test:layout": "NODE_ENV=test USE_MOCK_AI=true node scripts/test-layout.mjs",
     "test:retrieval": "NODE_ENV=test USE_MOCK_AI=true node scripts/test-retrieval.mjs",
-    "test:scoring": "NODE_ENV=test USE_MOCK_AI=true node scripts/test-scoring.mjs",
+    "test:memory": "NODE_ENV=test USE_MOCK_AI=true node --conditions react-server scripts/test-memory.mjs",
+    "test:profiler": "NODE_ENV=test USE_MOCK_AI=true node --conditions react-server scripts/test-candidate-profiler.mjs",
+    "test:gap-questions": "NODE_ENV=test USE_MOCK_AI=true node --conditions react-server scripts/test-gap-questions.mjs",
+    "test:gap-selection": "NODE_ENV=test USE_MOCK_AI=true node --conditions react-server scripts/test-gap-selection.mjs",
+    "test:match-snapshot": "NODE_ENV=test USE_MOCK_AI=true node scripts/test-match-snapshot.mjs",
+    "test:match-framing": "NODE_ENV=test USE_MOCK_AI=true node scripts/test-deterministic-match-framing.mjs",
+    "test:scoring": "NODE_ENV=test USE_MOCK_AI=true node --conditions react-server scripts/test-scoring.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

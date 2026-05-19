@@ -16,6 +16,7 @@ import {
   resetApplication,
   submitCandidateProfileSource,
   submitJob,
+  useSavedCandidateMemory,
 } from "~/server/services/applicationWorkflow.service";
 
 const applicationIdSchema = z.object({
@@ -81,6 +82,16 @@ export const applicationRouter = createTRPCRouter({
         rawCvText: input.rawCvText,
         rawBackgroundText: input.rawBackgroundText,
         sourceUrl: input.sourceUrl,
+      })
+    ),
+
+  useSavedCandidateMemory: publicProcedure
+    .input(applicationIdSchema)
+    .mutation(({ ctx, input }) =>
+      useSavedCandidateMemory({
+        anonymousSessionId: ctx.anonymousSessionId,
+        applicationId: input.applicationId,
+        clerkUserId: ctx.clerkUserId,
       })
     ),
 

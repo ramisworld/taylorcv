@@ -1,4 +1,4 @@
-type EvidenceConfidence = "high" | "medium" | "weak" | "missing";
+type EvidenceConfidence = "high" | "medium" | "low" | "missing";
 type Importance = "high" | "medium" | "low";
 
 export type EvidenceMatchScoreSummary = {
@@ -16,7 +16,7 @@ export function importanceWeight(importance: Importance | string) {
 export function confidenceValue(confidence: EvidenceConfidence) {
   if (confidence === "high") return 1;
   if (confidence === "medium") return 0.65;
-  if (confidence === "weak") return 0.3;
+  if (confidence === "low") return 0.3;
   return 0;
 }
 

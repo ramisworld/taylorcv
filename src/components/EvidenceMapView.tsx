@@ -18,7 +18,7 @@ function groupMatches(matches: ApplicationState["evidenceMatches"]) {
     partial: matches.filter((match) => match.overallConfidence === "medium"),
     gaps: matches.filter(
       (match) =>
-        match.overallConfidence === "weak" ||
+        match.overallConfidence === "low" ||
         match.overallConfidence === "missing"
     ),
   };

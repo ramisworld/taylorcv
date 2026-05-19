@@ -37,10 +37,17 @@ export const ImportanceSchema = z.enum(["high", "medium", "low"]);
 export const EvidenceConfidenceSchema = z.enum([
   "high",
   "medium",
-  "weak",
+  "low",
   "missing",
 ]);
-export const SourceTypeSchema = z.enum(["profile", "gap_answer", "manual"]);
+export const SourceTypeSchema = z.enum([
+  "profile",
+  "cv_upload",
+  "linkedin",
+  "background",
+  "gap_answer",
+  "manual",
+]);
 export const ChunkTypeSchema = z.enum([
   "project",
   "skill",
@@ -87,21 +94,6 @@ export const SectionBudgetTreatmentSchema = z.enum([
   "omit",
 ]);
 export const LayoutArchitectureSchema = z.enum(cvLayoutArchitectures);
-export const GapQuestionTypeSchema = z.enum([
-  "missing_requirement",
-  "metric_enrichment",
-  "scope_enrichment",
-  "domain_specific_proof",
-  "capability_check",
-  "tool_check",
-  "metric_or_scope",
-  "ownership",
-  "outcome_or_impact",
-  "responsibility",
-  "collaboration",
-  "safety_or_quality",
-  "domain_specific",
-]);
 export const EvidenceCardUsefulnessSchema = z.enum([
   "cv_ready",
   "supporting",
@@ -214,6 +206,25 @@ export const CandidateCertificationSchema = z.object({
   details: z.string().nullable(),
 });
 
+export const CandidateProfilerAgentContactInfoSchema = z.object({
+  fullName: z.string().nullable(),
+  professionalTitle: z.string().nullable(),
+  location: z.string().nullable(),
+});
+
+export const CandidateProfilerAgentOutputSchema = z.object({
+  contactInfo: CandidateProfilerAgentContactInfoSchema,
+  summary: z.string().min(1),
+  skills: z.array(z.string()),
+  projects: z.array(CandidateProjectSchema),
+  experience: z.array(CandidateExperienceSchema),
+  education: z.array(CandidateEducationSchema),
+  certifications: z.array(CandidateCertificationSchema),
+  tools: z.array(z.string()),
+  achievements: z.array(z.string()),
+  cautionNotes: z.array(z.string()),
+});
+
 export const CandidateProfilerOutputSchema = z.object({
   contactInfo: CandidateContactInfoSchema,
   links: CandidateLinksSchema,
@@ -233,78 +244,30 @@ export const CandidateProfilerOutputSchema = z.object({
   likelyTopEvidence: z.array(z.string()),
 });
 
-export const BatchEvidenceFitQuestionSchema = z.object({
+export const GapQuestionAgentQuestionSchema = z.object({
   targetRequirementId: z.string().nullable(),
-  question: z.string().min(1),
-  shortQuestion: z.string().min(1),
-  linkedJobRequirement: z.string().nullable(),
-  whyThisMatters: z.string().min(1),
-  howYourAnswerHelps: z.string().min(1),
-  quickOptions: z.array(z.string().min(1)).min(2).max(4),
-  selectedOptionRequiresDetail: z.boolean(),
-  followUpPrompt: z.string().nullable(),
-  dynamicGuidance: z.string().min(1),
-  questionType: GapQuestionTypeSchema,
+  question: z.string().min(1).max(180),
+  reason: z.string().min(1).max(180),
+  whyItMatters: z.string().min(1).max(180),
+  answerGuidance: z.string().min(1).max(220),
+  exampleAnswer: z.string().min(1).max(260),
+  exampleAngles: z.array(z.string().min(1).max(90)).max(4),
+});
+
+export const GapQuestionAgentOutputSchema = z.object({
+  questions: z.array(GapQuestionAgentQuestionSchema).max(3),
 });
 
 export const BatchRequirementFitSchema = z.object({
-  requirementId: z.string().min(1),
   confidence: EvidenceConfidenceSchema,
-  bestCandidateChunkId: z.string().nullable(),
-  reason: z.string().min(1),
+  selectedEvidenceIndex: z.number().int().nonnegative().nullable(),
+  reason: z.string().min(1).max(140),
   claimRisk: ClaimRiskSchema,
   cvUsefulness: EvidenceMatchCvUsefulnessSchema,
 });
 
 export const BatchEvidenceFitOutputSchema = z.object({
-  currentMatchScore: z.number().int().min(0).max(100),
-  matchLabel: z.string().min(1),
-  topStrengths: z.array(z.string().min(1)),
-  weakSpots: z.array(z.string().min(1)),
-  evidenceCards: z.array(
-    z.object({
-      requirementId: z.string().nullable(),
-      requirementLabel: z.string().min(1),
-      candidateChunkId: z.string().nullable(),
-      content: z.string().min(1),
-      confidence: EvidenceConfidenceSchema,
-      reason: z.string().min(1),
-      claimRisk: ClaimRiskSchema,
-    })
-  ),
-  requirementFitSummary: z.array(BatchRequirementFitSchema),
-  claimRisks: z.array(z.string().min(1)),
-  recommendedGapQuestions: z.array(BatchEvidenceFitQuestionSchema).max(4),
-  cvAngle: z.string().min(1),
-  roleArchetype: z.string().min(1),
-});
-
-export const EvidenceChunkMetadataSchema = z.object({
-  action: z.string().nullable(),
-  context: z.string().nullable(),
-  toolsOrMethods: z.array(z.string()),
-  ownership: z.string().nullable(),
-  outcome: z.string().nullable(),
-  metric: z.string().nullable(),
-  scope: z.string().nullable(),
-  source: z.string().nullable(),
-  targetRequirementId: z.string().nullable(),
-  targetRequirementLabel: z.string().nullable(),
-  cvUsefulness: EvidenceCardUsefulnessSchema,
-  cautionNotes: z.array(z.string()),
-});
-
-export const EvidenceChunkSchema = z.object({
-  chunkType: ChunkTypeSchema,
-  content: z.string().min(1),
-  tags: z.array(z.string()),
-  sourceType: SourceTypeSchema,
-  sourceId: z.string().nullable(),
-  metadata: EvidenceChunkMetadataSchema,
-});
-
-export const EvidenceChunkCreatorOutputSchema = z.object({
-  chunks: z.array(EvidenceChunkSchema),
+  requirementFitByRequirementId: z.record(BatchRequirementFitSchema),
 });
 
 export const EvidenceScoringMatchSchema = z.object({
@@ -318,37 +281,6 @@ export const EvidenceScoringMatchSchema = z.object({
 
 export const EvidenceScoringOutputSchema = z.object({
   matches: z.array(EvidenceScoringMatchSchema),
-});
-
-export const GapQuestionSchema = z.object({
-  targetRequirementId: z.string().nullable(),
-  question: z.string().min(1),
-  reason: z.string().min(1),
-  whyItMatters: z.string().min(1),
-  answerGuidance: z.string().min(1),
-  exampleAngles: z.array(z.string().min(1)),
-  shortQuestion: z.string().min(1),
-  whyThisMatters: z.string().min(1),
-  linkedJobRequirement: z.string().nullable(),
-  howYourAnswerHelps: z.string().min(1),
-  quickOptions: z.array(z.string().min(1)).min(2).max(4),
-  selectedOptionRequiresDetail: z.boolean(),
-  followUpPrompt: z.string().nullable(),
-  metricPrompt: z.string().nullable(),
-  metricOptionTriggers: z.array(z.string().min(1)).default([]),
-  questionType: GapQuestionTypeSchema,
-  exampleAnswer: z.string().nullable(),
-  priorityReason: z.string().min(1),
-});
-
-export const GapQuestionOutputSchema = z.object({
-  coachInsight: z.object({
-    openingMessage: z.string().min(1),
-    jobWants: z.string().min(1),
-    candidateStrengths: z.array(z.string().min(1)),
-    candidateConcerns: z.array(z.string().min(1)),
-  }),
-  questions: z.array(GapQuestionSchema).max(5),
 });
 
 export const CvStrategyOutputSchema = z.object({
@@ -742,8 +674,6 @@ export const AgentJsonSchemas = {
     additionalProperties: false,
     required: [
       "contactInfo",
-      "links",
-      "sourceSummary",
       "summary",
       "skills",
       "projects",
@@ -753,10 +683,6 @@ export const AgentJsonSchemas = {
       "tools",
       "achievements",
       "cautionNotes",
-      "metricOpportunities",
-      "strongProofCandidates",
-      "scopeOpportunities",
-      "likelyTopEvidence",
     ],
     properties: {
       contactInfo: {
@@ -766,59 +692,34 @@ export const AgentJsonSchemas = {
           "fullName",
           "professionalTitle",
           "location",
-          "email",
-          "phone",
         ],
         properties: {
-          fullName: { type: ["string", "null"] },
-          professionalTitle: { type: ["string", "null"] },
-          location: { type: ["string", "null"] },
-          email: { type: ["string", "null"] },
-          phone: { type: ["string", "null"] },
+          fullName: { type: ["string", "null"], maxLength: 100 },
+          professionalTitle: { type: ["string", "null"], maxLength: 120 },
+          location: { type: ["string", "null"], maxLength: 120 },
         },
       },
-      links: {
-        type: "object",
-        additionalProperties: false,
-        required: ["linkedin", "github", "portfolio", "other"],
-        properties: {
-          linkedin: { type: ["string", "null"] },
-          github: { type: ["string", "null"] },
-          portfolio: { type: ["string", "null"] },
-          other: {
-            type: "array",
-            items: {
-              type: "object",
-              additionalProperties: false,
-              required: ["label", "url"],
-              properties: {
-                label: { type: ["string", "null"] },
-                url: { type: "string" },
-              },
-            },
-          },
-        },
-      },
-      sourceSummary: { type: ["string", "null"] },
-      summary: { type: "string" },
-      skills: { type: "array", items: { type: "string" } },
+      summary: { type: "string", maxLength: 360 },
+      skills: { type: "array", maxItems: 32, items: { type: "string", maxLength: 80 } },
       projects: {
         type: "array",
+        maxItems: 8,
         items: {
           type: "object",
           additionalProperties: false,
           required: ["name", "description", "tools", "outcomes", "links"],
           properties: {
-            name: { type: ["string", "null"] },
-            description: { type: "string" },
-            tools: { type: "array", items: { type: "string" } },
-            outcomes: { type: "array", items: { type: "string" } },
-            links: { type: "array", items: { type: "string" } },
+            name: { type: ["string", "null"], maxLength: 120 },
+            description: { type: "string", maxLength: 320 },
+            tools: { type: "array", maxItems: 12, items: { type: "string", maxLength: 80 } },
+            outcomes: { type: "array", maxItems: 4, items: { type: "string", maxLength: 160 } },
+            links: { type: "array", maxItems: 4, items: { type: "string", maxLength: 240 } },
           },
         },
       },
       experience: {
         type: "array",
+        maxItems: 10,
         items: {
           type: "object",
           additionalProperties: false,
@@ -836,22 +737,23 @@ export const AgentJsonSchemas = {
             "outcomes",
           ],
           properties: {
-            role: { type: ["string", "null"] },
-            organization: { type: ["string", "null"] },
-            startDate: { type: ["string", "null"] },
-            endDate: { type: ["string", "null"] },
+            role: { type: ["string", "null"], maxLength: 120 },
+            organization: { type: ["string", "null"], maxLength: 140 },
+            startDate: { type: ["string", "null"], maxLength: 40 },
+            endDate: { type: ["string", "null"], maxLength: 40 },
             current: { type: "boolean" },
-            description: { type: "string" },
-            bullets: { type: "array", items: { type: "string" } },
-            technologies: { type: "array", items: { type: "string" } },
-            tools: { type: "array", items: { type: "string" } },
-            achievements: { type: "array", items: { type: "string" } },
-            outcomes: { type: "array", items: { type: "string" } },
+            description: { type: "string", maxLength: 320 },
+            bullets: { type: "array", maxItems: 6, items: { type: "string", maxLength: 180 } },
+            technologies: { type: "array", maxItems: 14, items: { type: "string", maxLength: 80 } },
+            tools: { type: "array", maxItems: 14, items: { type: "string", maxLength: 80 } },
+            achievements: { type: "array", maxItems: 5, items: { type: "string", maxLength: 160 } },
+            outcomes: { type: "array", maxItems: 5, items: { type: "string", maxLength: 160 } },
           },
         },
       },
       education: {
         type: "array",
+        maxItems: 6,
         items: {
           type: "object",
           additionalProperties: false,
@@ -868,119 +770,38 @@ export const AgentJsonSchemas = {
             "notes",
           ],
           properties: {
-            institution: { type: ["string", "null"] },
-            credential: { type: ["string", "null"] },
-            degree: { type: ["string", "null"] },
-            startYear: { type: ["string", "null"] },
-            endYear: { type: ["string", "null"] },
+            institution: { type: ["string", "null"], maxLength: 140 },
+            credential: { type: ["string", "null"], maxLength: 140 },
+            degree: { type: ["string", "null"], maxLength: 140 },
+            startYear: { type: ["string", "null"], maxLength: 20 },
+            endYear: { type: ["string", "null"], maxLength: 20 },
             current: { type: "boolean" },
             expected: { type: "boolean" },
-            details: { type: ["string", "null"] },
-            coursework: { type: "array", items: { type: "string" } },
-            notes: { type: ["string", "null"] },
+            details: { type: ["string", "null"], maxLength: 220 },
+            coursework: { type: "array", maxItems: 12, items: { type: "string", maxLength: 80 } },
+            notes: { type: ["string", "null"], maxLength: 180 },
           },
         },
       },
       certifications: {
         type: "array",
+        maxItems: 12,
         items: {
           type: "object",
           additionalProperties: false,
           required: ["name", "issuer", "date", "status", "details"],
           properties: {
-            name: { type: "string" },
-            issuer: { type: ["string", "null"] },
-            date: { type: ["string", "null"] },
-            status: { type: ["string", "null"] },
-            details: { type: ["string", "null"] },
+            name: { type: "string", maxLength: 160 },
+            issuer: { type: ["string", "null"], maxLength: 140 },
+            date: { type: ["string", "null"], maxLength: 40 },
+            status: { type: ["string", "null"], maxLength: 80 },
+            details: { type: ["string", "null"], maxLength: 220 },
           },
         },
       },
-      tools: { type: "array", items: { type: "string" } },
-      achievements: { type: "array", items: { type: "string" } },
-      cautionNotes: { type: "array", items: { type: "string" } },
-      metricOpportunities: { type: "array", items: { type: "string" } },
-      strongProofCandidates: { type: "array", items: { type: "string" } },
-      scopeOpportunities: { type: "array", items: { type: "string" } },
-      likelyTopEvidence: { type: "array", items: { type: "string" } },
-    },
-  },
-  evidenceChunkCreator: {
-    type: "object",
-    additionalProperties: false,
-    required: ["chunks"],
-    properties: {
-      chunks: {
-        type: "array",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          required: [
-            "chunkType",
-            "content",
-            "tags",
-            "sourceType",
-            "sourceId",
-            "metadata",
-          ],
-          properties: {
-            chunkType: {
-              type: "string",
-              enum: [
-                "project",
-                "skill",
-                "certification",
-                "education",
-                "experience",
-                "gap_answer",
-                "achievement",
-              ],
-            },
-            content: { type: "string" },
-            tags: { type: "array", items: { type: "string" } },
-            sourceType: {
-              type: "string",
-              enum: ["profile", "gap_answer", "manual"],
-            },
-            sourceId: { type: ["string", "null"] },
-            metadata: {
-              type: "object",
-              additionalProperties: false,
-              required: [
-                "action",
-                "context",
-                "toolsOrMethods",
-                "ownership",
-                "outcome",
-                "metric",
-                "scope",
-                "source",
-                "targetRequirementId",
-                "targetRequirementLabel",
-                "cvUsefulness",
-                "cautionNotes",
-              ],
-              properties: {
-                action: { type: ["string", "null"] },
-                context: { type: ["string", "null"] },
-                toolsOrMethods: { type: "array", items: { type: "string" } },
-                ownership: { type: ["string", "null"] },
-                outcome: { type: ["string", "null"] },
-                metric: { type: ["string", "null"] },
-                scope: { type: ["string", "null"] },
-                source: { type: ["string", "null"] },
-                targetRequirementId: { type: ["string", "null"] },
-                targetRequirementLabel: { type: ["string", "null"] },
-                cvUsefulness: {
-                  type: "string",
-                  enum: ["cv_ready", "supporting", "keyword_only", "caution"],
-                },
-                cautionNotes: { type: "array", items: { type: "string" } },
-              },
-            },
-          },
-        },
-      },
+      tools: { type: "array", maxItems: 32, items: { type: "string", maxLength: 80 } },
+      achievements: { type: "array", maxItems: 16, items: { type: "string", maxLength: 160 } },
+      cautionNotes: { type: "array", maxItems: 6, items: { type: "string", maxLength: 160 } },
     },
   },
   evidenceScoring: {
@@ -1006,7 +827,7 @@ export const AgentJsonSchemas = {
             candidateChunkId: { type: ["string", "null"] },
             confidence: {
               type: "string",
-              enum: ["high", "medium", "weak", "missing"],
+              enum: ["high", "medium", "low", "missing"],
             },
             cvUsefulness: {
               type: "string",
@@ -1025,27 +846,11 @@ export const AgentJsonSchemas = {
   gapQuestion: {
     type: "object",
     additionalProperties: false,
-    required: ["coachInsight", "questions"],
+    required: ["questions"],
     properties: {
-      coachInsight: {
-        type: "object",
-        additionalProperties: false,
-        required: [
-          "openingMessage",
-          "jobWants",
-          "candidateStrengths",
-          "candidateConcerns",
-        ],
-        properties: {
-          openingMessage: { type: "string" },
-          jobWants: { type: "string" },
-          candidateStrengths: { type: "array", items: { type: "string" } },
-          candidateConcerns: { type: "array", items: { type: "string" } },
-        },
-      },
       questions: {
         type: "array",
-        maxItems: 5,
+        maxItems: 3,
         items: {
           type: "object",
           additionalProperties: false,
@@ -1055,60 +860,21 @@ export const AgentJsonSchemas = {
             "reason",
             "whyItMatters",
             "answerGuidance",
-            "exampleAngles",
-            "shortQuestion",
-            "whyThisMatters",
-            "linkedJobRequirement",
-            "howYourAnswerHelps",
-            "quickOptions",
-            "selectedOptionRequiresDetail",
-            "followUpPrompt",
-            "metricPrompt",
-            "metricOptionTriggers",
-            "questionType",
             "exampleAnswer",
-            "priorityReason",
+            "exampleAngles",
           ],
           properties: {
-            targetRequirementId: { type: ["string", "null"] },
-            question: { type: "string" },
-            reason: { type: "string" },
-            whyItMatters: { type: "string" },
-            answerGuidance: { type: "string" },
-            exampleAngles: { type: "array", items: { type: "string" } },
-            shortQuestion: { type: "string" },
-            whyThisMatters: { type: "string" },
-            linkedJobRequirement: { type: ["string", "null"] },
-            howYourAnswerHelps: { type: "string" },
-            quickOptions: {
+            targetRequirementId: { type: "string" },
+            question: { type: "string", maxLength: 180 },
+            reason: { type: "string", maxLength: 180 },
+            whyItMatters: { type: "string", maxLength: 180 },
+            answerGuidance: { type: "string", maxLength: 220 },
+            exampleAnswer: { type: "string", maxLength: 260 },
+            exampleAngles: {
               type: "array",
-              minItems: 2,
               maxItems: 4,
-              items: { type: "string" },
+              items: { type: "string", maxLength: 90 },
             },
-            selectedOptionRequiresDetail: { type: "boolean" },
-            followUpPrompt: { type: ["string", "null"] },
-            metricPrompt: { type: ["string", "null"] },
-            metricOptionTriggers: {
-              type: "array",
-              items: { type: "string" },
-            },
-            questionType: {
-              type: "string",
-              enum: [
-                "capability_check",
-                "tool_check",
-                "metric_or_scope",
-                "ownership",
-                "outcome_or_impact",
-                "responsibility",
-                "collaboration",
-                "safety_or_quality",
-                "domain_specific",
-              ],
-            },
-            exampleAnswer: { type: ["string", "null"] },
-            priorityReason: { type: "string" },
           },
         },
       },

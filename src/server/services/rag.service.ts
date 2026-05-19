@@ -17,7 +17,7 @@ import type {
 
 const confidenceRank = {
   missing: 0,
-  weak: 1,
+  low: 1,
   medium: 2,
   high: 3,
 } satisfies Record<EvidenceConfidence, number>;
@@ -41,10 +41,10 @@ export type RequirementEvidenceMapRow = {
     claimRisk: string | null;
     metadata: unknown;
   }>;
-  weakEvidence: Array<{
+  lowEvidence: Array<{
     chunkId: string;
     contentPreview: string;
-    confidence: "weak";
+    confidence: "low";
     reason: string;
     cvUsefulness: string | null;
     claimRisk: string | null;
@@ -60,7 +60,7 @@ function preview(content: string) {
 function rankedConfidence(matches: Array<{ confidence: EvidenceConfidence }>) {
   if (matches.some((match) => match.confidence === "high")) return "high";
   if (matches.some((match) => match.confidence === "medium")) return "medium";
-  if (matches.some((match) => match.confidence === "weak")) return "weak";
+  if (matches.some((match) => match.confidence === "low")) return "low";
   return "missing";
 }
 
@@ -97,7 +97,6 @@ export async function retrieveCandidateEvidenceForRequirement(args: {
 
   const retrievedChunks = await searchCandidateChunks({
     anonymousSessionId: args.anonymousSessionId,
-    applicationId: args.applicationId,
     requirementText: `${args.requirement.label}\n${args.requirement.description}`,
     topK: 3,
   });
@@ -147,9 +146,9 @@ export async function replaceWithScoredEvidenceMatches(args: {
           const confidence =
             scored?.confidence === "high" ||
             scored?.confidence === "medium" ||
-            scored?.confidence === "weak"
+            scored?.confidence === "low"
               ? scored.confidence
-              : "weak";
+              : "low";
 
           return {
             jobRequirementId: args.requirement.id,
@@ -161,13 +160,13 @@ export async function replaceWithScoredEvidenceMatches(args: {
                 ? "headline"
                 : confidence === "medium"
                   ? "supporting"
-                  : "keyword_only"),
+            : "keyword_only"),
             claimRisk:
               scored?.claimRisk ??
               (confidence === "high" ? "safe" : "careful_wording"),
             reason:
               scored?.reason ??
-              "Retrieved candidate evidence was only weakly related to this requirement.",
+              "Retrieved candidate evidence was only lightly related to this requirement.",
           };
         })
       : [
@@ -382,14 +381,14 @@ export async function buildRequirementEvidenceMap(
         metadata: match.candidateChunk.metadataJson,
       }));
 
-    const weakEvidence = sortedMatches
+    const lowEvidence = sortedMatches
       .filter(
         (
           match
         ): match is typeof match & {
           candidateChunk: NonNullable<typeof match.candidateChunk>;
-          confidence: "weak";
-        } => !!match.candidateChunk && match.confidence === "weak"
+          confidence: "low";
+        } => !!match.candidateChunk && match.confidence === "low"
       )
       .map((match) => ({
         chunkId: match.candidateChunk.id,
@@ -404,7 +403,7 @@ export async function buildRequirementEvidenceMap(
     const reason =
       fitScore?.reason ??
       bestEvidence[0]?.reason ??
-      weakEvidence[0]?.reason ??
+      lowEvidence[0]?.reason ??
       requirementMatches.find((match) => match.confidence === "missing")
         ?.reason ??
       "No usable evidence found for this requirement.";
@@ -420,7 +419,7 @@ export async function buildRequirementEvidenceMap(
       possiblePoints: fitScore?.possiblePoints ?? fallbackParts.possiblePoints,
       bestCandidateChunkId: fitScore?.bestCandidateChunkId ?? null,
       bestEvidence,
-      weakEvidence,
+      lowEvidence,
       reason,
     };
   });

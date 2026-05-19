@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { createHash } from "crypto";
 
 import { PrismaClient } from "../generated/prisma/index.js";
 import { createMockEmbedding } from "../src/server/tools/mockEmbedding.ts";
@@ -13,33 +14,47 @@ function toVectorLiteral(embedding) {
   return `[${embedding.map((value) => value.toFixed(8)).join(",")}]`;
 }
 
+function hash(value) {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
 async function insertChunk(chunk) {
   await prisma.$executeRaw`
     INSERT INTO candidate_chunks (
       id,
       anonymous_session_id,
-      application_id,
+      source_application_id,
       candidate_profile_id,
       source_type,
       source_id,
+      source_key,
+      source_hash,
+      content_hash,
       chunk_type,
       content,
       embedding,
       tags_json,
-      metadata_json
+      metadata_json,
+      embedded_at,
+      last_seen_at
     )
     VALUES (
       ${chunk.id},
       ${seedAnonymousSessionId},
       ${seedApplicationId},
       ${seedProfileId},
-      'profile'::"SourceType",
+      'cv_upload'::"SourceType",
       ${seedProfileId},
+      ${`seed:${chunk.id}`},
+      ${hash({ source: "seed", id: chunk.id })},
+      ${hash(chunk.content.toLowerCase())},
       ${chunk.chunkType}::"ChunkType",
       ${chunk.content},
       ${toVectorLiteral(createMockEmbedding(chunk.content))}::vector,
       ${JSON.stringify(chunk.tags)}::jsonb,
-      ${JSON.stringify({ seed: true })}::jsonb
+      ${JSON.stringify({ seed: true })}::jsonb,
+      NOW(),
+      NOW()
     )
   `;
 }
@@ -137,8 +152,14 @@ async function main() {
   });
 
   await prisma.candidateProfile.upsert({
-    where: { applicationId: seedApplicationId },
+    where: { id: seedProfileId },
     update: {
+      anonymousSessionId: seedAnonymousSessionId,
+      sourceApplicationId: seedApplicationId,
+      sourceType: "cv_upload",
+      sourceKey: "seed:profile",
+      sourceHash: hash("seed-profile-source"),
+      contentHash: hash("seed-profile-content"),
       summary:
         "Fake candidate with practical RAG, OpenAI, PostgreSQL, pgvector, Next.js, TypeScript, and deployment experience.",
       skillsJson: ["RAG", "OpenAI", "PostgreSQL", "pgvector", "Next.js"],
@@ -152,7 +173,11 @@ async function main() {
     create: {
       id: seedProfileId,
       anonymousSessionId: seedAnonymousSessionId,
-      applicationId: seedApplicationId,
+      sourceApplicationId: seedApplicationId,
+      sourceType: "cv_upload",
+      sourceKey: "seed:profile",
+      sourceHash: hash("seed-profile-source"),
+      contentHash: hash("seed-profile-content"),
       rawCvText: null,
       rawBackgroundText:
         "Built RenovAI with RAG, OpenAI workflows, pgvector, Next.js, TypeScript, and deployment experience.",
@@ -169,8 +194,8 @@ async function main() {
   });
 
   await prisma.candidateChunk.deleteMany({
-    where: {
-      applicationId: seedApplicationId,
+      where: {
+      sourceApplicationId: seedApplicationId,
       anonymousSessionId: seedAnonymousSessionId,
     },
   });

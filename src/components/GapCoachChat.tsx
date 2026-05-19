@@ -29,6 +29,15 @@ function stringArray(value: unknown) {
     : [];
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function textFromRecord(value: Record<string, unknown>, key: string) {
+  const item = value[key];
+  return typeof item === "string" && item.trim() ? item : null;
+}
+
 function CoachBubble(props: { children: React.ReactNode }) {
   return (
     <div className="max-w-3xl rounded-lg bg-zinc-100 px-4 py-3 text-sm leading-6 text-zinc-800">
@@ -95,6 +104,10 @@ export function GapCoachChat(props: {
 
     return messages.filter(Boolean);
   }, [props.coachInsight]);
+  const activeMeta = isRecord(activeQuestion?.questionJson)
+    ? activeQuestion.questionJson
+    : {};
+  const exampleAnswer = textFromRecord(activeMeta, "exampleAnswer");
 
   useEffect(() => {
     setVisibleIntroCount(0);
@@ -177,6 +190,14 @@ export function GapCoachChat(props: {
                   <p className="mt-2 text-zinc-700">
                     {activeQuestion.answerGuidance}
                   </p>
+                ) : null}
+                {exampleAnswer ? (
+                  <div className="mt-3 rounded bg-white px-3 py-2 text-zinc-700">
+                    <p className="text-xs font-medium uppercase tracking-normal text-zinc-500">
+                      Example answer
+                    </p>
+                    <p className="mt-1">{exampleAnswer}</p>
+                  </div>
                 ) : null}
                 {stringArray(activeQuestion.exampleAnglesJson).length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">

@@ -6,7 +6,6 @@ import {
   CvBuilderOutputSchema,
   CvStrategyOutputSchema,
   CvWriterOutputSchema,
-  GapQuestionOutputSchema,
   JobParserOutputSchema,
 } from "../src/lib/schemas.ts";
 import { normalizeCvBuilderRawOutput } from "../src/lib/cvBuilderCanonicalizer.ts";
@@ -29,7 +28,7 @@ const bannedPhrases =
 
 const benStrategy = {
   strategySummary:
-    "Position Ben as an early-career applied AI/backend engineer and cut weak notebook-style projects.",
+    "Position Ben as an early-career applied AI/backend engineer and downplay lightweight notebook-style projects.",
   targetPositioning:
     "Early-career applied AI/backend engineer with credible hands-on LLM, RAG chatbot, and TypeScript backend evidence.",
   roleFamily: "software_ai_data",
@@ -215,122 +214,6 @@ const retailPresentation = normalizeCvPresentation(null, retailCv);
 assert.notEqual(retailPresentation.layoutArchitecture, "premium_hybrid");
 assert.equal(retailPresentation.layoutArchitecture, "simple_practical");
 
-const benGapQuestions = {
-  coachInsight: {
-    openingMessage:
-      "A few short answers can make Ben's AI/backend evidence sharper.",
-    jobWants:
-      "The role wants applied LLM systems, response quality, and practical delivery.",
-    candidateStrengths: ["Ben already has RAG chatbot and backend evidence."],
-    candidateConcerns: [
-      "Usage, evaluation, and feedback scope need one-line clarification.",
-    ],
-  },
-  questions: [
-    {
-      targetRequirementId: "req-rag",
-      question: "Did anyone use the chatbot or was it mainly a prototype?",
-      reason: "Usage scope is not clear yet.",
-      whyItMatters:
-        "This role values AI systems that support real users, not just chatbot demos.",
-      answerGuidance: "One line: who used it and what did it help them do?",
-      exampleAngles: [
-        "Examples: classmates, internal users, small test group, prototype only.",
-      ],
-      shortQuestion: "Did anyone use the chatbot or was it mainly a prototype?",
-      whyThisMatters:
-        "This role values AI systems that support real users, not just chatbot demos.",
-      linkedJobRequirement: "Build document-grounded AI applications",
-      howYourAnswerHelps:
-        "A short usage detail lets Taylor show truthful product scope without overstating production scale.",
-      quickOptions: ["Yes, people used it", "Small test group", "Prototype only", "Skip"],
-      selectedOptionRequiresDetail: true,
-      followUpPrompt: "One line: who used it and what did it help them do?",
-      metricPrompt: null,
-      metricOptionTriggers: [],
-      questionType: "outcome_or_impact",
-      exampleAnswer:
-        "Examples: classmates, internal users, small test group, prototype only.",
-      priorityReason: "High-impact usage scope gap.",
-    },
-    {
-      targetRequirementId: "req-eval",
-      question:
-        "This role values LLM evaluation. Have you tested or scored AI outputs before?",
-      reason: "Evaluation evidence is unclear.",
-      whyItMatters:
-        "This role asks for reliable AI systems, not just chatbot demos.",
-      answerGuidance:
-        "One line: what did you test, how did you check it, and any rough number if you know it?",
-      exampleAngles: [
-        "Examples: rubric, prompt comparison, model-as-judge, accuracy checks.",
-      ],
-      shortQuestion:
-        "This role values LLM evaluation. Have you tested or scored AI outputs before?",
-      whyThisMatters:
-        "This role asks for reliable AI systems, not just chatbot demos.",
-      linkedJobRequirement:
-        "Create evaluation workflows to measure model quality, reliability, and safety.",
-      howYourAnswerHelps:
-        "A short example lets Taylor turn this into evidence of testing and response-quality improvement.",
-      quickOptions: ["Yes, I did", "Kind of", "Not formally", "Skip"],
-      selectedOptionRequiresDetail: true,
-      followUpPrompt:
-        "One line: what did you test, how did you check it, and any rough number if you know it?",
-      metricPrompt: null,
-      metricOptionTriggers: [],
-      questionType: "safety_or_quality",
-      exampleAnswer:
-        "Examples: rubric, prompt comparison, model-as-judge, accuracy checks.",
-      priorityReason: "High-impact LLM quality evidence gap.",
-    },
-    {
-      targetRequirementId: "req-feedback",
-      question: "Did anyone help test, use, or give feedback on the chatbot?",
-      reason: "Feedback context is unclear.",
-      whyItMatters:
-        "Feedback shows whether the chatbot was checked against real expectations.",
-      answerGuidance:
-        "One line: who was involved and what role or feedback did they provide?",
-      exampleAngles: [
-        "Examples: classmates, teacher or mentor feedback, solo testing notes.",
-      ],
-      shortQuestion: "Did anyone help test, use, or give feedback on the chatbot?",
-      whyThisMatters:
-        "Feedback shows whether the chatbot was checked against real expectations.",
-      linkedJobRequirement: "Collaborate and improve AI application quality.",
-      howYourAnswerHelps:
-        "A concise feedback detail can prove communication and practical improvement without inventing team ownership.",
-      quickOptions: ["Yes, a team/classmates", "One person gave feedback", "Worked solo", "Skip"],
-      selectedOptionRequiresDetail: true,
-      followUpPrompt:
-        "One line: who was involved and what role or feedback did they provide?",
-      metricPrompt: null,
-      metricOptionTriggers: [],
-      questionType: "collaboration",
-      exampleAnswer:
-        "Examples: classmates, teacher or mentor feedback, solo testing notes.",
-      priorityReason: "High-impact collaboration evidence gap.",
-    },
-  ],
-};
-
-assert.equal(GapQuestionOutputSchema.safeParse(benGapQuestions).success, true);
-for (const question of benGapQuestions.questions) {
-  assert.equal(question.quickOptions.length <= 4, true);
-  assert.equal(question.quickOptions[question.quickOptions.length - 1], "Skip");
-  assert.equal(
-    /Product team|Support team|Infrastructure team|Senior developers/i.test(
-      question.quickOptions.join(" ")
-    ),
-    false
-  );
-  assert.equal(/^One line:/.test(question.followUpPrompt), true);
-}
-assert.equal(
-  benGapQuestions.questions[1].quickOptions.includes("Built an evaluation rubric"),
-  false
-);
 assert.equal(ApplicationStatus.strategy_failed, "strategy_failed");
 assert.equal(ApplicationStatus.draft_failed, "draft_failed");
 assert.equal(ApplicationStatus.draft_ready, "draft_ready");
@@ -406,52 +289,51 @@ assert.equal(
 );
 
 const batchFit = {
-  currentMatchScore: 62,
-  matchLabel: "Promising but untailored",
-  topStrengths: ["RAG project evidence"],
-  weakSpots: ["Production scale"],
-  evidenceCards: [
-    {
-      requirementId: "req-rag",
-      requirementLabel: "RAG",
-      candidateChunkId: "chunk-rag",
-      content: "Built a document-grounded chatbot.",
+  requirementFitByRequirementId: {
+    "req-rag": {
       confidence: "high",
-      reason: "Directly supports the role requirement.",
-      claimRisk: "safe",
-    },
-  ],
-  requirementFitSummary: [
-    {
-      requirementId: "req-rag",
-      confidence: "high",
-      bestCandidateChunkId: "chunk-rag",
+      selectedEvidenceIndex: 0,
       reason: "Direct match.",
       claimRisk: "safe",
       cvUsefulness: "headline",
     },
-  ],
+  },
+};
+assert.equal(BatchEvidenceFitOutputSchema.safeParse(batchFit).success, true);
+
+const matchAnalysisFixture = {
+  ...batchFit,
+  matchLabel: "Promising but untailored",
+  topStrengths: ["RAG project evidence"],
+  weakSpots: ["Production scale"],
   claimRisks: ["Avoid overstating production scale."],
+  coachInsight: {
+    openingMessage: "Taylor found one useful follow-up.",
+    jobWants: "Applied AI project delivery.",
+    candidateStrengths: ["RAG project evidence"],
+    candidateConcerns: ["Production scale"],
+  },
   recommendedGapQuestions: [
     {
       targetRequirementId: "req-rag",
       question: "Did anyone use the chatbot?",
-      shortQuestion: "Did anyone use the chatbot?",
-      linkedJobRequirement: "RAG",
-      whyThisMatters: "Usage scope improves proof.",
-      howYourAnswerHelps: "It lets Taylor write truthful scope.",
-      quickOptions: ["Yes", "Small group", "Prototype", "Skip"],
-      selectedOptionRequiresDetail: true,
-      followUpPrompt: "Who used it?",
-      dynamicGuidance: "Use a real example only.",
-      questionType: "scope_enrichment",
+      reason: "Usage scope is unclear.",
+      whyItMatters: "Usage scope improves proof.",
+      answerGuidance: "Mention who used it and what they used it for.",
+      exampleAnswer:
+        "Example: Yes, a small group tested it to answer document questions during an internal workflow review.",
+      exampleAngles: ["Who used it", "What they used it for", "Scope"],
     },
   ],
   cvAngle: "Lead with applied AI project evidence.",
   roleArchetype: "applied_ai_engineering",
 };
-assert.equal(BatchEvidenceFitOutputSchema.safeParse(batchFit).success, true);
-assert.equal(batchFit.recommendedGapQuestions.length <= 4, true);
+
+assert.equal(matchAnalysisFixture.recommendedGapQuestions.length <= 3, true);
+for (const question of matchAnalysisFixture.recommendedGapQuestions) {
+  assert.equal(!!question.exampleAnswer, true);
+  assert.equal(question.exampleAngles.length <= 4, true);
+}
 
 const cvBuilderOutput = {
   roleArchetype: "applied_ai_engineering",
@@ -668,7 +550,7 @@ const benQaContext = {
     },
   ],
   gapAnswers: [{ id: "gap-usage", skipped: false }],
-  matchAnalysis: batchFit,
+  matchAnalysis: matchAnalysisFixture,
 };
 const benQa = runDeterministicCvQa(cvBuilderOutput, benQaContext);
 assert.deepEqual(benQa.issues, []);
@@ -685,7 +567,6 @@ assert.equal(deterministicBenScore === 71, false);
 const workflowSource = readFileSync("src/server/services/applicationWorkflow.service.ts", "utf8");
 for (const legacyName of [
   "runEvidenceScoringAgent",
-  "runGapQuestionAgent",
   "runCvStrategyAgent",
   "runCvWriterAgent",
   "runCvQualityReviewAgent",
@@ -700,10 +581,14 @@ for (const legacyName of [
 }
 assert.equal(/scoreRequirement\s*\(/.test(workflowSource), false);
 assert.equal(
-  workflowSource.indexOf("await db.evidenceMatch.deleteMany({ where: { applicationId: args.applicationId } })") <
-    workflowSource.indexOf("await db.candidateChunk.deleteMany({"),
+  workflowSource.includes("candidateChunk.deleteMany"),
+  false,
+  "candidate memory must not be deleted during application matching"
+);
+assert.equal(
+  workflowSource.includes("upsertCandidateMemoryChunks"),
   true,
-  "candidate chunk regeneration must delete dependent evidence matches first"
+  "candidate chunks must be persisted through permanent memory upsert"
 );
 assert.equal(
   workflowSource.includes("buildEvidenceMatchPersistencePlan"),
@@ -711,9 +596,16 @@ assert.equal(
   "batch fit persistence must validate agent chunk IDs before Prisma writes"
 );
 assert.equal(
-  workflowSource.includes("taylor_rejected_evidence_matches"),
+  workflowSource.includes("taylor_rejected_evidence_selections"),
   true,
-  "invalid agent chunk IDs should be logged as rejected matches"
+  "invalid agent chunk selections should be logged as rejected matches"
+);
+assert.equal(
+  /if\s*\(\s*rejectedSelections\.length\s*>\s*0\s*\)\s*{[\s\S]*?"repair scorer call"/.test(
+    workflowSource
+  ),
+  true,
+  "repair scorer call must stay gated behind rejected evidence selections"
 );
 assert.equal(
   workflowSource.includes("Something went wrong while scanning your background. Please try again."),

@@ -49,12 +49,15 @@ function metadata(args: {
 
 export function buildEvidenceChunksFromProfile(args: {
   anonymousSessionId: string;
-  applicationId: string;
+  userId?: string | null;
+  sourceApplicationId: string;
   candidateProfileId: string;
+  sourceType?: NewCandidateChunk["sourceType"];
   profile: CandidateProfilerOutput;
 }): NewCandidateChunk[] {
   const chunks: NewCandidateChunk[] = [];
   const cautionNotes = args.profile.cautionNotes ?? [];
+  const sourceType = args.sourceType ?? "cv_upload";
 
   args.profile.experience.forEach((experience, experienceIndex) => {
     const base = compact([
@@ -76,9 +79,10 @@ export function buildEvidenceChunksFromProfile(args: {
       if (!content) return;
       chunks.push({
         anonymousSessionId: args.anonymousSessionId,
-        applicationId: args.applicationId,
+        userId: args.userId ?? null,
+        sourceApplicationId: args.sourceApplicationId,
         candidateProfileId: args.candidateProfileId,
-        sourceType: "profile",
+        sourceType,
         sourceId: `${sourceId("experience", experienceIndex)}-bullet-${bulletIndex + 1}`,
         chunkType: "experience",
         content,
@@ -112,9 +116,10 @@ export function buildEvidenceChunksFromProfile(args: {
     if (!content) return;
     chunks.push({
       anonymousSessionId: args.anonymousSessionId,
-      applicationId: args.applicationId,
+      userId: args.userId ?? null,
+      sourceApplicationId: args.sourceApplicationId,
       candidateProfileId: args.candidateProfileId,
-      sourceType: "profile",
+      sourceType,
       sourceId: sourceId("project", index),
       chunkType: "project",
       content,
@@ -144,9 +149,10 @@ export function buildEvidenceChunksFromProfile(args: {
     if (!content) return;
     chunks.push({
       anonymousSessionId: args.anonymousSessionId,
-      applicationId: args.applicationId,
+      userId: args.userId ?? null,
+      sourceApplicationId: args.sourceApplicationId,
       candidateProfileId: args.candidateProfileId,
-      sourceType: "profile",
+      sourceType,
       sourceId: sourceId("education", index),
       chunkType: "education",
       content,
@@ -177,9 +183,10 @@ export function buildEvidenceChunksFromProfile(args: {
     if (!content) return;
     chunks.push({
       anonymousSessionId: args.anonymousSessionId,
-      applicationId: args.applicationId,
+      userId: args.userId ?? null,
+      sourceApplicationId: args.sourceApplicationId,
       candidateProfileId: args.candidateProfileId,
-      sourceType: "profile",
+      sourceType,
       sourceId: sourceId("certification", index),
       chunkType: "certification",
       content,
@@ -198,9 +205,10 @@ export function buildEvidenceChunksFromProfile(args: {
     if (!achievement.trim()) return;
     chunks.push({
       anonymousSessionId: args.anonymousSessionId,
-      applicationId: args.applicationId,
+      userId: args.userId ?? null,
+      sourceApplicationId: args.sourceApplicationId,
       candidateProfileId: args.candidateProfileId,
-      sourceType: "profile",
+      sourceType,
       sourceId: sourceId("achievement", index),
       chunkType: "achievement",
       content: achievement,
@@ -219,9 +227,10 @@ export function buildEvidenceChunksFromProfile(args: {
   if (chunks.length === 0 && args.profile.summary.trim()) {
     chunks.push({
       anonymousSessionId: args.anonymousSessionId,
-      applicationId: args.applicationId,
+      userId: args.userId ?? null,
+      sourceApplicationId: args.sourceApplicationId,
       candidateProfileId: args.candidateProfileId,
-      sourceType: "profile",
+      sourceType,
       sourceId: "profile-summary",
       chunkType: "achievement",
       content: args.profile.summary,
@@ -242,7 +251,8 @@ export function buildEvidenceChunksFromProfile(args: {
 
 export function buildGapAnswerEvidenceChunk(args: {
   anonymousSessionId: string;
-  applicationId: string;
+  userId?: string | null;
+  sourceApplicationId: string;
   gapAnswerId: string;
   gapQuestionId: string;
   targetRequirementId: string | null;
@@ -266,7 +276,8 @@ export function buildGapAnswerEvidenceChunk(args: {
 
   return {
     anonymousSessionId: args.anonymousSessionId,
-    applicationId: args.applicationId,
+    userId: args.userId ?? null,
+    sourceApplicationId: args.sourceApplicationId,
     sourceType: "gap_answer",
     sourceId: args.gapAnswerId,
     chunkType: "gap_answer",
