@@ -38,6 +38,14 @@ import {
   calculateEvidenceMatchScore,
 } from "~/server/services/rag.service";
 import {
+  checkAndRecordAbuse,
+  isAbuseDenied,
+} from "~/server/services/abuse.service";
+import {
+  assertCanGenerateCv,
+  recordSuccessfulCvGeneration,
+} from "~/server/services/entitlement.service";
+import {
   calculateDeterministicAfterScore,
   compactCvRepairInstructions,
   composeDeterministicPresentation,
@@ -202,17 +210,14 @@ async function clearGeneratedWork(applicationId: string) {
 export async function assertApplicationForSession(args: {
   applicationId: string;
   anonymousSessionId: string;
-  clerkUserId?: string | null;
+  userId?: string | null;
 }) {
-  const user = args.clerkUserId
-    ? await db.user.findUnique({ where: { clerkUserId: args.clerkUserId } })
-    : null;
   const application = await db.application.findFirst({
     where: {
       id: args.applicationId,
       OR: [
         { anonymousSessionId: args.anonymousSessionId },
-        ...(user ? [{ userId: user.id }] : []),
+        ...(args.userId ? [{ userId: args.userId }] : []),
       ],
     },
   });
@@ -227,35 +232,14 @@ export async function assertApplicationForSession(args: {
   return application;
 }
 
-async function getOrCreateUser(args: {
-  clerkUserId: string;
-  email?: string | null;
-  name?: string | null;
-}) {
-  return db.user.upsert({
-    where: { clerkUserId: args.clerkUserId },
-    update: { email: optionalText(args.email), name: optionalText(args.name) },
-    create: {
-      clerkUserId: args.clerkUserId,
-      email: optionalText(args.email),
-      name: optionalText(args.name),
-    },
-  });
-}
-
 async function resolveMemoryOwnerForApplication(args: {
   application: { userId: string | null };
   anonymousSessionId: string;
-  clerkUserId?: string | null;
+  userId?: string | null;
 }): Promise<CandidateMemoryOwner> {
-  const user = args.application.userId
-    ? { id: args.application.userId }
-    : args.clerkUserId
-      ? await getOrCreateUser({ clerkUserId: args.clerkUserId })
-      : null;
   return {
     anonymousSessionId: args.anonymousSessionId,
-    userId: user?.id ?? null,
+    userId: args.application.userId ?? args.userId ?? null,
   };
 }
 
@@ -899,15 +883,12 @@ async function prepareFastMatch(args: {
 
 export async function createApplication(args: {
   anonymousSessionId: string;
-  clerkUserId?: string | null;
+  userId?: string | null;
 }) {
-  const user = args.clerkUserId
-    ? await getOrCreateUser({ clerkUserId: args.clerkUserId })
-    : null;
   const application = await db.application.create({
     data: {
       anonymousSessionId: args.anonymousSessionId,
-      userId: user?.id,
+      userId: args.userId ?? null,
       status: "started",
       currentStep: "started",
     },
@@ -918,27 +899,45 @@ export async function createApplication(args: {
 export async function resetApplication(args: {
   anonymousSessionId: string;
   applicationId: string;
-  clerkUserId?: string | null;
+  userId?: string | null;
 }) {
   await assertApplicationForSession(args);
   await db.application.delete({ where: { id: args.applicationId } });
   return createApplication({
     anonymousSessionId: args.anonymousSessionId,
-    clerkUserId: args.clerkUserId,
+    userId: args.userId,
   });
 }
 
 export async function submitJob(args: {
   anonymousSessionId: string;
   applicationId: string;
-  clerkUserId?: string | null;
+  userId?: string | null;
+  headers?: Headers;
+  resHeaders?: Headers;
   rawJobText: string;
 }) {
   const application = await assertApplicationForSession(args);
+  if (args.headers) {
+    const abuse = await checkAndRecordAbuse({
+      action: "anonymous_analysis",
+      headers: args.headers,
+      resHeaders: args.resHeaders,
+      userId: args.userId,
+      anonymousSessionId: args.anonymousSessionId,
+      metadata: { stage: "submitJob" },
+    });
+    if (isAbuseDenied(abuse.decision)) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "Too many analysis attempts. Try again shortly.",
+      });
+    }
+  }
   const owner = await resolveMemoryOwnerForApplication({
     application,
     anonymousSessionId: args.anonymousSessionId,
-    clerkUserId: args.clerkUserId,
+    userId: args.userId,
   });
   if (args.rawJobText.length > MAX_JOB_DESCRIPTION_CHARS) {
     throw new TRPCError({
@@ -1028,7 +1027,9 @@ export async function submitJob(args: {
 type SubmitCandidateProfileSourceArgs = {
   anonymousSessionId: string;
   applicationId: string;
-  clerkUserId?: string | null;
+  userId?: string | null;
+  headers?: Headers;
+  resHeaders?: Headers;
   source: "cv_upload" | "linkedin_url";
   rawCvText?: string | null;
   rawBackgroundText?: string | null;
@@ -1049,8 +1050,24 @@ async function submitCandidateProfileSourceTimed(args: SubmitCandidateProfileSou
   const owner = await resolveMemoryOwnerForApplication({
     application,
     anonymousSessionId: args.anonymousSessionId,
-    clerkUserId: args.clerkUserId,
+    userId: args.userId,
   });
+  if (args.headers) {
+    const abuse = await checkAndRecordAbuse({
+      action: "anonymous_analysis",
+      headers: args.headers,
+      resHeaders: args.resHeaders,
+      userId: args.userId,
+      anonymousSessionId: args.anonymousSessionId,
+      metadata: { stage: "submitCandidateProfileSource" },
+    });
+    if (isAbuseDenied(abuse.decision)) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "Too many analysis attempts. Try again shortly.",
+      });
+    }
+  }
   const sourceUrl = optionalText(args.sourceUrl);
   let rawCvText = args.rawCvText ?? null;
   let rawBackgroundText = args.rawBackgroundText ?? null;
@@ -1180,13 +1197,13 @@ async function submitCandidateProfileSourceTimed(args: SubmitCandidateProfileSou
 export async function useSavedCandidateMemory(args: {
   anonymousSessionId: string;
   applicationId: string;
-  clerkUserId?: string | null;
+  userId?: string | null;
 }) {
   const application = await assertApplicationForSession(args);
   const owner = await resolveMemoryOwnerForApplication({
     application,
     anonymousSessionId: args.anonymousSessionId,
-    clerkUserId: args.clerkUserId,
+    userId: args.userId,
   });
   const summary = await getCandidateMemorySummary(owner);
   if (!summary.hasMemory) {
@@ -1227,7 +1244,7 @@ export async function useSavedCandidateMemory(args: {
 export async function answerGapQuestions(args: {
   anonymousSessionId: string;
   applicationId: string;
-  clerkUserId?: string | null;
+  userId?: string | null;
   answers: Array<{
     gapQuestionId: string;
     answerText?: string | null;
@@ -1241,7 +1258,7 @@ export async function answerGapQuestions(args: {
   const owner = await resolveMemoryOwnerForApplication({
     application,
     anonymousSessionId: args.anonymousSessionId,
-    clerkUserId: args.clerkUserId,
+    userId: args.userId,
   });
 
   const chunks = await timedStep(
@@ -1350,14 +1367,29 @@ function matchAnalysisObject(value: unknown) {
 export async function generateCv(args: {
   anonymousSessionId: string;
   applicationId: string;
-  clerkUserId?: string | null;
+  userId?: string | null;
+  headers: Headers;
+  resHeaders?: Headers;
   strategyId?: string | null;
 }) {
   const application = await assertApplicationForSession(args);
-  const owner = await resolveMemoryOwnerForApplication({
-    application,
+  const entitlement = await assertCanGenerateCv({
+    userId: args.userId,
     anonymousSessionId: args.anonymousSessionId,
-    clerkUserId: args.clerkUserId,
+    headers: args.headers,
+    resHeaders: args.resHeaders,
+  });
+  if (!application.userId && args.userId) {
+    await claimApplication({
+      anonymousSessionId: args.anonymousSessionId,
+      applicationId: args.applicationId,
+      userId: args.userId,
+    });
+  }
+  const owner = await resolveMemoryOwnerForApplication({
+    application: { userId: application.userId ?? args.userId ?? null },
+    anonymousSessionId: args.anonymousSessionId,
+    userId: args.userId,
   });
   const [job, candidateProfile, candidateChunks, gapAnswers] = await Promise.all([
     db.job.findUnique({ where: { applicationId: args.applicationId } }),
@@ -1500,30 +1532,43 @@ export async function generateCv(args: {
     }
   })();
   const { cvOutput, finalAfterScore, presentationJson } = draftGeneration;
-  const latestDraft = await db.cvDraft.findFirst({
-    where: { applicationId: args.applicationId },
-    orderBy: { version: "desc" },
-  });
-  const cvDraft = await db.cvDraft.create({
-    data: {
+  const cvDraft = await db.$transaction(async (tx) => {
+    const latestDraft = await tx.cvDraft.findFirst({
+      where: { applicationId: args.applicationId },
+      orderBy: { version: "desc" },
+    });
+    const draft = await tx.cvDraft.create({
+      data: {
+        applicationId: args.applicationId,
+        strategyId: null,
+        version: (latestDraft?.version ?? 0) + 1,
+        cvJson: inputJson(cvOutput.cvJson),
+        cvText: cvOutput.cvText,
+        presentationJson: inputJson(presentationJson),
+        builderOutputJson: inputJson(cvOutput),
+      },
+    });
+    await recordSuccessfulCvGeneration({
+      tx,
+      userId: args.userId!,
       applicationId: args.applicationId,
-      strategyId: null,
-      version: (latestDraft?.version ?? 0) + 1,
-      cvJson: inputJson(cvOutput.cvJson),
-      cvText: cvOutput.cvText,
-      presentationJson: inputJson(presentationJson),
-      builderOutputJson: inputJson(cvOutput),
-    },
-  });
-  await db.application.update({
-    where: { id: args.applicationId },
-    data: {
-      status: "cv_ready",
-      currentStep: "draft_ready",
-      updatedEvidenceMatchScore: finalAfterScore,
-      cvAngle: cvOutput.cvAngle,
-      roleArchetype: cvOutput.roleArchetype,
-    },
+      cvDraftId: draft.id,
+      planKey: entitlement.planKey,
+      billingPeriodStart: entitlement.periodStart,
+      billingPeriodEnd: entitlement.periodEnd,
+    });
+    await tx.application.update({
+      where: { id: args.applicationId },
+      data: {
+        userId: args.userId,
+        status: "cv_ready",
+        currentStep: "draft_ready",
+        updatedEvidenceMatchScore: finalAfterScore,
+        cvAngle: cvOutput.cvAngle,
+        roleArchetype: cvOutput.roleArchetype,
+      },
+    });
+    return draft;
   });
   return { cvDraft };
 }
@@ -1531,13 +1576,13 @@ export async function generateCv(args: {
 export async function getApplicationState(args: {
   anonymousSessionId: string;
   applicationId: string;
-  clerkUserId?: string | null;
+  userId?: string | null;
 }) {
   const application = await assertApplicationForSession(args);
   const owner = await resolveMemoryOwnerForApplication({
     application,
     anonymousSessionId: args.anonymousSessionId,
-    clerkUserId: args.clerkUserId,
+    userId: args.userId,
   });
 
   const [
@@ -1676,13 +1721,12 @@ export async function getApplicationState(args: {
 export async function claimApplication(args: {
   anonymousSessionId: string;
   applicationId: string;
-  clerkUserId: string;
+  userId: string;
 }) {
-  const user = await getOrCreateUser({ clerkUserId: args.clerkUserId });
   const application = await db.application.findFirst({
     where: {
       id: args.applicationId,
-      OR: [{ anonymousSessionId: args.anonymousSessionId }, { userId: user.id }],
+      OR: [{ anonymousSessionId: args.anonymousSessionId }, { userId: args.userId }],
     },
   });
   if (!application) {
@@ -1690,20 +1734,19 @@ export async function claimApplication(args: {
   }
   await claimAnonymousCandidateMemory({
     anonymousSessionId: args.anonymousSessionId,
-    userId: user.id,
+    userId: args.userId,
   });
   return {
     application: await db.application.update({
       where: { id: args.applicationId },
-      data: { userId: user.id },
+      data: { userId: args.userId },
     }),
   };
 }
 
-export async function listUserApplications(args: { clerkUserId: string }) {
-  const user = await getOrCreateUser({ clerkUserId: args.clerkUserId });
+export async function listUserApplications(args: { userId: string }) {
   const applications = await db.application.findMany({
-    where: { userId: user.id },
+    where: { userId: args.userId },
     include: {
       job: true,
       cvDrafts: { orderBy: { version: "desc" }, take: 1 },
@@ -1726,12 +1769,11 @@ export async function listUserApplications(args: { clerkUserId: string }) {
 }
 
 export async function getApplicationExportData(args: {
-  clerkUserId: string;
+  userId: string;
   applicationId: string;
 }) {
-  const user = await getOrCreateUser({ clerkUserId: args.clerkUserId });
   const application = await db.application.findFirst({
-    where: { id: args.applicationId, userId: user.id },
+    where: { id: args.applicationId, userId: args.userId },
   });
   if (!application) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: "Application does not belong to your account." });

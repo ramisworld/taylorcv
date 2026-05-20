@@ -131,7 +131,45 @@ exports.Prisma.UserScalarFieldEnum = {
   id: 'id',
   clerkUserId: 'clerkUserId',
   email: 'email',
+  emailVerified: 'emailVerified',
   name: 'name',
+  image: 'image',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.SessionScalarFieldEnum = {
+  id: 'id',
+  expiresAt: 'expiresAt',
+  token: 'token',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  ipAddress: 'ipAddress',
+  userAgent: 'userAgent',
+  userId: 'userId'
+};
+
+exports.Prisma.AccountScalarFieldEnum = {
+  id: 'id',
+  accountId: 'accountId',
+  providerId: 'providerId',
+  userId: 'userId',
+  accessToken: 'accessToken',
+  refreshToken: 'refreshToken',
+  idToken: 'idToken',
+  accessTokenExpiresAt: 'accessTokenExpiresAt',
+  refreshTokenExpiresAt: 'refreshTokenExpiresAt',
+  scope: 'scope',
+  password: 'password',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.VerificationScalarFieldEnum = {
+  id: 'id',
+  identifier: 'identifier',
+  value: 'value',
+  expiresAt: 'expiresAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -329,6 +367,64 @@ exports.Prisma.CvDraftScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.BillingAccountScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  stripeCustomerId: 'stripeCustomerId',
+  stripeSubscriptionId: 'stripeSubscriptionId',
+  stripeSubscriptionScheduleId: 'stripeSubscriptionScheduleId',
+  activePlanKey: 'activePlanKey',
+  planFamily: 'planFamily',
+  planVariant: 'planVariant',
+  subscriptionStatus: 'subscriptionStatus',
+  priceId: 'priceId',
+  currentPeriodStart: 'currentPeriodStart',
+  currentPeriodEnd: 'currentPeriodEnd',
+  cancelAtPeriodEnd: 'cancelAtPeriodEnd',
+  commitmentStartAt: 'commitmentStartAt',
+  commitmentEndAt: 'commitmentEndAt',
+  commitmentActive: 'commitmentActive',
+  quotaPerPeriod: 'quotaPerPeriod',
+  lastSyncedAt: 'lastSyncedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.CvGenerationUsageScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  applicationId: 'applicationId',
+  cvDraftId: 'cvDraftId',
+  planKey: 'planKey',
+  billingPeriodStart: 'billingPeriodStart',
+  billingPeriodEnd: 'billingPeriodEnd',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.StripeWebhookEventScalarFieldEnum = {
+  id: 'id',
+  stripeEventId: 'stripeEventId',
+  eventType: 'eventType',
+  processedAt: 'processedAt',
+  processingStatus: 'processingStatus',
+  error: 'error',
+  payloadHash: 'payloadHash',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.AbuseSignalEventScalarFieldEnum = {
+  id: 'id',
+  action: 'action',
+  decision: 'decision',
+  userId: 'userId',
+  anonymousSessionId: 'anonymousSessionId',
+  deviceKeyHash: 'deviceKeyHash',
+  ipKeyHash: 'ipKeyHash',
+  metadataJson: 'metadataJson',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.AgentRunScalarFieldEnum = {
   id: 'id',
   applicationId: 'applicationId',
@@ -437,6 +533,53 @@ exports.ButtonAnswer = exports.$Enums.ButtonAnswer = {
   skip: 'skip'
 };
 
+exports.PlanFamily = exports.$Enums.PlanFamily = {
+  free: 'free',
+  pro: 'pro',
+  premium: 'premium'
+};
+
+exports.PlanVariant = exports.$Enums.PlanVariant = {
+  free: 'free',
+  annual: 'annual',
+  monthly: 'monthly'
+};
+
+exports.BillingSubscriptionStatus = exports.$Enums.BillingSubscriptionStatus = {
+  incomplete: 'incomplete',
+  incomplete_expired: 'incomplete_expired',
+  trialing: 'trialing',
+  active: 'active',
+  past_due: 'past_due',
+  canceled: 'canceled',
+  unpaid: 'unpaid',
+  paused: 'paused',
+  none: 'none'
+};
+
+exports.StripeWebhookProcessingStatus = exports.$Enums.StripeWebhookProcessingStatus = {
+  processing: 'processing',
+  processed: 'processed',
+  failed: 'failed'
+};
+
+exports.AbuseAction = exports.$Enums.AbuseAction = {
+  account_create: 'account_create',
+  sign_in: 'sign_in',
+  anonymous_analysis: 'anonymous_analysis',
+  free_cv_claim: 'free_cv_claim',
+  checkout_create: 'checkout_create',
+  password_reset: 'password_reset',
+  verification_resend: 'verification_resend'
+};
+
+exports.AbuseDecision = exports.$Enums.AbuseDecision = {
+  allowed: 'allowed',
+  throttled: 'throttled',
+  blocked: 'blocked',
+  flagged: 'flagged'
+};
+
 exports.AgentRunStatus = exports.$Enums.AgentRunStatus = {
   success: 'success',
   error: 'error',
@@ -446,6 +589,9 @@ exports.AgentRunStatus = exports.$Enums.AgentRunStatus = {
 exports.Prisma.ModelName = {
   AnonymousSession: 'AnonymousSession',
   User: 'User',
+  Session: 'Session',
+  Account: 'Account',
+  Verification: 'Verification',
   Application: 'Application',
   Job: 'Job',
   JobRequirement: 'JobRequirement',
@@ -458,6 +604,10 @@ exports.Prisma.ModelName = {
   GapAnswer: 'GapAnswer',
   CvStrategy: 'CvStrategy',
   CvDraft: 'CvDraft',
+  BillingAccount: 'BillingAccount',
+  CvGenerationUsage: 'CvGenerationUsage',
+  StripeWebhookEvent: 'StripeWebhookEvent',
+  AbuseSignalEvent: 'AbuseSignalEvent',
   AgentRun: 'AgentRun'
 };
 

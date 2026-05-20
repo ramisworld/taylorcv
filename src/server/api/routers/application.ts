@@ -27,7 +27,7 @@ export const applicationRouter = createTRPCRouter({
   createApplication: publicProcedure.mutation(({ ctx }) =>
     createApplication({
       anonymousSessionId: ctx.anonymousSessionId,
-      clerkUserId: ctx.clerkUserId,
+      userId: ctx.userId,
     })
   ),
 
@@ -37,7 +37,7 @@ export const applicationRouter = createTRPCRouter({
       resetApplication({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
-        clerkUserId: ctx.clerkUserId,
+        userId: ctx.userId,
       })
     ),
 
@@ -51,7 +51,9 @@ export const applicationRouter = createTRPCRouter({
       submitJob({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
-        clerkUserId: ctx.clerkUserId,
+        userId: ctx.userId,
+        headers: ctx.headers,
+        resHeaders: ctx.resHeaders,
         rawJobText: input.rawJobText,
       })
     ),
@@ -77,7 +79,9 @@ export const applicationRouter = createTRPCRouter({
       submitCandidateProfileSource({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
-        clerkUserId: ctx.clerkUserId,
+        userId: ctx.userId,
+        headers: ctx.headers,
+        resHeaders: ctx.resHeaders,
         source: input.source,
         rawCvText: input.rawCvText,
         rawBackgroundText: input.rawBackgroundText,
@@ -91,7 +95,7 @@ export const applicationRouter = createTRPCRouter({
       useSavedCandidateMemory({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
-        clerkUserId: ctx.clerkUserId,
+        userId: ctx.userId,
       })
     ),
 
@@ -114,7 +118,7 @@ export const applicationRouter = createTRPCRouter({
       answerGapQuestions({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
-        clerkUserId: ctx.clerkUserId,
+        userId: ctx.userId,
         answers: input.answers,
       })
     ),
@@ -129,7 +133,9 @@ export const applicationRouter = createTRPCRouter({
       generateCv({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
-        clerkUserId: ctx.clerkUserId,
+        userId: ctx.userId,
+        headers: ctx.headers,
+        resHeaders: ctx.resHeaders,
         strategyId: input.strategyId,
       })
     ),
@@ -140,7 +146,7 @@ export const applicationRouter = createTRPCRouter({
       getApplicationState({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
-        clerkUserId: ctx.clerkUserId,
+        userId: ctx.userId,
       })
     ),
 
@@ -150,19 +156,19 @@ export const applicationRouter = createTRPCRouter({
       claimApplication({
         anonymousSessionId: ctx.anonymousSessionId,
         applicationId: input.applicationId,
-        clerkUserId: ctx.clerkUserId,
+        userId: ctx.userId,
       })
     ),
 
   listUserApplications: protectedProcedure.query(({ ctx }) =>
-    listUserApplications({ clerkUserId: ctx.clerkUserId })
+    listUserApplications({ userId: ctx.userId })
   ),
 
   getApplicationExportData: protectedProcedure
     .input(applicationIdSchema)
     .mutation(({ ctx, input }) =>
       getApplicationExportData({
-        clerkUserId: ctx.clerkUserId,
+        userId: ctx.userId,
         applicationId: input.applicationId,
       })
     ),

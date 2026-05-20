@@ -1,18 +1,20 @@
-import { auth } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { anonymousSessionCookieName } from "~/server/services/session.service";
 import { claimApplication } from "~/server/services/applicationWorkflow.service";
+import { getAuthSession } from "~/server/auth";
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const applicationId = url.searchParams.get("applicationId");
-  const next = url.searchParams.get("next") || "/hub";
-  const authState = await auth();
+  const next = url.searchParams.get("next") || "/dashboard";
+  const authSession = await getAuthSession(request.headers);
 
-  if (!authState.userId) {
-    return authState.redirectToSignIn({ returnBackUrl: request.url });
+  if (!authSession?.user?.id) {
+    return NextResponse.redirect(
+      new URL(`/auth/sign-in?returnTo=${encodeURIComponent(request.url)}`, request.url)
+    );
   }
 
   const anonymousSessionId = (await cookies()).get(
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest) {
     await claimApplication({
       anonymousSessionId,
       applicationId,
-      clerkUserId: authState.userId,
+      userId: authSession.user.id,
     }).catch(() => undefined);
   }
 

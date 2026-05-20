@@ -82,10 +82,57 @@ enum AgentRunStatus {
   failed
 }
 
+enum PlanFamily {
+  free
+  pro
+  premium
+}
+
+enum PlanVariant {
+  free
+  annual
+  monthly
+}
+
+enum BillingSubscriptionStatus {
+  incomplete
+  incomplete_expired
+  trialing
+  active
+  past_due
+  canceled
+  unpaid
+  paused
+  none
+}
+
+enum StripeWebhookProcessingStatus {
+  processing
+  processed
+  failed
+}
+
+enum AbuseAction {
+  account_create
+  sign_in
+  anonymous_analysis
+  free_cv_claim
+  checkout_create
+  password_reset
+  verification_resend
+}
+
+enum AbuseDecision {
+  allowed
+  throttled
+  blocked
+  flagged
+}
+
 model AnonymousSession {
   id                String             @id @default(cuid())
   createdAt         DateTime           @default(now()) @map("created_at")
-  updatedAt         DateTime           @updatedAt @map("updated_at")
+  updatedAt         DateTime           @default(now()) @updatedAt @map("updated_at")
   applications      Application[]
   candidateProfiles CandidateProfile[]
   candidateChunks   CandidateChunk[]
@@ -95,16 +142,69 @@ model AnonymousSession {
 
 model User {
   id            String        @id @default(cuid())
-  clerkUserId   String        @unique @map("clerk_user_id")
-  email         String?
-  name          String?
+  clerkUserId   String?       @unique @map("clerk_user_id")
+  email         String        @unique
+  emailVerified Boolean       @default(false) @map("email_verified")
+  name          String        @default("")
+  image         String?
   createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at")
+  sessions      Session[]
+  accounts      Account[]
+  billingAccount BillingAccount?
+  cvGenerationUsage CvGenerationUsage[]
   applications  Application[]
   candidateProfiles CandidateProfile[]
   candidateChunks   CandidateChunk[]
 
   @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime @map("expires_at")
+  token     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String    @map("account_id")
+  providerId            String    @map("provider_id")
+  userId                String    @map("user_id")
+  accessToken           String?   @map("access_token") @db.Text
+  refreshToken          String?   @map("refresh_token") @db.Text
+  idToken               String?   @map("id_token") @db.Text
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  scope                 String?
+  password              String?   @db.Text
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([identifier])
+  @@map("verifications")
 }
 
 model Application {
@@ -121,7 +221,7 @@ model Application {
   roleArchetype      String?           @map("role_archetype")
   matchAnalysisJson  Json?             @map("match_analysis_json")
   createdAt          DateTime          @default(now()) @map("created_at")
-  updatedAt          DateTime          @updatedAt @map("updated_at")
+  updatedAt          DateTime          @default(now()) @updatedAt @map("updated_at")
 
   anonymousSession AnonymousSession  @relation(fields: [anonymousSessionId], references: [id], onDelete: Cascade)
   user             User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -135,6 +235,7 @@ model Application {
   gapCoachInsight  GapCoachInsight?
   cvStrategies     CvStrategy[]
   cvDrafts         CvDraft[]
+  cvGenerationUsage CvGenerationUsage[]
   agentRuns        AgentRun[]
 
   @@index([anonymousSessionId])
@@ -211,7 +312,7 @@ model CandidateProfile {
   scopeOpportunitiesJson Json?         @map("scope_opportunities_json")
   likelyTopEvidenceJson Json?          @map("likely_top_evidence_json")
   createdAt          DateTime         @default(now()) @map("created_at")
-  updatedAt          DateTime         @updatedAt @map("updated_at")
+  updatedAt          DateTime         @default(now()) @updatedAt @map("updated_at")
   lastSeenAt         DateTime         @default(now()) @map("last_seen_at")
   archivedAt         DateTime?        @map("archived_at")
   anonymousSession   AnonymousSession? @relation(fields: [anonymousSessionId], references: [id], onDelete: SetNull)
@@ -244,7 +345,7 @@ model CandidateChunk {
   tagsJson           Json                @map("tags_json")
   metadataJson       Json                @map("metadata_json")
   createdAt          DateTime            @default(now()) @map("created_at")
-  updatedAt          DateTime            @updatedAt @map("updated_at")
+  updatedAt          DateTime            @default(now()) @updatedAt @map("updated_at")
   embeddedAt         DateTime?           @map("embedded_at")
   lastSeenAt         DateTime            @default(now()) @map("last_seen_at")
   archivedAt         DateTime?           @map("archived_at")
@@ -393,13 +494,98 @@ model CvDraft {
   presentationJson Json?    @map("presentation_json")
   builderOutputJson Json?   @map("builder_output_json")
   createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
+  updatedAt     DateTime    @default(now()) @updatedAt @map("updated_at")
   application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   strategy      CvStrategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+  usage         CvGenerationUsage[]
 
   @@index([applicationId])
   @@index([strategyId])
   @@map("cv_drafts")
+}
+
+model BillingAccount {
+  id                             String                    @id @default(cuid())
+  userId                         String                    @unique @map("user_id")
+  stripeCustomerId               String?                   @unique @map("stripe_customer_id")
+  stripeSubscriptionId           String?                   @unique @map("stripe_subscription_id")
+  stripeSubscriptionScheduleId   String?                   @unique @map("stripe_subscription_schedule_id")
+  activePlanKey                  String                    @default("free") @map("active_plan_key")
+  planFamily                     PlanFamily                @default(free) @map("plan_family")
+  planVariant                    PlanVariant               @default(free) @map("plan_variant")
+  subscriptionStatus             BillingSubscriptionStatus @default(none) @map("subscription_status")
+  priceId                        String?                   @map("price_id")
+  currentPeriodStart             DateTime?                 @map("current_period_start")
+  currentPeriodEnd               DateTime?                 @map("current_period_end")
+  cancelAtPeriodEnd              Boolean                   @default(false) @map("cancel_at_period_end")
+  commitmentStartAt              DateTime?                 @map("commitment_start_at")
+  commitmentEndAt                DateTime?                 @map("commitment_end_at")
+  commitmentActive               Boolean                   @default(false) @map("commitment_active")
+  quotaPerPeriod                 Int                       @default(1) @map("quota_per_period")
+  lastSyncedAt                   DateTime?                 @map("last_synced_at")
+  createdAt                      DateTime                  @default(now()) @map("created_at")
+  updatedAt                      DateTime                  @updatedAt @map("updated_at")
+  user                           User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@index([activePlanKey])
+  @@map("billing_accounts")
+}
+
+model CvGenerationUsage {
+  id                 String      @id @default(cuid())
+  userId             String      @map("user_id")
+  applicationId      String      @map("application_id")
+  cvDraftId          String?     @map("cv_draft_id")
+  planKey            String      @map("plan_key")
+  billingPeriodStart DateTime?   @map("billing_period_start")
+  billingPeriodEnd   DateTime?   @map("billing_period_end")
+  createdAt          DateTime    @default(now()) @map("created_at")
+  user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application        Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  cvDraft            CvDraft?    @relation(fields: [cvDraftId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([userId, billingPeriodStart, billingPeriodEnd])
+  @@index([applicationId])
+  @@index([cvDraftId])
+  @@map("cv_generation_usage")
+}
+
+model StripeWebhookEvent {
+  id               String                         @id @default(cuid())
+  stripeEventId    String                         @unique @map("stripe_event_id")
+  eventType        String                         @map("event_type")
+  processedAt      DateTime?                      @map("processed_at")
+  processingStatus StripeWebhookProcessingStatus  @default(processing) @map("processing_status")
+  error            String?                        @db.Text
+  payloadHash      String?                        @map("payload_hash")
+  createdAt        DateTime                       @default(now()) @map("created_at")
+  updatedAt        DateTime                       @updatedAt @map("updated_at")
+
+  @@index([eventType])
+  @@index([processingStatus])
+  @@map("stripe_webhook_events")
+}
+
+model AbuseSignalEvent {
+  id                 String        @id @default(cuid())
+  action             AbuseAction
+  decision           AbuseDecision @default(allowed)
+  userId             String?       @map("user_id")
+  anonymousSessionId String?       @map("anonymous_session_id")
+  deviceKeyHash      String?       @map("device_key_hash")
+  ipKeyHash          String?       @map("ip_key_hash")
+  metadataJson       Json?         @map("metadata_json")
+  createdAt          DateTime      @default(now()) @map("created_at")
+
+  @@index([action, createdAt])
+  @@index([userId, action, createdAt])
+  @@index([anonymousSessionId, action, createdAt])
+  @@index([deviceKeyHash, action, createdAt])
+  @@index([ipKeyHash, action, createdAt])
+  @@map("abuse_signal_events")
 }
 
 model AgentRun {

@@ -41,6 +41,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { TaylorBrand, TaylorLogoMark } from "~/components/TaylorBrand";
 import { LandingPage } from "~/components/landing/LandingPage";
+import { useSession } from "~/lib/auth-client";
 import {
   claimText,
   contactItems,
@@ -55,6 +56,7 @@ import {
 import { exportCvDocx, exportCvPdf } from "~/lib/cvExport";
 import { selectBalancedMatchPreviewFits } from "~/lib/matchSnapshotSelection";
 import { friendlyGenerationErrorMessage } from "~/lib/workflowStatus";
+import type { PlanKey } from "~/lib/plans";
 import { api, type RouterOutputs } from "~/trpc/react";
 
 const currentApplicationStorageKey = "currentApplicationId";
@@ -76,6 +78,8 @@ type AppStage =
   | "gap_questions"
   | "cv_generating"
   | "final_export"
+  | "auth_gate"
+  | "paywall"
   | "error";
 type GapAnswerDraft = {
   selectedOption?: string | null;
@@ -282,6 +286,59 @@ function TopRail(props: { onReset: () => void; resetDisabled?: boolean }) {
         New CV
       </SecondaryButton>
     </header>
+  );
+}
+
+function AuthGateStage(props: { applicationId: string | null; reason?: string | null }) {
+  const returnTo = props.applicationId
+    ? `/auth/claim?applicationId=${encodeURIComponent(props.applicationId)}&next=${encodeURIComponent(`/?applicationId=${props.applicationId}`)}`
+    : "/";
+  const search = `returnTo=${encodeURIComponent(returnTo)}`;
+  return (
+    <Shell
+      eyebrow="Account required"
+      title="Create your free TaylorCV account to generate and save your tailored CV."
+      subtitle={
+        props.reason === "EMAIL_VERIFICATION_REQUIRED"
+          ? "Verify your email before using your free CV generation."
+          : "Your match analysis is ready. Final CV generation is protected so your CV and usage are saved to your account."
+      }
+    >
+      <Panel className="max-w-2xl p-6">
+        <div className="flex flex-wrap gap-3">
+          <a
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-white/10 transition hover:bg-cyan-50"
+            href={`/auth/sign-up?${search}`}
+          >
+            Create account
+            <ArrowRight className="h-4 w-4" />
+          </a>
+          <a
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/12 bg-white/[0.06] px-4 py-2.5 text-sm font-medium text-zinc-100 transition hover:bg-white/[0.1]"
+            href={`/auth/sign-in?${search}`}
+          >
+            Sign in
+          </a>
+        </div>
+      </Panel>
+    </Shell>
+  );
+}
+
+function PaywallStage(props: { onPricing: () => void }) {
+  return (
+    <Shell
+      eyebrow="Plan limit reached"
+      title="You have used the CV generations available on your current plan."
+      subtitle="Choose Pro or Premium to keep generating role-tailored CVs."
+    >
+      <Panel className="max-w-2xl p-6">
+        <PrimaryButton onClick={props.onPricing} type="button">
+          View plans
+          <ArrowRight className="h-4 w-4" />
+        </PrimaryButton>
+      </Panel>
+    </Shell>
   );
 }
 
@@ -2991,6 +3048,7 @@ function FinalExportStage(props: {
 
 export default function Home() {
   const utils = api.useUtils();
+  const session = useSession();
   const [showLanding, setShowLanding] = useState(true);
   const [applicationId, setApplicationId] = useState<string | null>(null);
   const [resumedApplicationId, setResumedApplicationId] = useState<string | null>(null);
@@ -3006,6 +3064,18 @@ export default function Home() {
   const [exportError, setExportError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const recoveryPromiseRef = useRef<Promise<string | null> | null>(null);
+  const checkout = api.billing.createCheckoutSession.useMutation({
+    onSuccess: (data) => {
+      window.location.href = data.url;
+    },
+    onError: (mutationError) => {
+      if (mutationError.message === "ALREADY_HAS_SUBSCRIPTION") {
+        window.location.href = "/dashboard";
+        return;
+      }
+      setError(mutationError.message);
+    },
+  });
 
   const createApplication = api.application.createApplication.useMutation({
     onSuccess: (data) => {
@@ -3201,6 +3271,22 @@ export default function Home() {
         void recoverFromStaleApplication(true);
         return;
       }
+      if (
+        mutationError.message === "ACCOUNT_REQUIRED" ||
+        mutationError.message === "EMAIL_VERIFICATION_REQUIRED"
+      ) {
+        setStage("auth_gate");
+        setError(mutationError.message);
+        return;
+      }
+      if (
+        mutationError.message === "QUOTA_EXCEEDED" ||
+        mutationError.message === "FREE_CV_LIMIT_REACHED"
+      ) {
+        setStage("paywall");
+        setError(null);
+        return;
+      }
       setStage("error");
       setError(
         friendlyGenerationErrorMessage(
@@ -3290,11 +3376,37 @@ export default function Home() {
     createApplication.mutate();
   }
 
+  function selectPlan(planKey: PlanKey) {
+    if (planKey === "free") {
+      enterWorkspace();
+      return;
+    }
+    if (!session.data?.user) {
+      localStorage.setItem("pendingPlanKey", planKey);
+      window.location.href = `/auth/sign-up?returnTo=${encodeURIComponent(`/dashboard?checkoutPlan=${planKey}`)}`;
+      return;
+    }
+    checkout.mutate({ planKey: planKey as Exclude<PlanKey, "free"> });
+  }
+
   function startCvGeneration() {
     if (!applicationId) return;
+    if (!session.data?.user) {
+      localStorage.setItem("pendingGenerateApplicationId", applicationId);
+      setStage("auth_gate");
+      return;
+    }
     setStage("cv_generating");
     generateCv.mutate({ applicationId });
   }
+
+  useEffect(() => {
+    if (!session.data?.user || !applicationId || !state) return;
+    const pending = localStorage.getItem("pendingGenerateApplicationId");
+    if (pending !== applicationId || state.cvDraft || state.requirementFitScores.length === 0) return;
+    localStorage.removeItem("pendingGenerateApplicationId");
+    startCvGeneration();
+  }, [applicationId, session.data?.user, state]);
 
   function submitGapAnswers(skipRemaining = false) {
     if (!applicationId || !state) return;
@@ -3336,8 +3448,14 @@ export default function Home() {
     return (
       <LandingPage
         error={error}
+        isCheckoutLoading={checkout.isPending}
         isLoading={createApplication.isPending}
+        isSignedIn={!!session.data?.user}
+        onDashboard={() => {
+          window.location.href = "/dashboard";
+        }}
         onGetStarted={enterWorkspace}
+        onPlanSelected={selectPlan}
       />
     );
   }
@@ -3487,6 +3605,19 @@ export default function Home() {
               />
             ) : null}
             {stage === "cv_generating" ? <CvGeneratingStage key="cv_generating" /> : null}
+            {stage === "auth_gate" ? (
+              <AuthGateStage applicationId={applicationId} key="auth_gate" reason={error} />
+            ) : null}
+            {stage === "paywall" ? (
+              <PaywallStage
+                key="paywall"
+                onPricing={() => {
+                  setShowLanding(true);
+                  window.history.replaceState(null, "", "/?pricing=1#pricing");
+                  setTimeout(() => document.getElementById("pricing")?.scrollIntoView(), 0);
+                }}
+              />
+            ) : null}
             {stage === "final_export" && state ? (
               <FinalExportStage
                 cv={cv}

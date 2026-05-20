@@ -3,21 +3,28 @@
 import {
   ArrowRight,
   BriefcaseBusiness,
+  Check,
   CheckCircle2,
   ClipboardList,
   Flag,
-  HelpCircle,
+  Crown,
+  FileText,
+  LockKeyhole,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   Star,
+  Zap,
   Trophy,
   TrendingUp,
   UserRound,
   UsersRound,
 } from "lucide-react";
 import { motion } from "motion/react";
+import { useEffect, useState } from "react";
 
 import { TaylorBrand } from "~/components/TaylorBrand";
+import { paidPlanFromSelection, planDisplayPrice, type PlanKey } from "~/lib/plans";
 
 import { LandingArtifact } from "./LandingArtifact";
 import { LandingBackground } from "./LandingBackground";
@@ -25,7 +32,11 @@ import { LandingBackground } from "./LandingBackground";
 type LandingPageProps = {
   error?: string | null;
   isLoading: boolean;
+  isSignedIn?: boolean;
   onGetStarted: () => void;
+  onDashboard?: () => void;
+  onPlanSelected?: (planKey: PlanKey) => void;
+  isCheckoutLoading?: boolean;
 };
 
 const entrance = {
@@ -98,16 +109,17 @@ function LandingNav(props: LandingPageProps) {
         />
 
         <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-12 text-[14px] font-semibold text-white/86 lg:flex">
-          <span aria-disabled="true">How it works</span>
-          <span aria-disabled="true">Pricing</span>
+          <a href="#how-it-works">How it works</a>
+          <a href="#pricing">Pricing</a>
         </nav>
 
         <div className="ml-auto flex items-center gap-3 text-[14px] font-medium">
           <button
-            className="hidden cursor-default rounded-md px-2.5 py-1.5 text-white/82 sm:inline-flex"
+            className="hidden rounded-md px-2.5 py-1.5 text-white/82 transition hover:text-white sm:inline-flex"
+            onClick={props.isSignedIn ? props.onDashboard : undefined}
             type="button"
           >
-            Sign in
+            {props.isSignedIn ? "Dashboard" : "Sign in"}
           </button>
           <motion.button
             className="group inline-flex min-h-11 items-center justify-center gap-2.5 whitespace-nowrap rounded-lg bg-blue-600 px-4 text-[14px] font-semibold text-white shadow-[0_0_28px_rgba(37,99,235,0.42),inset_0_1px_0_rgba(255,255,255,0.22)] transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-70 sm:px-5"
@@ -176,7 +188,7 @@ function BenefitRows() {
 function LogoMarquee() {
   const logos = [...companyLogos, ...companyLogos];
   return (
-    <div className="relative mx-auto mt-7 w-full overflow-hidden border-y border-blue-400/16 py-5 [mask-image:linear-gradient(90deg,transparent,black_9%,black_91%,transparent)] 2xl:mt-9 2xl:py-6 min-[1900px]:mt-6">
+    <div className="relative mx-auto mt-7 w-full overflow-hidden py-5 [mask-image:linear-gradient(90deg,transparent,black_9%,black_91%,transparent)] 2xl:mt-9 2xl:py-6 min-[1900px]:mt-6">
       <div className="taylor-logo-marquee flex w-max items-center gap-8">
         {logos.map((company, index) => (
           <span
@@ -201,9 +213,8 @@ function LogoMarquee() {
 
 function TrustedCompaniesSection() {
   return (
-    <section className="relative z-10 border-t border-blue-400/12 px-5 py-12 sm:px-8 lg:px-10 2xl:px-14 2xl:py-14 min-[1900px]:py-6">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(59,130,246,0.18),rgba(34,211,238,0.75),rgba(59,130,246,0.18),transparent)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(37,99,235,0.16),transparent_34%)]" />
+    <section className="relative z-10 px-5 py-12 sm:px-8 lg:px-10 xl:mt-10 2xl:mt-12 2xl:px-14 2xl:py-14 min-[1900px]:mt-16 min-[1900px]:py-6">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(37,99,235,0.08),transparent_38%)]" />
       <div className="relative mx-auto max-w-[1540px] text-center">
         <div className="inline-flex items-center gap-2.5 rounded-full border border-blue-400/25 bg-blue-500/[0.055] px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.18em] text-cyan-300 shadow-[0_0_28px_rgba(37,99,235,0.12)]">
           <ShieldCheck className="h-4 w-4" />
@@ -298,7 +309,7 @@ const tailoredCvItems = [
 
 function StepIntro(props: { body: string; index: number; title: string }) {
   return (
-    <div className="grid grid-cols-[40px_minmax(0,1fr)] items-start gap-3.5 min-[2400px]:grid-cols-[48px_minmax(0,1fr)] min-[2400px]:gap-5">
+    <div className="grid grid-cols-[40px_minmax(0,1fr)] items-start gap-3.5 xl:min-h-[134px] min-[2400px]:min-h-[152px] min-[2400px]:grid-cols-[48px_minmax(0,1fr)] min-[2400px]:gap-5">
       <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-[17px] font-semibold text-white shadow-[0_0_28px_rgba(37,99,235,0.58),inset_0_1px_0_rgba(255,255,255,0.24)] min-[2400px]:h-12 min-[2400px]:w-12 min-[2400px]:text-[20px]">
         {props.index}
       </span>
@@ -316,7 +327,7 @@ function StepIntro(props: { body: string; index: number; title: string }) {
 
 function ProcessArrow() {
   return (
-    <div className="hidden h-[320px] items-center justify-center pt-[156px] xl:flex 2xl:h-[330px] min-[2400px]:!h-[410px] min-[2400px]:pt-[196px]">
+    <div className="hidden h-[340px] items-center justify-center pt-[170px] xl:flex 2xl:h-[350px] min-[2400px]:!h-[410px] min-[2400px]:pt-[196px]">
       <ArrowRight className="h-8 w-8 text-slate-300/70 min-[2400px]:h-9 min-[2400px]:w-9" strokeWidth={1.65} />
     </div>
   );
@@ -346,36 +357,67 @@ function WhiteProcessCard(props: {
   );
 }
 
-function MiniScoreRing(props: { score: number; tone: "blue" | "green" }) {
+function AnimatedMiniScoreRing(props: { score: number; tone: "blue" | "green" }) {
   const isGreen = props.tone === "green";
+  const [shouldAnimate, setShouldAnimate] = useState(false);
+  const [displayScore, setDisplayScore] = useState(0);
+
+  useEffect(() => {
+    if (!shouldAnimate) return;
+
+    let frame = 0;
+    let animationId = 0;
+    const duration = isGreen ? 1450 : 1250;
+    const start = performance.now();
+    const easeOutQuart = (value: number) => 1 - Math.pow(1 - value, 4);
+
+    const tick = (now: number) => {
+      const progress = Math.min((now - start) / duration, 1);
+      const nextScore = Math.round(props.score * easeOutQuart(progress));
+      if (nextScore !== frame) {
+        frame = nextScore;
+        setDisplayScore(nextScore);
+      }
+      if (progress < 1) {
+        animationId = requestAnimationFrame(tick);
+      }
+    };
+
+    setDisplayScore(0);
+    animationId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animationId);
+  }, [isGreen, props.score, shouldAnimate]);
+
   return (
-    <div
+    <motion.div
       className={[
         "relative grid place-items-center rounded-full",
         isGreen
           ? "h-[108px] w-[108px] min-[2400px]:h-[128px] min-[2400px]:w-[128px]"
           : "h-[92px] w-[92px] min-[2400px]:h-[112px] min-[2400px]:w-[112px]",
       ].join(" ")}
+      onViewportEnter={() => setShouldAnimate(true)}
       style={{
         background: isGreen
-          ? `conic-gradient(#1fb874 ${props.score * 3.6}deg, #d9f3e8 0deg)`
-          : `conic-gradient(#1667f2 ${props.score * 3.6}deg, #cfe0fb 0deg)`,
+          ? `conic-gradient(#1fb874 ${displayScore * 3.6}deg, #d9f3e8 0deg)`
+          : `conic-gradient(#1667f2 ${displayScore * 3.6}deg, #cfe0fb 0deg)`,
       }}
+      viewport={{ amount: 0.55, once: true }}
     >
       <div className="absolute inset-[9px] rounded-full bg-white shadow-[inset_0_0_0_1px_rgba(15,23,42,0.04)]" />
       <div className="relative text-center">
         <p className="text-[25px] font-bold leading-none tracking-[-0.05em] text-slate-950 min-[2400px]:text-[30px]">
-          {props.score}%
+          {displayScore}%
         </p>
         <p className="mt-1 text-[11px] font-semibold text-slate-800 min-[2400px]:text-[12px]">Match</p>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
 function JobDescriptionProcessCard(props: LandingPageProps) {
   return (
-    <WhiteProcessCard className="h-[320px] 2xl:h-[330px] min-[2400px]:!h-[410px]" title="Job description">
+    <WhiteProcessCard className="h-[340px] 2xl:h-[350px] min-[2400px]:!h-[410px]" title="Job description">
       <div className="mt-7 space-y-3.5 min-[2400px]:mt-8 min-[2400px]:space-y-4">
         {[92, 78, 92, 78, 92, 78, 92].map((width, index) => (
           <div className="flex items-center gap-3" key={`${width}-${index}`}>
@@ -403,7 +445,7 @@ function JobDescriptionProcessCard(props: LandingPageProps) {
 
 function BackgroundProcessCard() {
   return (
-    <WhiteProcessCard className="h-[320px] 2xl:h-[330px] min-[2400px]:!h-[410px]" title="Your background">
+    <WhiteProcessCard className="h-[340px] 2xl:h-[350px] min-[2400px]:!h-[410px]" title="Your background">
       <div className="mt-7 space-y-4.5 min-[2400px]:mt-8 min-[2400px]:space-y-6">
         {backgroundRows.map((row) => {
           const Icon = row.icon;
@@ -429,9 +471,9 @@ function BackgroundProcessCard() {
 function EvidenceProcessCards() {
   return (
     <div className="grid gap-3 min-[2400px]:gap-4">
-      <WhiteProcessCard className="h-[150px] 2xl:h-[155px] min-[2400px]:!h-[204px]" title="Evidence found">
+      <WhiteProcessCard className="h-[160px] 2xl:h-[166px] min-[2400px]:!h-[204px]" title="Evidence found">
         <div className="mt-4 grid grid-cols-[96px_minmax(0,1fr)] items-center gap-5 min-[2400px]:mt-5 min-[2400px]:grid-cols-[118px_minmax(0,1fr)] min-[2400px]:gap-6">
-          <MiniScoreRing score={55} tone="blue" />
+          <AnimatedMiniScoreRing score={55} tone="blue" />
           <div className="space-y-3">
             {[94, 94, 82, 95].map((width, index) => (
               <span
@@ -444,7 +486,7 @@ function EvidenceProcessCards() {
         </div>
       </WhiteProcessCard>
 
-      <WhiteProcessCard className="h-[170px] 2xl:h-[170px] min-[2400px]:!h-[190px]" title="">
+      <WhiteProcessCard className="h-[168px] 2xl:h-[172px] min-[2400px]:!h-[190px]" title="">
         <div className="flex items-center gap-2.5">
           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[12px] font-bold text-white shadow-[0_0_16px_rgba(37,99,235,0.32)]">
             ?
@@ -466,18 +508,18 @@ function EvidenceProcessCards() {
 
 function TailoredCvProcessCard() {
   return (
-    <WhiteProcessCard className="h-[320px] 2xl:h-[330px] min-[2400px]:!h-[410px]" title="Your tailored CV">
-      <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-center gap-3 min-[2400px]:mt-7 min-[2400px]:gap-4">
+    <WhiteProcessCard className="h-[340px] 2xl:h-[350px] min-[2400px]:!h-[410px]" title="Your tailored CV">
+      <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3 min-[2400px]:mt-7 min-[2400px]:gap-4">
         <div className="flex justify-center text-emerald-500">
           <Sparkles className="h-7 w-7 fill-emerald-500/18 min-[2400px]:h-8 min-[2400px]:w-8" />
         </div>
-        <MiniScoreRing score={97} tone="green" />
+        <AnimatedMiniScoreRing score={97} tone="green" />
         <div className="flex justify-center text-emerald-500">
           <Sparkles className="h-7 w-7 fill-emerald-500/18 min-[2400px]:h-8 min-[2400px]:w-8" />
         </div>
       </div>
 
-      <ul className="mt-5 space-y-2.5 min-[2400px]:mt-6 min-[2400px]:space-y-3">
+      <ul className="mt-5 space-y-2.5 pb-3 min-[2400px]:mt-6 min-[2400px]:space-y-3 min-[2400px]:pb-0">
         {tailoredCvItems.map((item) => (
           <li className="flex items-center gap-3 text-[12px] text-slate-700 min-[2400px]:text-[13px]" key={item}>
             <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
@@ -493,8 +535,8 @@ function TailoredCvProcessCard() {
 
 function HowItWorksSection(props: LandingPageProps) {
   return (
-    <section className="relative z-10 overflow-hidden px-5 pb-20 pt-8 sm:px-8 lg:px-10 xl:pb-24 xl:pt-8 2xl:px-14 min-[2400px]:pb-28 min-[2400px]:pt-16">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(37,99,235,0.17),transparent_38%),radial-gradient(circle_at_50%_88%,rgba(14,165,233,0.08),transparent_36%)]" />
+    <section id="how-it-works" className="relative z-10 overflow-hidden px-5 pb-20 pt-12 sm:px-8 lg:px-10 xl:pb-24 xl:pt-14 2xl:px-14 min-[2400px]:pb-28 min-[2400px]:pt-20">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_24%,rgba(37,99,235,0.055),transparent_46%),radial-gradient(circle_at_50%_88%,rgba(14,165,233,0.035),transparent_42%)]" />
       <div className="relative mx-auto max-w-[1320px] min-[2400px]:max-w-[1880px]">
         <div className="text-center">
           <p className="text-[14px] font-semibold uppercase tracking-[0.42em] text-cyan-300">
@@ -507,10 +549,10 @@ function HowItWorksSection(props: LandingPageProps) {
           </h2>
         </div>
 
-        <div className="mt-8 grid gap-8 lg:grid-cols-2 xl:grid-cols-[1fr_38px_1fr_38px_1.08fr_38px_1fr] xl:items-start xl:gap-3 min-[2400px]:mt-16 min-[2400px]:grid-cols-[1fr_58px_1fr_58px_1.1fr_58px_1fr] min-[2400px]:gap-5">
+        <div className="mt-8 grid gap-8 lg:grid-cols-2 xl:grid-cols-[1fr_38px_1fr_38px_1.08fr_38px_1fr] xl:items-start xl:gap-3 min-[2400px]:mt-14 min-[2400px]:grid-cols-[1fr_58px_1fr_58px_1.1fr_58px_1fr] min-[2400px]:gap-5">
           <div>
             <StepIntro index={1} {...howItWorksSteps[0]} />
-            <div className="mt-5 min-[2400px]:mt-8">
+            <div className="mt-5 min-[2400px]:mt-7">
               <JobDescriptionProcessCard {...props} />
             </div>
           </div>
@@ -518,7 +560,7 @@ function HowItWorksSection(props: LandingPageProps) {
 
           <div>
             <StepIntro index={2} {...howItWorksSteps[1]} />
-            <div className="mt-5 min-[2400px]:mt-8">
+            <div className="mt-5 min-[2400px]:mt-7">
               <BackgroundProcessCard />
             </div>
           </div>
@@ -526,7 +568,7 @@ function HowItWorksSection(props: LandingPageProps) {
 
           <div>
             <StepIntro index={3} {...howItWorksSteps[2]} />
-            <div className="mt-5 min-[2400px]:mt-8">
+            <div className="mt-5 min-[2400px]:mt-7">
               <EvidenceProcessCards />
             </div>
           </div>
@@ -534,10 +576,210 @@ function HowItWorksSection(props: LandingPageProps) {
 
           <div>
             <StepIntro index={4} {...howItWorksSteps[3]} />
-            <div className="mt-5 min-[2400px]:mt-8">
+            <div className="mt-5 min-[2400px]:mt-7">
               <TailoredCvProcessCard />
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PricingSection(props: LandingPageProps) {
+  const [variant, setVariant] = useState<"annual" | "monthly">("annual");
+  const proKey = paidPlanFromSelection("pro", variant);
+  const premiumKey = paidPlanFromSelection("premium", variant);
+  const cards = [
+    {
+      key: "free" as const,
+      name: "Free",
+      subtext: "Get started with the basics",
+      price: "NZ$0",
+      capacity: "1",
+      capacityLabel: "CV generation",
+      capacitySub: "one-time",
+      bullets: ["1 CV generation", "PDF download", "Basic match analysis"],
+      cta: "Get started for free",
+      tone: "free",
+      onClick: props.onGetStarted,
+    },
+    {
+      key: proKey,
+      name: "Pro",
+      subtext: "For job seekers who want more",
+      price: planDisplayPrice(proKey),
+      period: "/ month",
+      capacity: "100",
+      capacityLabel: "CV generations",
+      capacitySub: "/ month",
+      bullets: ["Role-tailored CVs", "Gap questions", "Evidence-based insights"],
+      cta: "Start Pro",
+      tone: "pro",
+      onClick: () => props.onPlanSelected?.(proKey),
+    },
+    {
+      key: premiumKey,
+      name: "Premium",
+      subtext: "For active professionals",
+      price: planDisplayPrice(premiumKey),
+      period: "/ month",
+      capacity: "350",
+      capacityLabel: "CV generations",
+      capacitySub: "/ month",
+      bullets: ["Everything in Pro", "Designed for frequent tailoring", "Higher monthly capacity"],
+      cta: "Start Premium",
+      tone: "premium",
+      onClick: () => props.onPlanSelected?.(premiumKey),
+    },
+  ];
+  const trustItems = [
+    {
+      icon: LockKeyhole,
+      title: "Private & secure",
+      body: "Your data is encrypted and never shared.",
+    },
+    {
+      icon: ShieldCheck,
+      title: "Secure checkout",
+      body: "Payments powered by Stripe.",
+    },
+    {
+      icon: RefreshCw,
+      title: "Flexible options",
+      body: "Choose monthly flexibility or annual savings.",
+    },
+  ];
+
+  return (
+    <section className="pricing-section" id="pricing">
+      <div className="pricing-ambient" />
+      <div className="pricing-shell">
+        <div className="pricing-heading">
+          <div aria-label="Taylor CV" className="pricing-brand">
+            <span className="pricing-brand__mark">
+              <FileText className="pricing-brand__icon" />
+            </span>
+            <span className="pricing-brand__text">Taylor CV</span>
+          </div>
+          <h2 className="pricing-title">
+            Smart plans for every stage of{" "}
+            <span>
+              your career.
+            </span>
+          </h2>
+          <p className="pricing-subtitle">
+            Simple pricing. Choose flexible monthly access or discounted annual plans.
+          </p>
+          <div className="pricing-toggle-row">
+            <div className="pricing-toggle">
+              {(["monthly", "annual"] as const).map((option) => (
+                <button
+                  className={[
+                    "pricing-toggle__button",
+                    variant === option ? "pricing-toggle__button--active" : "",
+                  ].join(" ")}
+                  key={option}
+                  onClick={() => setVariant(option)}
+                  type="button"
+                >
+                  {option === "monthly" ? "Monthly" : "Annual plan"}
+                </button>
+              ))}
+            </div>
+            <span className="pricing-savings-pill">
+              Save up to 53%
+            </span>
+          </div>
+        </div>
+
+        <div className="pricing-card-row">
+          {cards.map((card) => {
+            const isPro = card.tone === "pro";
+            const isPremium = card.tone === "premium";
+            const Icon = isPro ? Zap : isPremium ? Crown : FileText;
+            return (
+              <article
+                className={[
+                  "pricing-card",
+                  `pricing-card--${card.tone}`,
+                ].join(" ")}
+                key={card.key}
+              >
+                {isPro ? (
+                  <div className="pricing-popular-tab">
+                    <Star className="pricing-popular-tab__icon" />
+                    Most popular
+                  </div>
+                ) : null}
+                <div className="pricing-card__top">
+                  <h3>{card.name}</h3>
+                  <p className="pricing-card__subtext">{card.subtext}</p>
+                  <p className="pricing-card__price">
+                    <span>{card.price}</span>
+                    {"period" in card && card.period ? (
+                      <span className="pricing-card__period">{card.period}</span>
+                    ) : null}
+                  </p>
+                </div>
+                <div className={`pricing-capacity pricing-capacity--${card.tone}`}>
+                  <div className="pricing-capacity__inner">
+                    <span className="pricing-capacity__icon">
+                      <Icon className="pricing-capacity__svg" />
+                    </span>
+                    <p className="pricing-capacity__text">
+                      <span className="pricing-capacity__number">{card.capacity}</span>
+                      <span className="pricing-capacity__label">
+                        <span className="pricing-capacity__label-main">{card.capacityLabel}</span>
+                        <span className="pricing-capacity__label-sub">{card.capacitySub}</span>
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <div className="pricing-card__body">
+                  <ul className="pricing-bullets">
+                    {card.bullets.map((bullet) => (
+                      <li key={bullet}>
+                        <span className="pricing-check">
+                          <Check className="pricing-check__icon" />
+                        </span>
+                        {bullet}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    className={[
+                      "pricing-cta",
+                      `pricing-cta--${card.tone}`,
+                    ].join(" ")}
+                    disabled={props.isLoading || props.isCheckoutLoading}
+                    onClick={card.onClick}
+                    type="button"
+                  >
+                    {card.cta}
+                    <ArrowRight className="pricing-cta__arrow" />
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="pricing-trust">
+          {trustItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <div className="pricing-trust__item" key={item.title}>
+                <span className="pricing-trust__icon">
+                  <Icon />
+                </span>
+                <span>
+                  <span className="pricing-trust__title">{item.title}</span>
+                  <span className="pricing-trust__body">{item.body}</span>
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -550,7 +792,7 @@ export function LandingPage(props: LandingPageProps) {
       <LandingBackground />
       <LandingNav {...props} />
 
-      <section className="relative z-10 mx-auto grid w-full max-w-[1920px] grid-cols-1 gap-10 px-5 pb-12 pt-8 sm:px-8 lg:px-10 xl:min-h-[calc(100vh-4rem)] xl:grid-cols-[minmax(360px,430px)_minmax(0,1fr)] xl:items-start xl:gap-6 xl:pb-6 xl:pt-9 2xl:grid-cols-[minmax(470px,570px)_minmax(0,1fr)] 2xl:gap-10 2xl:px-14 2xl:pt-11 min-[1900px]:max-w-[2060px] min-[1900px]:!min-h-0 min-[1900px]:grid-cols-[minmax(540px,640px)_minmax(0,1fr)] min-[1900px]:pb-2">
+      <section className="relative z-10 mx-auto grid w-full max-w-[1920px] grid-cols-1 gap-10 px-5 pb-12 pt-8 sm:px-8 lg:px-10 xl:min-h-[min(820px,calc(100vh-4rem))] xl:grid-cols-[minmax(360px,430px)_minmax(0,1fr)] xl:items-start xl:gap-6 xl:pb-6 xl:pt-9 2xl:grid-cols-[minmax(470px,570px)_minmax(0,1fr)] 2xl:gap-10 2xl:px-14 2xl:pt-11 min-[1900px]:max-w-[2060px] min-[1900px]:!min-h-0 min-[1900px]:grid-cols-[minmax(540px,640px)_minmax(0,1fr)] min-[1900px]:pb-2">
         <motion.div
           animate="visible"
           className="max-w-[590px] xl:max-w-[430px] 2xl:max-w-[570px] min-[1900px]:max-w-[640px]"
@@ -623,6 +865,7 @@ export function LandingPage(props: LandingPageProps) {
       </section>
       <TrustedCompaniesSection />
       <HowItWorksSection {...props} />
+      <PricingSection {...props} />
     </main>
   );
 }

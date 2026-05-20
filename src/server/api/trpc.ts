@@ -8,11 +8,11 @@
  */
 import { initTRPC } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
-import { auth } from "@clerk/nextjs/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
 import { db } from "~/server/db";
+import { getAuthSession } from "~/server/auth";
 import { getOrCreateAnonymousSession } from "~/server/services/session.service";
 
 /**
@@ -35,14 +35,14 @@ export const createTRPCContext = async (opts: {
     headers: opts.headers,
     resHeaders: opts.resHeaders,
   });
-  const clerkUserId = await auth()
-    .then((authState) => authState.userId ?? null)
-    .catch(() => null);
+  const authSession = await getAuthSession(opts.headers);
+  const userId = authSession?.user?.id ?? null;
 
   return {
     db,
     anonymousSessionId,
-    clerkUserId,
+    authSession,
+    userId,
     ...opts,
   };
 };
@@ -122,7 +122,7 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
 export const publicProcedure = t.procedure.use(timingMiddleware);
 
 export const protectedProcedure = publicProcedure.use(async ({ ctx, next }) => {
-  if (!ctx.clerkUserId) {
+  if (!ctx.userId) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
       message: "Sign in to continue.",
@@ -132,7 +132,7 @@ export const protectedProcedure = publicProcedure.use(async ({ ctx, next }) => {
   return next({
     ctx: {
       ...ctx,
-      clerkUserId: ctx.clerkUserId,
+      userId: ctx.userId,
     },
   });
 });
