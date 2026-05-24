@@ -10,10 +10,12 @@ import {
   claimApplication,
   createApplication,
   generateCv,
+  getLandingActivity,
   getApplicationExportData,
   getApplicationState,
   listUserApplications,
   resetApplication,
+  skipGapQuestion,
   submitCandidateProfileSource,
   submitJob,
   useSavedCandidateMemory,
@@ -24,6 +26,8 @@ const applicationIdSchema = z.object({
 });
 
 export const applicationRouter = createTRPCRouter({
+  getLandingActivity: publicProcedure.query(() => getLandingActivity()),
+
   createApplication: publicProcedure.mutation(({ ctx }) =>
     createApplication({
       anonymousSessionId: ctx.anonymousSessionId,
@@ -120,6 +124,21 @@ export const applicationRouter = createTRPCRouter({
         applicationId: input.applicationId,
         userId: ctx.userId,
         answers: input.answers,
+      })
+    ),
+
+  skipGapQuestion: publicProcedure
+    .input(
+      applicationIdSchema.extend({
+        gapQuestionId: z.string().min(1),
+      })
+    )
+    .mutation(({ ctx, input }) =>
+      skipGapQuestion({
+        anonymousSessionId: ctx.anonymousSessionId,
+        applicationId: input.applicationId,
+        userId: ctx.userId,
+        gapQuestionId: input.gapQuestionId,
       })
     ),
 

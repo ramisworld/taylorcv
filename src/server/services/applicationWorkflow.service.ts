@@ -8,10 +8,12 @@ import { buildDeterministicMatchFraming } from "~/lib/deterministicMatchFraming"
 import { buildEvidenceMatchPersistencePlan } from "~/lib/evidenceMatchPersistence";
 import { selectGapQuestionTargets } from "~/lib/gapQuestionSelection";
 import { calculateEvidenceMatchScoreFromRows } from "~/lib/scoring";
+import { calculateGapAnswerBoost } from "~/lib/gapAnswerBoost";
 import { parseStructuredCv } from "~/lib/cvDocument";
 import { stripCvPresentationDebug } from "~/lib/cvPresentation";
 import { runEvidenceFitScorerAgent } from "~/server/agents/evidenceFitScorer.agent";
 import { runGapQuestionAgent } from "~/server/agents/gapQuestion.agent";
+import { runGapAnswerEvaluatorAgent } from "~/server/agents/gapAnswerEvaluator.agent";
 import { runCandidateProfilerAgent } from "~/server/agents/candidateProfiler.agent";
 import { runCvBuilderAgent } from "~/server/agents/cvBuilder.agent";
 import { runJobParserAgent } from "~/server/agents/jobParser.agent";
@@ -58,6 +60,21 @@ const MAX_JOB_DESCRIPTION_CHARS = 20_000;
 const MAX_CANDIDATE_BACKGROUND_CHARS = 30_000;
 const LINKEDIN_FAILURE_MESSAGE =
   "We couldn’t read this LinkedIn profile automatically. Please upload your CV instead.";
+
+export async function getLandingActivity() {
+  const since = new Date(Date.now() - 60 * 60 * 1000);
+  const count = await db.cvDraft.count({
+    where: {
+      createdAt: { gte: since },
+    },
+  });
+  return {
+    source: "live" as const,
+    count,
+    windowMinutes: 60,
+    generatedAt: new Date(),
+  };
+}
 
 type CandidateScanStep =
   | "parsing_profile"
@@ -1360,6 +1377,271 @@ export async function answerGapQuestions(args: {
   };
 }
 
+function acceptedGapAnswerStatus(status: string | null) {
+  return status === "usable" || status === "use_carefully";
+}
+
+function compactChunk(chunk: CandidateMemoryChunkRow) {
+  return {
+    id: chunk.id,
+    content: compactText(chunk.content, 560),
+    chunkType: chunk.chunkType,
+    sourceType: chunk.sourceType,
+  };
+}
+
+export async function skipGapQuestion(args: {
+  anonymousSessionId: string;
+  applicationId: string;
+  userId?: string | null;
+  gapQuestionId: string;
+}) {
+  await assertApplicationForSession(args);
+  const question = await db.gapQuestion.findFirst({
+    where: { id: args.gapQuestionId, applicationId: args.applicationId },
+  });
+  if (!question) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Gap question does not belong to this application",
+    });
+  }
+  if (question.status === "unanswered") {
+    await db.gapQuestion.update({
+      where: { id: question.id },
+      data: { status: "skipped" },
+    });
+  }
+  return {
+    gapQuestions: await db.gapQuestion.findMany({
+      where: { applicationId: args.applicationId },
+      orderBy: { createdAt: "asc" },
+    }),
+  };
+}
+
+export async function evaluateGapAnswerChatMessage(args: {
+  anonymousSessionId: string;
+  applicationId: string;
+  userId?: string | null;
+  gapQuestionId: string;
+  userMessage: string;
+  onAssistantReplyDelta: (delta: string) => void | Promise<void>;
+  onAcceptedBoost?: (boost: {
+    boostPercent: number;
+    totalBoostPercent: number;
+  }) => void | Promise<void>;
+}) {
+  const application = await assertApplicationForSession(args);
+  const owner = await resolveMemoryOwnerForApplication({
+    application,
+    anonymousSessionId: args.anonymousSessionId,
+    userId: args.userId,
+  });
+  const [gapQuestion, job, candidateProfile, candidateChunks, previousGapAnswers] =
+    await Promise.all([
+      db.gapQuestion.findFirst({
+        where: { id: args.gapQuestionId, applicationId: args.applicationId },
+        include: { targetRequirement: true },
+      }),
+      db.job.findUnique({ where: { applicationId: args.applicationId } }),
+      loadLatestCandidateProfile(owner),
+      loadCandidateMemoryChunks(owner),
+      db.gapAnswer.findMany({
+        where: {
+          applicationId: args.applicationId,
+          usableStatus: { in: ["usable", "use_carefully"] },
+        },
+        include: { gapQuestion: true },
+        orderBy: { createdAt: "asc" },
+      }),
+    ]);
+  if (!gapQuestion || gapQuestion.status !== "unanswered") {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "This gap question is no longer available.",
+    });
+  }
+  if (!job || !candidateProfile) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Taylor needs the role match before evaluating gap answers.",
+    });
+  }
+
+  const fitScore = gapQuestion.targetRequirementId
+    ? await db.requirementFitScore.findUnique({
+        where: {
+          applicationId_jobRequirementId: {
+            applicationId: args.applicationId,
+            jobRequirementId: gapQuestion.targetRequirementId,
+          },
+        },
+      })
+    : null;
+  const relevantIds = new Set(
+    [fitScore?.bestCandidateChunkId].filter((id): id is string => !!id)
+  );
+  const relevantChunks = [
+    ...candidateChunks.filter((chunk) => relevantIds.has(chunk.id)),
+    ...candidateChunks.filter((chunk) => !relevantIds.has(chunk.id)).slice(0, 5),
+  ].slice(0, 6);
+  const evaluatorOutput = await runGapAnswerEvaluatorAgent({
+    applicationId: args.applicationId,
+    input: {
+      gapQuestion: {
+        id: gapQuestion.id,
+        question: gapQuestion.question,
+        answerGuidance: gapQuestion.answerGuidance,
+        targetRequirementId: gapQuestion.targetRequirementId,
+      },
+      targetRequirement: gapQuestion.targetRequirement
+        ? {
+            id: gapQuestion.targetRequirement.id,
+            label: gapQuestion.targetRequirement.label,
+            description: gapQuestion.targetRequirement.description,
+            importance: gapQuestion.targetRequirement.importance,
+            currentConfidence: fitScore?.finalConfidence ?? "missing",
+            weaknessReason:
+              fitScore?.reason ??
+              "The current role match does not have clear evidence for this requirement.",
+          }
+        : null,
+      userMessage: compactText(args.userMessage, 2200),
+      job: {
+        title: job.title,
+        company: job.company,
+        summary: compactText(job.summary, 520),
+        roleDomain: job.roleDomain,
+        archetypeHint: job.archetypeHint,
+      },
+      candidateProfileSummary: compactText(candidateProfile.summary, 720),
+      relevantCandidateChunks: relevantChunks.map(compactChunk),
+      previousGapAnswers: previousGapAnswers
+        .filter((answer) => acceptedGapAnswerStatus(answer.usableStatus))
+        .map((answer) => ({
+          question: answer.originalQuestion ?? answer.gapQuestion.question,
+          extractedEvidenceSummary:
+            answer.extractedEvidenceSummary ?? answer.elaboration ?? "",
+          usableStatus: answer.usableStatus as "usable" | "use_carefully",
+        }))
+        .filter((answer) => !!answer.extractedEvidenceSummary),
+      matchAnalysis: application.matchAnalysisJson,
+    },
+    onAssistantReplyDelta: args.onAssistantReplyDelta,
+  });
+
+  const shouldPersist =
+    evaluatorOutput.shouldSaveEvidence &&
+    acceptedGapAnswerStatus(evaluatorOutput.usableStatus) &&
+    !!evaluatorOutput.extractedEvidenceSummary?.trim();
+  if (!shouldPersist) {
+    return {
+      evaluatorOutput,
+      savedGapAnswerId: null,
+      boostPercent: 0,
+      totalBoostPercent: previousGapAnswers.reduce(
+        (sum, answer) => sum + (answer.boostPercent ?? 0),
+        0
+      ),
+      evidenceMatchScore: await calculateEvidenceMatchScore(args.applicationId),
+      gapQuestions: await db.gapQuestion.findMany({
+        where: { applicationId: args.applicationId },
+        orderBy: { createdAt: "asc" },
+      }),
+    };
+  }
+
+  const previousBoostTotal = previousGapAnswers.reduce(
+    (sum, answer) => sum + (answer.boostPercent ?? 0),
+    0
+  );
+  const boost = calculateGapAnswerBoost({
+    output: evaluatorOutput,
+    importance: gapQuestion.targetRequirement?.importance ?? "low",
+    currentConfidence: fitScore?.finalConfidence ?? "missing",
+    previousBoostTotal,
+    originalMatchScore:
+      application.originalEvidenceMatchScore ??
+      (await calculateEvidenceMatchScore(args.applicationId)).score,
+  });
+  const gapAnswer = await db.gapAnswer.create({
+    data: {
+      applicationId: args.applicationId,
+      gapQuestionId: gapQuestion.id,
+      userId: owner.userId,
+      targetRequirementId: gapQuestion.targetRequirementId,
+      buttonAnswer: "yes",
+      elaboration: evaluatorOutput.extractedEvidenceSummary,
+      rawUserAnswer: compactText(args.userMessage, 4000),
+      extractedEvidenceSummary: evaluatorOutput.extractedEvidenceSummary,
+      originalQuestion: gapQuestion.question,
+      usableStatus: evaluatorOutput.usableStatus,
+      evidenceQuality: evaluatorOutput.evidenceQuality,
+      boostPercent: boost.boostPercent,
+      source: "gap_question_chat",
+      skipped: false,
+    },
+  });
+  await db.gapQuestion.update({
+    where: { id: gapQuestion.id },
+    data: { status: "answered" },
+  });
+  await args.onAcceptedBoost?.({
+    boostPercent: boost.boostPercent,
+    totalBoostPercent: boost.totalBoostPercent,
+  });
+  const chunk = buildGapAnswerEvidenceChunk({
+    anonymousSessionId: args.anonymousSessionId,
+    userId: owner.userId,
+    sourceApplicationId: args.applicationId,
+    gapAnswerId: gapAnswer.id,
+    gapQuestionId: gapQuestion.id,
+    targetRequirementId: gapQuestion.targetRequirementId,
+    targetRequirementLabel: gapQuestion.targetRequirement?.label ?? null,
+    selectedOption: null,
+    followUpText: null,
+    metricText: null,
+    answerText: evaluatorOutput.extractedEvidenceSummary,
+    trustLevel:
+      evaluatorOutput.usableStatus === "use_carefully" ? "use_carefully" : "usable",
+    rawUserAnswer: args.userMessage,
+    extractedEvidenceSummary: evaluatorOutput.extractedEvidenceSummary,
+    evidenceQuality: evaluatorOutput.evidenceQuality,
+    boostPercent: boost.boostPercent,
+    originalQuestion: gapQuestion.question,
+    source: "gap_question_chat",
+  });
+  if (chunk) {
+    await upsertCandidateMemoryChunks({
+      owner,
+      chunks: [chunk],
+      applicationId: args.applicationId,
+    });
+    await prepareFastMatch({
+      anonymousSessionId: args.anonymousSessionId,
+      applicationId: args.applicationId,
+      owner,
+      writeGapQuestions: false,
+    });
+  }
+  await db.application.update({
+    where: { id: args.applicationId },
+    data: { status: "answers_added", currentStep: "answers_added" },
+  });
+  return {
+    evaluatorOutput,
+    savedGapAnswerId: gapAnswer.id,
+    boostPercent: boost.boostPercent,
+    totalBoostPercent: boost.totalBoostPercent,
+    evidenceMatchScore: await calculateEvidenceMatchScore(args.applicationId),
+    gapQuestions: await db.gapQuestion.findMany({
+      where: { applicationId: args.applicationId },
+      orderBy: { createdAt: "asc" },
+    }),
+  };
+}
+
 function matchAnalysisObject(value: unknown) {
   return isRecord(value) ? value : {};
 }
@@ -1373,12 +1655,15 @@ export async function generateCv(args: {
   strategyId?: string | null;
 }) {
   const application = await assertApplicationForSession(args);
-  const entitlement = await assertCanGenerateCv({
-    userId: args.userId,
-    anonymousSessionId: args.anonymousSessionId,
-    headers: args.headers,
-    resHeaders: args.resHeaders,
-  });
+  const entitlement = args.userId
+    ? await assertCanGenerateCv({
+        userId: args.userId,
+        anonymousSessionId: args.anonymousSessionId,
+        headers: args.headers,
+        resHeaders: args.resHeaders,
+        allowUnverifiedEmail: true,
+      })
+    : null;
   if (!application.userId && args.userId) {
     await claimApplication({
       anonymousSessionId: args.anonymousSessionId,
@@ -1391,13 +1676,24 @@ export async function generateCv(args: {
     anonymousSessionId: args.anonymousSessionId,
     userId: args.userId,
   });
-  const [job, candidateProfile, candidateChunks, gapAnswers] = await Promise.all([
+  const [job, candidateProfile, candidateChunks, gapAnswers, requirementFitScores] = await Promise.all([
     db.job.findUnique({ where: { applicationId: args.applicationId } }),
     loadLatestCandidateProfile(owner),
     loadCandidateChunks({ owner }),
     db.gapAnswer.findMany({
-      where: { applicationId: args.applicationId, skipped: false },
+      where: {
+        applicationId: args.applicationId,
+        skipped: false,
+        OR: [
+          { usableStatus: { in: ["usable", "use_carefully"] } },
+          { usableStatus: null },
+        ],
+      },
       include: { gapQuestion: true },
+    }),
+    db.requirementFitScore.findMany({
+      where: { applicationId: args.applicationId },
+      include: { jobRequirement: true },
     }),
   ]);
   if (!job || !candidateProfile || candidateChunks.length === 0) {
@@ -1418,15 +1714,18 @@ export async function generateCv(args: {
     candidateProfile,
     candidateChunks,
     matchAnalysis,
+    requirementFitScores,
     gapEvidence: trustedGapEvidence,
     gapAnswers,
     gapAnswerTrust: gapAnswers.map((answer) => ({
       id: answer.id,
-      trustLevel: classifyGapAnswerTrust(
-        [answer.selectedOption, answer.followUpText, answer.metricText, answer.elaboration]
-          .filter(Boolean)
-          .join(" ")
-      ),
+      trustLevel:
+        answer.usableStatus ??
+        classifyGapAnswerTrust(
+          [answer.selectedOption, answer.followUpText, answer.metricText, answer.elaboration]
+            .filter(Boolean)
+            .join(" ")
+        ),
     })),
   };
   const draftGeneration = await (async () => {
@@ -1548,19 +1847,21 @@ export async function generateCv(args: {
         builderOutputJson: inputJson(cvOutput),
       },
     });
-    await recordSuccessfulCvGeneration({
-      tx,
-      userId: args.userId!,
-      applicationId: args.applicationId,
-      cvDraftId: draft.id,
-      planKey: entitlement.planKey,
-      billingPeriodStart: entitlement.periodStart,
-      billingPeriodEnd: entitlement.periodEnd,
-    });
+    if (entitlement && args.userId) {
+      await recordSuccessfulCvGeneration({
+        tx,
+        userId: args.userId,
+        applicationId: args.applicationId,
+        cvDraftId: draft.id,
+        planKey: entitlement.planKey,
+        billingPeriodStart: entitlement.periodStart,
+        billingPeriodEnd: entitlement.periodEnd,
+      });
+    }
     await tx.application.update({
       where: { id: args.applicationId },
       data: {
-        userId: args.userId,
+        userId: args.userId ?? application.userId,
         status: "cv_ready",
         currentStep: "draft_ready",
         updatedEvidenceMatchScore: finalAfterScore,

@@ -22,7 +22,7 @@ function DashboardButton(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
     <button
       {...props}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-lg border border-white/12 bg-white/[0.06] px-3 py-2 text-sm font-medium text-zinc-100 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-white/12 bg-white/[0.06] px-3 py-2 text-sm font-medium text-zinc-100 transition hover:scale-[1.02] hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-50",
         props.className
       )}
     />

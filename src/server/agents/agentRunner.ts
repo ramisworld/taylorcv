@@ -7,6 +7,7 @@ import {
   getFastModel,
   getStrongModel,
   isMockAiEnabled,
+  streamStructuredJsonResponse,
 } from "~/lib/openai";
 import { db } from "~/server/db";
 
@@ -149,6 +150,62 @@ export async function runJsonAgent<TOutput>(args: {
       )
       .catch(() => undefined);
 
+    throw error;
+  }
+}
+
+export async function runStreamingJsonAgent<TOutput>(args: {
+  applicationId: string;
+  agentName: string;
+  model: "fast" | "strong";
+  systemPrompt: string;
+  userPrompt: string;
+  schema: z.ZodType<TOutput>;
+  jsonSchema: Record<string, unknown>;
+  temperature?: number;
+  onRawOutputDelta: (delta: string) => void | Promise<void>;
+  mockOutput: () => TOutput;
+}): Promise<TOutput> {
+  let rawOutput: unknown;
+  try {
+    if (isMockAiEnabled()) {
+      rawOutput = args.mockOutput();
+    } else {
+      rawOutput = await streamStructuredJsonResponse({
+        model: args.model === "fast" ? getFastModel() : getStrongModel(),
+        systemPrompt: args.systemPrompt,
+        userPrompt: args.userPrompt,
+        schemaName: args.agentName.replace(/[^a-zA-Z0-9_-]/g, "_"),
+        jsonSchema: args.jsonSchema,
+        temperature: args.temperature,
+        onOutputTextDelta: args.onRawOutputDelta,
+      });
+    }
+    const output = args.schema.parse(rawOutput);
+    await db.agentRun.create({
+      data: {
+        applicationId: args.applicationId,
+        agentName: args.agentName,
+        inputSummary: summarize(args.userPrompt),
+        outputSummary: summarize(output),
+        status: "success",
+      },
+    });
+    return output;
+  } catch (error) {
+    const message = errorMessage(error);
+    await db.agentRun
+      .create({
+        data: {
+          applicationId: args.applicationId,
+          agentName: args.agentName,
+          inputSummary: summarize(args.userPrompt),
+          outputSummary: summarize(rawOutput ?? null),
+          status: "failed",
+          error: message,
+        },
+      })
+      .catch(() => undefined);
     throw error;
   }
 }

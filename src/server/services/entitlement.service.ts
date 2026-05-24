@@ -66,6 +66,7 @@ export async function assertCanGenerateCv(args: {
   anonymousSessionId: string;
   headers: Headers;
   resHeaders?: Headers;
+  allowUnverifiedEmail?: boolean;
 }) {
   if (!args.userId) {
     throw new TRPCError({
@@ -74,7 +75,7 @@ export async function assertCanGenerateCv(args: {
     });
   }
   const entitlement = await getEntitlementState(args.userId);
-  if (entitlement.requiresEmailVerification) {
+  if (entitlement.requiresEmailVerification && !args.allowUnverifiedEmail) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "EMAIL_VERIFICATION_REQUIRED",

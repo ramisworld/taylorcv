@@ -1,33 +1,28 @@
 "use client";
 
 import {
-  ArrowRight,
-  BriefcaseBusiness,
   Check,
-  CheckCircle2,
-  ClipboardList,
-  Flag,
-  Crown,
-  FileText,
-  LockKeyhole,
-  RefreshCw,
+  ChevronDown,
+  CircleCheck,
+  MapPin,
   ShieldCheck,
-  Sparkles,
-  Star,
-  Zap,
-  Trophy,
-  TrendingUp,
-  UserRound,
-  UsersRound,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 
-import { TaylorBrand } from "~/components/TaylorBrand";
-import { paidPlanFromSelection, planDisplayPrice, type PlanKey } from "~/lib/plans";
+import {
+  paidPlanFromSelection,
+  planDisplayPrice,
+  plans,
+  type PlanKey,
+} from "~/lib/plans";
 
-import { LandingArtifact } from "./LandingArtifact";
 import { LandingBackground } from "./LandingBackground";
+import { FlowArrow } from "./FlowArrow";
+import { GlassHeader } from "./GlassHeader";
+import { PrimaryButton, SecondaryButton } from "./GlassButton";
+import { LiquidGlassDefs } from "./LiquidGlassDefs";
+import { ProofStrip } from "./ProofStrip";
 
 type LandingPageProps = {
   error?: string | null;
@@ -39,547 +34,513 @@ type LandingPageProps = {
   isCheckoutLoading?: boolean;
 };
 
+const requirements = [
+  "Product leadership",
+  "Rapid iteration mindset",
+  "Manufacturing scale & cost focus",
+  "AI / software product execution",
+  "Cross-functional alignment",
+  "High-velocity decision making",
+] as const;
+
+const gapRows = [
+  {
+    icon: "people",
+    question: "What is the largest team you led to deliver a complex product?",
+    status: "Matched",
+    tone: "green",
+  },
+  {
+    icon: "factory",
+    question: "Share a measurable example of manufacturing impact at scale.",
+    status: "Needs stronger evidence",
+    tone: "amber",
+  },
+  {
+    icon: "lock",
+    question: "What AI or software product did you ship end-to-end?",
+    status: "Missing proof",
+    tone: "red",
+  },
+] as const;
+
+const cvAchievements = [
+  "Led Falcon 9 from concept to most-flown launch vehicle, driving reusability and >10x reduction in launch cost.",
+  "Scaled Starlink to millions of users and built the world's largest LEO constellation manufacturing and deployment system.",
+  "Integrated AI capabilities into products and operations to improve autonomy, forecasting, and decision velocity.",
+] as const;
+
+const cvSkills = [
+  "Product Leadership",
+  "Engineering Leadership",
+  "Manufacturing Scale",
+  "AI & Software Products",
+  "Systems Thinking",
+  "Cost & Margin Focus",
+  "Cross-functional Alignment",
+  "High-velocity Execution",
+] as const;
+
+const howSteps = [
+  {
+    title: "Paste the role",
+    body: "TaylorCV extracts seniority, requirements, hiring signals, and must-have evidence from the job ad.",
+  },
+  {
+    title: "Compare your background",
+    body: "Your strongest proof is matched to each requirement so the CV is built from evidence, not generic claims.",
+  },
+  {
+    title: "Answer the gaps",
+    body: "A few targeted questions surface missing metrics, leadership scope, tools, and outcomes before the draft is written.",
+  },
+  {
+    title: "Export a one-page CV",
+    body: "The final CV stays concise, ATS-safe, and aligned to the role without overclaiming.",
+  },
+] as const;
+
+const faqItems = [
+  {
+    question: "Is TaylorCV built for New Zealand job seekers?",
+    answer:
+      "Yes. The product is designed around practical job ads, concise one-page CVs, and the evidence employers expect from students, graduates, tradespeople, and professionals.",
+  },
+  {
+    question: "Do I need an account?",
+    answer:
+      "You can start the analysis first. Account verification is required before final CV generation so your CV, usage, and billing are protected.",
+  },
+  {
+    question: "Is the CV ATS-safe?",
+    answer:
+      "TaylorCV keeps the generated CV document-like, structured, and readable. It avoids decorative layouts that can make applicant tracking systems harder to parse.",
+  },
+  {
+    question: "Are the company names endorsements?",
+    answer:
+      "No. The proof strip uses the wording 'professionals at' to avoid implying official company endorsement.",
+  },
+] as const;
+
 const entrance = {
-  hidden: { opacity: 0, y: 22 },
+  hidden: { opacity: 0, y: 18 },
   visible: { opacity: 1, y: 0 },
 };
 
-const benefits = [
-  {
-    icon: ShieldCheck,
-    title: "Private & secure",
-    body: "Your data is encrypted and never shared.",
-  },
-  {
-    icon: Sparkles,
-    title: "AI that gets you",
-    body: "Built on proven job matching and NLP.",
-  },
-  {
-    icon: CheckCircle2,
-    title: "Results that land",
-    body: "Tailored CVs that pass screens and get replies.",
-  },
-];
+function cn(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ");
+}
 
-const companyLogos = [
-  { name: "Airbnb", src: "/assets/company-logos/airbnb.svg" },
-  { name: "Canva", src: "/assets/company-logos/canva.svg" },
-  { name: "Microsoft", src: "/assets/company-logos/microsoft.svg" },
-  { name: "Google", src: "/assets/company-logos/google.svg" },
-  { name: "Atlassian", src: "/assets/company-logos/atlassian.svg" },
-  { name: "Shopify", src: "/assets/company-logos/shopify.svg" },
-  { name: "Stripe", src: "/assets/company-logos/stripe.svg" },
-  { name: "Figma", src: "/assets/company-logos/figma.svg" },
-  { name: "HubSpot", src: "/assets/company-logos/hubspot.svg" },
-  { name: "Slack", src: "/assets/company-logos/slack.svg" },
-] as const;
-
-const trustedStats = [
-  {
-    icon: UsersRound,
-    value: "1,900+",
-    label: "professionals helped",
-  },
-  {
-    icon: TrendingUp,
-    value: "29%",
-    label: "average match uplift",
-  },
-  {
-    icon: Trophy,
-    value: "920+",
-    label: "interviews won",
-  },
-] as const;
-
-function LandingNav(props: LandingPageProps) {
+function TaylorLogoIcon(props: { className?: string }) {
   return (
-    <motion.header
-      animate="visible"
-      className="sticky top-0 z-50 w-full border-b border-white/[0.09] bg-[#030813]/58 shadow-[0_14px_42px_rgba(2,6,23,0.18)] backdrop-blur-xl supports-[backdrop-filter]:bg-[#030813]/42"
-      initial="hidden"
-      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-      variants={entrance}
-    >
-      <div className="mx-auto flex h-16 w-full max-w-[1920px] items-center justify-between gap-5 px-5 sm:px-8 lg:px-10 2xl:h-[68px] 2xl:px-14">
-        <TaylorBrand
-          markClassName="h-8 w-8 2xl:h-9 2xl:w-9"
-          textClassName="text-[21px] font-semibold 2xl:text-[22px]"
-        />
-
-        <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-12 text-[14px] font-semibold text-white/86 lg:flex">
-          <a href="#how-it-works">How it works</a>
-          <a href="#pricing">Pricing</a>
-        </nav>
-
-        <div className="ml-auto flex items-center gap-3 text-[14px] font-medium">
-          <button
-            className="hidden rounded-md px-2.5 py-1.5 text-white/82 transition hover:text-white sm:inline-flex"
-            onClick={props.isSignedIn ? props.onDashboard : undefined}
-            type="button"
-          >
-            {props.isSignedIn ? "Dashboard" : "Sign in"}
-          </button>
-          <motion.button
-            className="group inline-flex min-h-11 items-center justify-center gap-2.5 whitespace-nowrap rounded-lg bg-blue-600 px-4 text-[14px] font-semibold text-white shadow-[0_0_28px_rgba(37,99,235,0.42),inset_0_1px_0_rgba(255,255,255,0.22)] transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-70 sm:px-5"
-            disabled={props.isLoading}
-            onClick={props.onGetStarted}
-            type="button"
-            whileHover={{ y: -1 }}
-            whileTap={{ scale: 0.985 }}
-          >
-            {props.isLoading ? "Starting..." : "Build my CV"}
-            <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-          </motion.button>
-        </div>
-      </div>
-    </motion.header>
+    <img
+      alt=""
+      aria-hidden="true"
+      className={cn("shrink-0 object-contain", props.className ?? "h-9 w-9")}
+      src="/assets/taylorcv-logo-transparent.png"
+    />
   );
 }
 
-function LandingCta(props: LandingPageProps) {
+function TaylorWordmark(props: { center?: boolean; compact?: boolean }) {
   return (
-    <div className="mt-7 flex xl:mt-6 2xl:mt-8">
-      <motion.button
-        className="group inline-flex min-h-14 items-center justify-center gap-2.5 whitespace-nowrap rounded-lg bg-blue-600 px-5 text-[14px] font-semibold text-white shadow-[0_18px_58px_rgba(37,99,235,0.32),inset_0_1px_0_rgba(255,255,255,0.24)] transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-70 sm:px-6"
-        disabled={props.isLoading}
-        onClick={props.onGetStarted}
-        type="button"
-        whileHover={{ y: -2 }}
-        whileTap={{ scale: 0.985 }}
+    <div
+      aria-label="TaylorCV"
+      className={cn(
+        "flex min-w-0 items-center gap-2.5",
+        props.center && "justify-center"
+      )}
+    >
+      <TaylorLogoIcon className={props.compact ? "h-[34px] w-[34px]" : "h-9 w-9"} />
+      <span
+        className={cn(
+          "truncate font-bold tracking-[-0.04em] text-[#080d22]",
+          props.compact ? "text-[25px]" : "text-[28px]"
+        )}
       >
-        <ClipboardList className="h-4.5 w-4.5" />
-        {props.isLoading ? "Starting..." : "Start with a job description"}
-        <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-      </motion.button>
+        TaylorCV
+      </span>
     </div>
   );
 }
 
-function BenefitRows() {
+function ScoreRing() {
+  const radius = 47;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * 0.16;
   return (
-    <div className="mt-8 grid overflow-hidden rounded-xl border border-white/[0.105] bg-white/[0.025] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] sm:grid-cols-3 xl:mt-7 xl:max-w-[430px] 2xl:mt-8 2xl:max-w-none">
-      {benefits.map((benefit) => {
-        const Icon = benefit.icon;
-        return (
-          <div
-            className="flex min-h-[92px] items-start gap-2.5 border-b border-white/[0.08] p-3.5 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0 2xl:min-h-[104px] 2xl:gap-3 2xl:p-4"
-            key={benefit.title}
-          >
-            <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-cyan-300/20 bg-cyan-300/[0.055] text-cyan-300 shadow-[0_0_24px_rgba(34,211,238,0.12),inset_0_1px_0_rgba(255,255,255,0.07)] 2xl:h-8 2xl:w-8">
-              <Icon className="h-4 w-4 2xl:h-4.5 2xl:w-4.5" />
-            </span>
-            <div>
-              <p className="text-[12px] font-semibold tracking-[-0.01em] text-white 2xl:text-[13px]">
-                {benefit.title}
-              </p>
-              <p className="mt-1.5 text-[11px] leading-[1.4] text-slate-400 2xl:mt-2 2xl:text-[12px]">
-                {benefit.body}
-              </p>
+    <div className="relative grid h-[126px] w-[126px] place-items-center">
+      <svg aria-hidden="true" className="absolute inset-0 h-full w-full" shapeRendering="geometricPrecision" viewBox="0 0 126 126">
+        <circle
+          cx="63"
+          cy="63"
+          fill="none"
+          r={radius}
+          stroke="#e8eefb"
+          strokeWidth="6"
+        />
+        <circle
+          cx="63"
+          cy="63"
+          fill="none"
+          r={radius}
+          stroke="#2a53fa"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          strokeWidth="6"
+          transform="rotate(-96 63 63)"
+        />
+      </svg>
+      <div className="relative text-center">
+        <p className="tabular-nums text-[27px] font-semibold leading-[1.05] tracking-[-0.018em] text-[#080d22]">
+          84%
+        </p>
+        <p className="mt-1 text-[10.5px] font-medium leading-none text-[#64718d]">Overall fit</p>
+      </div>
+    </div>
+  );
+}
+
+function CardShell(props: {
+  children: React.ReactNode;
+  className?: string;
+  index: number;
+  title: string;
+}) {
+  return (
+    <article
+      className={cn(
+        "relative min-h-[444px] rounded-[15px] border border-[#dfe6f2] bg-white/82 p-7 text-[#080d22] shadow-[0_24px_56px_rgba(29,42,78,0.12),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-xl xl:h-[444px]",
+        props.className
+      )}
+    >
+      <div className="mb-5 flex items-center gap-4">
+        <span className="grid h-8 w-8 place-items-center rounded-[8px] bg-[#2450f4] text-[17px] font-bold text-white shadow-[0_8px_18px_rgba(32,71,240,0.24),inset_0_1px_0_rgba(255,255,255,0.25)]">
+          {props.index}
+        </span>
+        <h3 className="text-[18px] font-semibold tracking-[-0.025em]">{props.title}</h3>
+      </div>
+      {props.children}
+    </article>
+  );
+}
+
+function JobAdCard() {
+  return (
+    <CardShell index={1} title="Paste job ad">
+      <div className="overflow-hidden rounded-[10px] border border-[#dfe5ef] bg-white shadow-[0_16px_32px_rgba(8,13,34,0.075)]">
+        <div className="grid grid-cols-[56px_minmax(0,1fr)] gap-4 border-b border-[#e5eaf2] p-3">
+          <span className="flex h-[56px] w-[56px] items-center justify-center rounded-[8px] border border-[#edf1f6] bg-white shadow-[0_5px_12px_rgba(8,13,34,0.04)]">
+            <img
+              alt="SpaceX"
+              className="h-8 w-[50px] object-contain"
+              src="/assets/company-logos/spacex-x.svg"
+            />
+          </span>
+          <div className="min-w-0">
+            <p className="max-w-[230px] text-[12.5px] font-bold leading-snug tracking-[-0.02em]">
+              Senior Product & Engineering Executive
+            </p>
+            <p className="mt-0.5 text-[11px] font-semibold text-[#2047f0]">SpaceX</p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[9.5px] font-medium text-[#56627d]">
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin className="h-3 w-3" />
+                Hawthorne, CA
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full border border-[#9aa7bd]" />
+                Full-time
+              </span>
             </div>
           </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function LogoMarquee() {
-  const logos = [...companyLogos, ...companyLogos];
-  return (
-    <div className="relative mx-auto mt-7 w-full overflow-hidden py-5 [mask-image:linear-gradient(90deg,transparent,black_9%,black_91%,transparent)] 2xl:mt-9 2xl:py-6 min-[1900px]:mt-6">
-      <div className="taylor-logo-marquee flex w-max items-center gap-8">
-        {logos.map((company, index) => (
-          <span
-            className="flex items-center gap-2.5 opacity-82"
-            key={`${company.name}-${index}`}
-          >
-            <img
-              alt={`${company.name} logo`}
-              className="h-6 w-6 object-contain"
-              src={company.src}
-            />
-            <span className="whitespace-nowrap text-[18px] font-semibold tracking-[-0.04em] text-white/82">
-              {company.name}
-            </span>
-            <span className="ml-5 h-1.5 w-1.5 rounded-full bg-blue-400 shadow-[0_0_14px_rgba(59,130,246,0.95)]" />
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TrustedCompaniesSection() {
-  return (
-    <section className="relative z-10 px-5 py-12 sm:px-8 lg:px-10 xl:mt-10 2xl:mt-12 2xl:px-14 2xl:py-14 min-[1900px]:mt-16 min-[1900px]:py-6">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(37,99,235,0.08),transparent_38%)]" />
-      <div className="relative mx-auto max-w-[1540px] text-center">
-        <div className="inline-flex items-center gap-2.5 rounded-full border border-blue-400/25 bg-blue-500/[0.055] px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.18em] text-cyan-300 shadow-[0_0_28px_rgba(37,99,235,0.12)]">
-          <ShieldCheck className="h-4 w-4" />
-          Trusted by professionals
         </div>
-        <h2 className="mx-auto mt-5 max-w-[1120px] text-balance text-[clamp(3rem,4.9vw,5.9rem)] font-semibold leading-[1.05] tracking-[-0.055em] text-white min-[1900px]:mt-4">
-          Trusted by{" "}
-          <span className="bg-[linear-gradient(100deg,#3b82f6_0%,#2776ff_48%,#49ddff_100%)] bg-clip-text text-transparent">
-            professionals at
-          </span>
-        </h2>
-
-        <LogoMarquee />
-
-        <div className="mx-auto mt-12 grid max-w-[1220px] overflow-hidden rounded-xl border border-blue-300/18 bg-white/[0.025] shadow-[0_0_42px_rgba(37,99,235,0.13),inset_0_1px_0_rgba(255,255,255,0.06)] md:grid-cols-3">
-          {trustedStats.map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <div
-                className="flex items-center justify-center gap-6 border-b border-blue-300/12 px-6 py-8 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0"
-                key={stat.label}
+        <div className="p-3">
+          <p className="mb-2 text-[12px] font-bold tracking-[-0.015em]">Key requirements</p>
+          <div className="flex flex-wrap gap-2">
+            {requirements.map((requirement) => (
+              <span
+                className="inline-flex min-h-[28px] w-fit items-center gap-2.5 rounded-full border border-[#e0e6ef] bg-[#fbfcff] px-3.5 text-[11px] font-medium text-[#25314d]"
+                key={requirement}
               >
-                <span className="flex h-16 w-16 items-center justify-center rounded-xl border border-blue-300/22 bg-blue-500/[0.06] text-blue-400 shadow-[0_0_24px_rgba(37,99,235,0.16)]">
-                  <Icon className="h-8 w-8" />
-                </span>
-                <span className="text-left">
-                  <span className="block text-[38px] font-semibold leading-none tracking-[-0.045em] text-white">
-                    {stat.value}
-                  </span>
-                  <span className="mt-2 block text-[16px] text-slate-300">
-                    {stat.label}
-                  </span>
-                </span>
-              </div>
-            );
-          })}
+                <span className="h-1.5 w-1.5 rounded-full bg-[#2047f0]" />
+                {requirement}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
+    </CardShell>
+  );
+}
+
+function GapIcon(props: { type: (typeof gapRows)[number]["icon"] }) {
+  if (props.type === "people") {
+    return (
+      <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 16 16">
+        <circle cx="6" cy="5" fill="none" r="2.2" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M2.8 12.5c.45-2 1.55-3 3.2-3s2.75 1 3.2 3" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" />
+        <path d="M10.2 7.3a2 2 0 1 0-.15-3.65" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" />
+        <path d="M10.7 9.7c1.25.2 2.08 1.1 2.5 2.8" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" />
+      </svg>
+    );
+  }
+  if (props.type === "factory") {
+    return (
+      <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 16 16">
+        <path d="M2.5 12.8V6.3l3.3 2.1V6.3l3.4 2.1V4.1h3.2v8.7" fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.5" />
+        <path d="M2.2 12.8h11.6M5 11h1.2M8 11h1.2" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" />
+      </svg>
+    );
+  }
+  return (
+    <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 16 16">
+      <rect fill="none" height="7" rx="1.7" stroke="currentColor" strokeWidth="1.5" width="9" x="3.5" y="6.5" />
+      <path d="M5.2 6.5V5a2.8 2.8 0 0 1 5.6 0v1.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function FitGapsCard() {
+  return (
+    <CardShell className="min-h-[444px] lg:min-w-[440px]" index={2} title="Role fit + gaps to answer">
+      <div className="grid grid-cols-[132px_minmax(0,1fr)] items-center gap-3.5 max-sm:grid-cols-1">
+        <ScoreRing />
+        <div className="flex items-start gap-3 rounded-[10px] bg-[#f1f4fc] p-4">
+          <svg aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-[#2450f4]" viewBox="0 0 18 18">
+            <path d="M9 1.6 10.4 6l4.4 1.4-4.4 1.4L9 13.2 7.6 8.8 3.2 7.4 7.6 6 9 1.6Z" fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.7" />
+            <path d="m14.2 12.4.45 1.45 1.45.45-1.45.45-.45 1.45-.45-1.45-1.45-.45 1.45-.45.45-1.45Z" fill="currentColor" />
+          </svg>
+          <p className="text-[12.3px] font-medium leading-[1.62] text-[#34415f]">
+            <span className="font-semibold text-[#2047f0]">TaylorCV found a few gaps.</span>
+            <br />
+            Answer 3 quick questions to
+            <br />
+            strengthen your match and
+            <br />
+            unlock your tailored CV.
+          </p>
+        </div>
+      </div>
+      <div className="mt-3">
+        <p className="mb-2.5 text-[12.5px] font-bold">3 smart questions to answer</p>
+        <div className="overflow-hidden rounded-[10px] border border-[#dfe5ef] bg-white">
+          {gapRows.map((row) => (
+            <div
+              className="grid grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-3 border-b border-[#e7ecf4] px-3.5 py-2.5 last:border-b-0 max-sm:grid-cols-[32px_minmax(0,1fr)]"
+              key={row.question}
+            >
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-[#eef3ff] text-[#2047f0]">
+                <GapIcon type={row.icon} />
+              </span>
+              <p className="text-[10.8px] font-medium leading-[1.55] text-[#263252]">{row.question}</p>
+              <span
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-center text-[9.5px] font-semibold leading-tight max-sm:col-start-2 max-sm:w-fit",
+                  row.tone === "green" && "bg-[#daf6e9] text-[#07814f]",
+                  row.tone === "amber" && "bg-[#fff0d9] text-[#c66a00]",
+                  row.tone === "red" && "bg-[#ffe4e8] text-[#d43857]"
+                )}
+              >
+                {row.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </CardShell>
+  );
+}
+
+function CvPreviewCard() {
+  return (
+    <CardShell index={3} title="Get tailored CV">
+      <div
+        className="rounded-[9px] border border-[#dfe5ef] bg-white px-4 py-3 shadow-[0_14px_30px_rgba(8,13,34,0.065)]"
+        id="example-cv"
+      >
+        <header className="border-b border-[#e4e9f2] pb-2.5">
+          <h4 className="text-[21px] font-bold leading-none tracking-[-0.045em] text-[#080d22]">
+            Elon Musk
+          </h4>
+          <p className="mt-1 text-[10.5px] font-bold text-[#2047f0]">
+            Senior Product & Engineering Executive
+          </p>
+          <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[6.8px] font-medium text-[#4d5872]">
+            <span>Hawthorne, CA</span>
+            <span>elon@spacex.com</span>
+            <span>linkedin.com/in/elonmusk</span>
+          </p>
+        </header>
+        <CvSection title="Professional Summary">
+          Product and engineering executive with a track record of building and scaling breakthrough technologies at SpaceX, Tesla, and xAI. Expert in product strategy, system design, manufacturing scale, and rapid iteration to deliver fundamentally better, lower-cost products to market.
+        </CvSection>
+        <CvSection title="Selected Achievements">
+          <div className="space-y-1.5">
+            {cvAchievements.map((achievement) => (
+              <div className="grid grid-cols-[15px_minmax(0,1fr)] gap-2" key={achievement}>
+                <span className="mt-0.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-[#2047f0] text-white">
+                  <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                </span>
+                <p>{achievement}</p>
+              </div>
+            ))}
+          </div>
+        </CvSection>
+        <CvSection title="Core Skills">
+          <div className="flex flex-wrap gap-1.5">
+            {cvSkills.map((skill) => (
+              <span
+                className="rounded-full bg-[#edf1f8] px-2 py-0.5 text-[7.5px] font-semibold text-[#33405f]"
+                key={skill}
+              >
+                {skill}
+              </span>
+            ))}
+          </div>
+        </CvSection>
+      </div>
+    </CardShell>
+  );
+}
+
+function CvSection(props: { children: React.ReactNode; title: string }) {
+  return (
+    <section className="border-b border-[#e8edf4] py-2 text-[8.2px] leading-[1.34] text-[#1f2a44] last:border-b-0 last:pb-0">
+      <h5 className="mb-1.5 text-[7.4px] font-bold uppercase tracking-[0.03em] text-[#10182d]">
+        {props.title}
+      </h5>
+      {props.children}
     </section>
   );
 }
 
-const howItWorksSteps = [
-  {
-    title: "Paste your job description",
-    body: "Taylor reads the role and extracts what really matters.",
-  },
-  {
-    title: "Add your background",
-    body: "Add your experience and Taylor builds a complete picture.",
-  },
-  {
-    title: "Taylor finds strong evidence and asks 1–3 high-ROI questions",
-    body: "You get targeted questions to surface the evidence that wins.",
-  },
-  {
-    title: "Get a tailored CV with a stronger match",
-    body: "Your CV is aligned to the role and ready to land interviews.",
-  },
-] as const;
-
-const backgroundRows = [
-  {
-    icon: BriefcaseBusiness,
-    title: "12+ years experience",
-    body: "Product Strategy",
-  },
-  {
-    icon: UserRound,
-    title: "Senior Product Manager",
-    body: "SaaS · B2B · Remote",
-  },
-  {
-    icon: Star,
-    title: "Key skills",
-    body: "Analytics, Roadmaps, Stakeholder Mgmt",
-  },
-  {
-    icon: Flag,
-    title: "Achievements",
-    body: "Led cross-functional teams, improved activation by 32%",
-  },
-] as const;
-
-const tailoredCvItems = [
-  "Stronger evidence",
-  "Keyword alignment",
-  "Impact statements",
-  "Skill coverage",
-  "Role relevance",
-] as const;
-
-function StepIntro(props: { body: string; index: number; title: string }) {
-  return (
-    <div className="grid grid-cols-[40px_minmax(0,1fr)] items-start gap-3.5 xl:min-h-[134px] min-[2400px]:min-h-[152px] min-[2400px]:grid-cols-[48px_minmax(0,1fr)] min-[2400px]:gap-5">
-      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-[17px] font-semibold text-white shadow-[0_0_28px_rgba(37,99,235,0.58),inset_0_1px_0_rgba(255,255,255,0.24)] min-[2400px]:h-12 min-[2400px]:w-12 min-[2400px]:text-[20px]">
-        {props.index}
-      </span>
-      <div>
-        <h3 className="text-[16px] font-semibold leading-snug tracking-[-0.035em] text-white min-[2400px]:text-[20px]">
-          {props.title}
-        </h3>
-        <p className="mt-2.5 max-w-[250px] text-[13.5px] leading-6 text-slate-300/86 min-[2400px]:mt-3 min-[2400px]:max-w-[290px] min-[2400px]:text-[16px] min-[2400px]:leading-7">
-          {props.body}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function ProcessArrow() {
-  return (
-    <div className="hidden h-[340px] items-center justify-center pt-[170px] xl:flex 2xl:h-[350px] min-[2400px]:!h-[410px] min-[2400px]:pt-[196px]">
-      <ArrowRight className="h-8 w-8 text-slate-300/70 min-[2400px]:h-9 min-[2400px]:w-9" strokeWidth={1.65} />
-    </div>
-  );
-}
-
-function WhiteProcessCard(props: {
-  children: React.ReactNode;
-  className?: string;
-  title: string;
-}) {
-  return (
-    <div
-      className={[
-        "relative overflow-hidden rounded-xl border border-blue-100/80 bg-white p-5 text-slate-950 min-[2400px]:p-6",
-        "shadow-[0_28px_82px_rgba(2,6,23,0.42),0_0_0_1px_rgba(255,255,255,0.48),inset_0_1px_0_rgba(255,255,255,0.9)]",
-        "before:pointer-events-none before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_85%_5%,rgba(59,130,246,0.08),transparent_30%)]",
-        props.className ?? "",
-      ].join(" ")}
-    >
-      <div className="relative">
-        <h4 className="text-[16px] font-semibold leading-none tracking-[-0.035em] text-slate-950 min-[2400px]:text-[18px]">
-          {props.title}
-        </h4>
-        {props.children}
-      </div>
-    </div>
-  );
-}
-
-function AnimatedMiniScoreRing(props: { score: number; tone: "blue" | "green" }) {
-  const isGreen = props.tone === "green";
-  const [shouldAnimate, setShouldAnimate] = useState(false);
-  const [displayScore, setDisplayScore] = useState(0);
-
-  useEffect(() => {
-    if (!shouldAnimate) return;
-
-    let frame = 0;
-    let animationId = 0;
-    const duration = isGreen ? 1450 : 1250;
-    const start = performance.now();
-    const easeOutQuart = (value: number) => 1 - Math.pow(1 - value, 4);
-
-    const tick = (now: number) => {
-      const progress = Math.min((now - start) / duration, 1);
-      const nextScore = Math.round(props.score * easeOutQuart(progress));
-      if (nextScore !== frame) {
-        frame = nextScore;
-        setDisplayScore(nextScore);
-      }
-      if (progress < 1) {
-        animationId = requestAnimationFrame(tick);
-      }
-    };
-
-    setDisplayScore(0);
-    animationId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animationId);
-  }, [isGreen, props.score, shouldAnimate]);
-
+function WorkflowCards() {
   return (
     <motion.div
-      className={[
-        "relative grid place-items-center rounded-full",
-        isGreen
-          ? "h-[108px] w-[108px] min-[2400px]:h-[128px] min-[2400px]:w-[128px]"
-          : "h-[92px] w-[92px] min-[2400px]:h-[112px] min-[2400px]:w-[112px]",
-      ].join(" ")}
-      onViewportEnter={() => setShouldAnimate(true)}
-      style={{
-        background: isGreen
-          ? `conic-gradient(#1fb874 ${displayScore * 3.6}deg, #d9f3e8 0deg)`
-          : `conic-gradient(#1667f2 ${displayScore * 3.6}deg, #cfe0fb 0deg)`,
-      }}
-      viewport={{ amount: 0.55, once: true }}
+      animate="visible"
+      className="relative mx-auto mt-5 grid w-full max-w-[1450px] grid-cols-[0.98fr_1.1fr_1.05fr] gap-8 px-12 max-xl:grid-cols-1 max-xl:px-5"
+      initial="hidden"
+      transition={{ staggerChildren: 0.08, delayChildren: 0.18 }}
     >
-      <div className="absolute inset-[9px] rounded-full bg-white shadow-[inset_0_0_0_1px_rgba(15,23,42,0.04)]" />
-      <div className="relative text-center">
-        <p className="text-[25px] font-bold leading-none tracking-[-0.05em] text-slate-950 min-[2400px]:text-[30px]">
-          {displayScore}%
-        </p>
-        <p className="mt-1 text-[11px] font-semibold text-slate-800 min-[2400px]:text-[12px]">Match</p>
-      </div>
+      <motion.div className="relative" transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }} variants={entrance}>
+        <JobAdCard />
+        <FlowArrow className="absolute right-[-34px] top-1/2 z-10 -translate-y-1/2 max-xl:hidden" />
+      </motion.div>
+      <motion.div className="relative" transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }} variants={entrance}>
+        <FitGapsCard />
+        <FlowArrow className="absolute right-[-34px] top-1/2 z-10 -translate-y-1/2 max-xl:hidden" />
+      </motion.div>
+      <motion.div transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }} variants={entrance}>
+        <CvPreviewCard />
+      </motion.div>
     </motion.div>
   );
 }
 
-function JobDescriptionProcessCard(props: LandingPageProps) {
+function Hero(props: LandingPageProps) {
   return (
-    <WhiteProcessCard className="h-[340px] 2xl:h-[350px] min-[2400px]:!h-[410px]" title="Job description">
-      <div className="mt-7 space-y-3.5 min-[2400px]:mt-8 min-[2400px]:space-y-4">
-        {[92, 78, 92, 78, 92, 78, 92].map((width, index) => (
-          <div className="flex items-center gap-3" key={`${width}-${index}`}>
-            <span className="h-2 w-2 shrink-0 rounded-full bg-slate-200 min-[2400px]:h-2.5 min-[2400px]:w-2.5" />
-            <span
-              className="h-2 rounded-full bg-slate-200 min-[2400px]:h-2.5"
-              style={{ width: `${width}%` }}
-            />
-          </div>
-        ))}
-      </div>
-
-      <button
-        className="absolute inset-x-6 bottom-9 inline-flex min-h-12 items-center justify-center gap-2.5 rounded-lg bg-blue-600 text-[13.5px] font-semibold text-white shadow-[0_14px_34px_rgba(37,99,235,0.28),inset_0_1px_0_rgba(255,255,255,0.28)] transition hover:bg-blue-500 min-[2400px]:inset-x-7 min-[2400px]:bottom-11 min-[2400px]:min-h-13 min-[2400px]:gap-3 min-[2400px]:text-[15px]"
-        disabled={props.isLoading}
-        onClick={props.onGetStarted}
-        type="button"
+    <section className="relative z-10 pt-6">
+      <motion.div
+        animate="visible"
+        className="mx-auto max-w-[960px] px-5 text-center"
+        initial="hidden"
+        transition={{ staggerChildren: 0.08, delayChildren: 0.05 }}
       >
-        <ClipboardList className="h-5 w-5" />
-        {props.isLoading ? "Starting..." : "Paste job description"}
-      </button>
-    </WhiteProcessCard>
-  );
-}
-
-function BackgroundProcessCard() {
-  return (
-    <WhiteProcessCard className="h-[340px] 2xl:h-[350px] min-[2400px]:!h-[410px]" title="Your background">
-      <div className="mt-7 space-y-4.5 min-[2400px]:mt-8 min-[2400px]:space-y-6">
-        {backgroundRows.map((row) => {
-          const Icon = row.icon;
-          return (
-            <div className="grid grid-cols-[34px_minmax(0,1fr)] gap-3 min-[2400px]:grid-cols-[38px_minmax(0,1fr)]" key={row.title}>
-              <span className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-50 text-blue-600 min-[2400px]:h-9 min-[2400px]:w-9">
-                <Icon className="h-4.5 w-4.5 min-[2400px]:h-5 min-[2400px]:w-5" />
-              </span>
-              <div>
-                <p className="text-[12.5px] font-semibold leading-tight tracking-[-0.02em] text-slate-950 min-[2400px]:text-[14px]">
-                  {row.title}
-                </p>
-                <p className="mt-1 text-[12px] leading-5 text-slate-600 min-[2400px]:text-[13px]">{row.body}</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </WhiteProcessCard>
-  );
-}
-
-function EvidenceProcessCards() {
-  return (
-    <div className="grid gap-3 min-[2400px]:gap-4">
-      <WhiteProcessCard className="h-[160px] 2xl:h-[166px] min-[2400px]:!h-[204px]" title="Evidence found">
-        <div className="mt-4 grid grid-cols-[96px_minmax(0,1fr)] items-center gap-5 min-[2400px]:mt-5 min-[2400px]:grid-cols-[118px_minmax(0,1fr)] min-[2400px]:gap-6">
-          <AnimatedMiniScoreRing score={55} tone="blue" />
-          <div className="space-y-3">
-            {[94, 94, 82, 95].map((width, index) => (
-              <span
-                className="block h-2 rounded-full bg-slate-200 min-[2400px]:h-2.5"
-                key={`${width}-${index}`}
-                style={{ width: `${width}%` }}
-              />
-            ))}
-          </div>
-        </div>
-      </WhiteProcessCard>
-
-      <WhiteProcessCard className="h-[168px] 2xl:h-[172px] min-[2400px]:!h-[190px]" title="">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[12px] font-bold text-white shadow-[0_0_16px_rgba(37,99,235,0.32)]">
-            ?
+        <motion.div transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }} variants={entrance}>
+          <TaylorWordmark center />
+        </motion.div>
+        <motion.h1
+          className="mx-auto mt-4 max-w-[900px] text-balance text-[clamp(2.9rem,3.8vw,4.18rem)] font-bold leading-[1.05] tracking-[-0.055em] text-[#080d22]"
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          variants={entrance}
+        >
+          Paste one job. Get a CV built
+          <br className="hidden sm:block" />
+          {" "}
+          for the interview.
+        </motion.h1>
+        <motion.p
+          className="mx-auto mt-3 max-w-[680px] text-[16px] leading-7 text-[#33405f]"
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          variants={entrance}
+        >
+          TaylorCV reads the role, compares your background, and builds a sharp,
+          <br className="hidden sm:block" />
+          {" "}
+          one-page CV that proves you’re the right hire.
+        </motion.p>
+        <motion.div
+          className="mt-5 flex flex-wrap items-center justify-center gap-5"
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          variants={entrance}
+        >
+          <PrimaryButton
+            className="min-w-[285px]"
+            disabled={props.isLoading}
+            onClick={props.onGetStarted}
+            trailingArrow
+          >
+            {props.isLoading ? "Starting..." : "See what my CV is missing"}
+          </PrimaryButton>
+        </motion.div>
+        {props.error ? (
+          <p className="mx-auto mt-4 max-w-xl rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+            {props.error}
+          </p>
+        ) : null}
+        <motion.p
+          className="mx-auto mt-4 flex max-w-[520px] items-center justify-center gap-2.5 text-center text-[15px] font-medium text-[#435070]"
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          variants={entrance}
+        >
+          <span className="grid h-5 w-5 place-items-center text-[#2047f0]">
+            <ShieldCheck className="h-5 w-5 fill-[#2047f0] text-white" strokeWidth={2.1} />
           </span>
-          <h4 className="text-[16px] font-semibold leading-none tracking-[-0.035em] text-slate-950 min-[2400px]:text-[18px]">
-            High-ROI question
-          </h4>
-        </div>
-        <p className="mt-4 text-[12px] leading-5 text-slate-700 min-[2400px]:mt-5 min-[2400px]:text-[13px] min-[2400px]:leading-6">
-          What was the measurable impact of the activation strategy you led?
-        </p>
-        <div className="mt-3 min-h-11 rounded-md border border-slate-200 bg-white px-4 py-3 text-[12px] text-slate-400 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] min-[2400px]:mt-4 min-[2400px]:text-[13px]">
-          Type your answer...
-        </div>
-      </WhiteProcessCard>
-    </div>
-  );
-}
-
-function TailoredCvProcessCard() {
-  return (
-    <WhiteProcessCard className="h-[340px] 2xl:h-[350px] min-[2400px]:!h-[410px]" title="Your tailored CV">
-      <div className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3 min-[2400px]:mt-7 min-[2400px]:gap-4">
-        <div className="flex justify-center text-emerald-500">
-          <Sparkles className="h-7 w-7 fill-emerald-500/18 min-[2400px]:h-8 min-[2400px]:w-8" />
-        </div>
-        <AnimatedMiniScoreRing score={97} tone="green" />
-        <div className="flex justify-center text-emerald-500">
-          <Sparkles className="h-7 w-7 fill-emerald-500/18 min-[2400px]:h-8 min-[2400px]:w-8" />
-        </div>
+          Built for job ads, ATS systems, and one-page CVs.
+        </motion.p>
+      </motion.div>
+      <div id="examples">
+        <WorkflowCards />
       </div>
-
-      <ul className="mt-5 space-y-2.5 pb-3 min-[2400px]:mt-6 min-[2400px]:space-y-3 min-[2400px]:pb-0">
-        {tailoredCvItems.map((item) => (
-          <li className="flex items-center gap-3 text-[12px] text-slate-700 min-[2400px]:text-[13px]" key={item}>
-            <span className="flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-            </span>
-            {item}
-          </li>
-        ))}
-      </ul>
-    </WhiteProcessCard>
+      <ProofStrip />
+    </section>
   );
 }
 
-function HowItWorksSection(props: LandingPageProps) {
+function HowItWorksSection() {
   return (
-    <section id="how-it-works" className="relative z-10 overflow-hidden px-5 pb-20 pt-12 sm:px-8 lg:px-10 xl:pb-24 xl:pt-14 2xl:px-14 min-[2400px]:pb-28 min-[2400px]:pt-20">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_24%,rgba(37,99,235,0.055),transparent_46%),radial-gradient(circle_at_50%_88%,rgba(14,165,233,0.035),transparent_42%)]" />
-      <div className="relative mx-auto max-w-[1320px] min-[2400px]:max-w-[1880px]">
-        <div className="text-center">
-          <p className="text-[14px] font-semibold uppercase tracking-[0.42em] text-cyan-300">
+    <section className="relative z-10 mx-auto max-w-[1240px] px-6 py-24" id="how-it-works">
+      <div className="grid gap-10 lg:grid-cols-[0.9fr_1.25fr] lg:items-start">
+        <div>
+          <p className="text-[13px] font-bold uppercase tracking-[0.2em] text-[#2047f0]">
             How it works
           </p>
-          <h2 className="mx-auto mt-6 max-w-[980px] text-balance text-[clamp(2.75rem,3.72vw,3.8rem)] font-semibold leading-[1.13] tracking-[-0.055em] text-white min-[2400px]:relative min-[2400px]:left-1/2 min-[2400px]:w-[2200px] min-[2400px]:max-w-none min-[2400px]:-translate-x-1/2 min-[2400px]:whitespace-nowrap min-[2400px]:text-[3rem]">
-            How Taylor turns your background
-            <br className="hidden md:block min-[2400px]:hidden" />
-            into a stronger CV
+          <h2 className="mt-4 text-[clamp(2.2rem,3vw,3.6rem)] font-semibold leading-[1.08] tracking-[-0.045em] text-[#080d22]">
+            Role evidence in.
+            <br />
+            One-page CV out.
           </h2>
+          <p className="mt-5 max-w-[500px] text-[17px] leading-7 text-[#42506d]">
+            TaylorCV keeps the workflow focused: parse the job, match your evidence, ask only the highest-value questions, then produce the draft.
+          </p>
         </div>
-
-        <div className="mt-8 grid gap-8 lg:grid-cols-2 xl:grid-cols-[1fr_38px_1fr_38px_1.08fr_38px_1fr] xl:items-start xl:gap-3 min-[2400px]:mt-14 min-[2400px]:grid-cols-[1fr_58px_1fr_58px_1.1fr_58px_1fr] min-[2400px]:gap-5">
-          <div>
-            <StepIntro index={1} {...howItWorksSteps[0]} />
-            <div className="mt-5 min-[2400px]:mt-7">
-              <JobDescriptionProcessCard {...props} />
-            </div>
-          </div>
-          <ProcessArrow />
-
-          <div>
-            <StepIntro index={2} {...howItWorksSteps[1]} />
-            <div className="mt-5 min-[2400px]:mt-7">
-              <BackgroundProcessCard />
-            </div>
-          </div>
-          <ProcessArrow />
-
-          <div>
-            <StepIntro index={3} {...howItWorksSteps[2]} />
-            <div className="mt-5 min-[2400px]:mt-7">
-              <EvidenceProcessCards />
-            </div>
-          </div>
-          <ProcessArrow />
-
-          <div>
-            <StepIntro index={4} {...howItWorksSteps[3]} />
-            <div className="mt-5 min-[2400px]:mt-7">
-              <TailoredCvProcessCard />
-            </div>
-          </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {howSteps.map((step, index) => (
+            <article
+              className="rounded-[15px] border border-[#dfe5ef] bg-white/76 p-6 shadow-[0_18px_38px_rgba(29,42,78,0.08),inset_0_1px_0_rgba(255,255,255,0.9)]"
+              key={step.title}
+            >
+              <span className="grid h-9 w-9 place-items-center rounded-[9px] bg-[#eef3ff] text-[15px] font-bold text-[#2047f0]">
+                {index + 1}
+              </span>
+              <h3 className="mt-5 text-[19px] font-semibold tracking-[-0.025em] text-[#080d22]">
+                {step.title}
+              </h3>
+              <p className="mt-2.5 text-[14.5px] leading-6 text-[#42506d]">{step.body}</p>
+            </article>
+          ))}
         </div>
       </div>
     </section>
@@ -590,197 +551,151 @@ function PricingSection(props: LandingPageProps) {
   const [variant, setVariant] = useState<"annual" | "monthly">("annual");
   const proKey = paidPlanFromSelection("pro", variant);
   const premiumKey = paidPlanFromSelection("premium", variant);
-  const cards = [
-    {
-      key: "free" as const,
-      name: "Free",
-      subtext: "Get started with the basics",
-      price: "NZ$0",
-      capacity: "1",
-      capacityLabel: "CV generation",
-      capacitySub: "one-time",
-      bullets: ["1 CV generation", "PDF download", "Basic match analysis"],
-      cta: "Get started for free",
-      tone: "free",
-      onClick: props.onGetStarted,
-    },
-    {
-      key: proKey,
-      name: "Pro",
-      subtext: "For job seekers who want more",
-      price: planDisplayPrice(proKey),
-      period: "/ month",
-      capacity: "100",
-      capacityLabel: "CV generations",
-      capacitySub: "/ month",
-      bullets: ["Role-tailored CVs", "Gap questions", "Evidence-based insights"],
-      cta: "Start Pro",
-      tone: "pro",
-      onClick: () => props.onPlanSelected?.(proKey),
-    },
-    {
-      key: premiumKey,
-      name: "Premium",
-      subtext: "For active professionals",
-      price: planDisplayPrice(premiumKey),
-      period: "/ month",
-      capacity: "350",
-      capacityLabel: "CV generations",
-      capacitySub: "/ month",
-      bullets: ["Everything in Pro", "Designed for frequent tailoring", "Higher monthly capacity"],
-      cta: "Start Premium",
-      tone: "premium",
-      onClick: () => props.onPlanSelected?.(premiumKey),
-    },
-  ];
-  const trustItems = [
-    {
-      icon: LockKeyhole,
-      title: "Private & secure",
-      body: "Your data is encrypted and never shared.",
-    },
-    {
-      icon: ShieldCheck,
-      title: "Secure checkout",
-      body: "Payments powered by Stripe.",
-    },
-    {
-      icon: RefreshCw,
-      title: "Flexible options",
-      body: "Choose monthly flexibility or annual savings.",
-    },
-  ];
+  const cards = useMemo(
+    () => [
+      {
+        key: "free" as const,
+        name: "Free",
+        detail: "Start with one tailored CV generation.",
+        price: "NZ$0",
+        quota: "1 CV generation",
+        bullets: ["Paste a job ad", "Role-aware match analysis", "PDF export"],
+        cta: "Get started",
+        featured: false,
+        onClick: props.onGetStarted,
+      },
+      {
+        key: proKey,
+        name: "Pro",
+        detail: variant === "annual" ? "Annual plan, billed for 12 months." : "Monthly access for active job search.",
+        price: planDisplayPrice(proKey),
+        quota: `${plans[proKey].cvGenerationQuota} CVs / month`,
+        bullets: ["Gap questions", "Evidence-backed tailoring", "DOCX and PDF exports"],
+        cta: "Start Pro",
+        featured: true,
+        onClick: () => props.onPlanSelected?.(proKey),
+      },
+      {
+        key: premiumKey,
+        name: "Premium",
+        detail: variant === "annual" ? "Best for frequent applications." : "Higher monthly capacity.",
+        price: planDisplayPrice(premiumKey),
+        quota: `${plans[premiumKey].cvGenerationQuota} CVs / month`,
+        bullets: ["Everything in Pro", "Higher generation capacity", "Built for frequent tailoring"],
+        cta: "Start Premium",
+        featured: false,
+        onClick: () => props.onPlanSelected?.(premiumKey),
+      },
+    ],
+    [premiumKey, proKey, props, variant]
+  );
 
   return (
-    <section className="pricing-section" id="pricing">
-      <div className="pricing-ambient" />
-      <div className="pricing-shell">
-        <div className="pricing-heading">
-          <div aria-label="Taylor CV" className="pricing-brand">
-            <span className="pricing-brand__mark">
-              <FileText className="pricing-brand__icon" />
-            </span>
-            <span className="pricing-brand__text">Taylor CV</span>
-          </div>
-          <h2 className="pricing-title">
-            Smart plans for every stage of{" "}
-            <span>
-              your career.
-            </span>
-          </h2>
-          <p className="pricing-subtitle">
-            Simple pricing. Choose flexible monthly access or discounted annual plans.
+    <section className="relative z-10 border-y border-[#e4e9f2] bg-white/46 px-6 py-24" id="pricing">
+      <div className="mx-auto max-w-[1220px]">
+        <div className="text-center">
+          <p className="text-[13px] font-bold uppercase tracking-[0.2em] text-[#2047f0]">
+            Pricing
           </p>
-          <div className="pricing-toggle-row">
-            <div className="pricing-toggle">
-              {(["monthly", "annual"] as const).map((option) => (
-                <button
-                  className={[
-                    "pricing-toggle__button",
-                    variant === option ? "pricing-toggle__button--active" : "",
-                  ].join(" ")}
-                  key={option}
-                  onClick={() => setVariant(option)}
-                  type="button"
-                >
-                  {option === "monthly" ? "Monthly" : "Annual plan"}
-                </button>
-              ))}
-            </div>
-            <span className="pricing-savings-pill">
-              Save up to 53%
-            </span>
+          <h2 className="mt-4 text-[clamp(2.15rem,3vw,3.55rem)] font-semibold leading-[1.08] tracking-[-0.045em] text-[#080d22]">
+            Simple plans for serious applications.
+          </h2>
+          <p className="mx-auto mt-4 max-w-[620px] text-[17px] leading-7 text-[#42506d]">
+            Start free, then choose the amount of tailoring you need while you apply.
+          </p>
+          <div className="mt-7 inline-grid grid-cols-2 rounded-full border border-[#d8dfec] bg-white p-1 shadow-[0_10px_22px_rgba(29,42,78,0.07)]">
+            {(["monthly", "annual"] as const).map((option) => (
+              <button
+                className={cn(
+                  "h-10 rounded-full px-5 text-[14px] font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#2047f0]/16",
+                  variant === option
+                    ? "bg-[#2047f0] text-white shadow-[0_8px_18px_rgba(32,71,240,0.22)]"
+                    : "text-[#42506d] hover:text-[#080d22]"
+                )}
+                key={option}
+                onClick={() => setVariant(option)}
+                type="button"
+              >
+                {option === "monthly" ? "Monthly" : "Annual"}
+              </button>
+            ))}
           </div>
         </div>
-
-        <div className="pricing-card-row">
-          {cards.map((card) => {
-            const isPro = card.tone === "pro";
-            const isPremium = card.tone === "premium";
-            const Icon = isPro ? Zap : isPremium ? Crown : FileText;
-            return (
-              <article
-                className={[
-                  "pricing-card",
-                  `pricing-card--${card.tone}`,
-                ].join(" ")}
-                key={card.key}
+        <div className="mt-12 grid gap-5 lg:grid-cols-3">
+          {cards.map((card) => (
+            <article
+              className={cn(
+                "relative rounded-[18px] border bg-white p-7 shadow-[0_22px_48px_rgba(29,42,78,0.1),inset_0_1px_0_rgba(255,255,255,0.95)]",
+                card.featured
+                  ? "border-[#2047f0] ring-4 ring-[#2047f0]/10"
+                  : "border-[#dfe5ef]"
+              )}
+              key={card.key}
+            >
+              {card.featured ? (
+                <span className="absolute right-5 top-5 rounded-full bg-[#eef3ff] px-3 py-1 text-[12px] font-bold text-[#2047f0]">
+                  Most popular
+                </span>
+              ) : null}
+              <h3 className="text-[27px] font-semibold tracking-[-0.04em] text-[#080d22]">
+                {card.name}
+              </h3>
+              <p className="mt-2 min-h-12 text-[14.5px] leading-6 text-[#42506d]">{card.detail}</p>
+              <p className="mt-8 text-[42px] font-bold leading-none tracking-[-0.04em] text-[#080d22]">
+                {card.price}
+                {card.key !== "free" ? <span className="text-[15px] font-medium text-[#42506d]"> / month</span> : null}
+              </p>
+              <p className="mt-3 rounded-[10px] bg-[#f3f6fb] px-4 py-3 text-[14px] font-bold text-[#263252]">
+                {card.quota}
+              </p>
+              <ul className="mt-6 grid gap-3">
+                {card.bullets.map((bullet) => (
+                  <li className="flex items-center gap-3 text-[14.5px] text-[#263252]" key={bullet}>
+                    <CircleCheck className="h-4.5 w-4.5 text-[#04ae66]" />
+                    {bullet}
+                  </li>
+                ))}
+              </ul>
+              <PrimaryButton
+                className={cn("mt-8 w-full", !card.featured && "bg-[#080d22] hover:bg-[#18213b]")}
+                disabled={props.isLoading || props.isCheckoutLoading}
+                onClick={card.onClick}
+                trailingArrow
               >
-                {isPro ? (
-                  <div className="pricing-popular-tab">
-                    <Star className="pricing-popular-tab__icon" />
-                    Most popular
-                  </div>
-                ) : null}
-                <div className="pricing-card__top">
-                  <h3>{card.name}</h3>
-                  <p className="pricing-card__subtext">{card.subtext}</p>
-                  <p className="pricing-card__price">
-                    <span>{card.price}</span>
-                    {"period" in card && card.period ? (
-                      <span className="pricing-card__period">{card.period}</span>
-                    ) : null}
-                  </p>
-                </div>
-                <div className={`pricing-capacity pricing-capacity--${card.tone}`}>
-                  <div className="pricing-capacity__inner">
-                    <span className="pricing-capacity__icon">
-                      <Icon className="pricing-capacity__svg" />
-                    </span>
-                    <p className="pricing-capacity__text">
-                      <span className="pricing-capacity__number">{card.capacity}</span>
-                      <span className="pricing-capacity__label">
-                        <span className="pricing-capacity__label-main">{card.capacityLabel}</span>
-                        <span className="pricing-capacity__label-sub">{card.capacitySub}</span>
-                      </span>
-                    </p>
-                  </div>
-                </div>
-                <div className="pricing-card__body">
-                  <ul className="pricing-bullets">
-                    {card.bullets.map((bullet) => (
-                      <li key={bullet}>
-                        <span className="pricing-check">
-                          <Check className="pricing-check__icon" />
-                        </span>
-                        {bullet}
-                      </li>
-                    ))}
-                  </ul>
-                  <button
-                    className={[
-                      "pricing-cta",
-                      `pricing-cta--${card.tone}`,
-                    ].join(" ")}
-                    disabled={props.isLoading || props.isCheckoutLoading}
-                    onClick={card.onClick}
-                    type="button"
-                  >
-                    {card.cta}
-                    <ArrowRight className="pricing-cta__arrow" />
-                  </button>
-                </div>
-              </article>
-            );
-          })}
+                {card.cta}
+              </PrimaryButton>
+            </article>
+          ))}
         </div>
+      </div>
+    </section>
+  );
+}
 
-        <div className="pricing-trust">
-          {trustItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <div className="pricing-trust__item" key={item.title}>
-                <span className="pricing-trust__icon">
-                  <Icon />
-                </span>
-                <span>
-                  <span className="pricing-trust__title">{item.title}</span>
-                  <span className="pricing-trust__body">{item.body}</span>
-                </span>
-              </div>
-            );
-          })}
-        </div>
+function FaqSection() {
+  return (
+    <section className="relative z-10 mx-auto max-w-[1040px] px-6 py-24" id="faq">
+      <div className="text-center">
+        <p className="text-[13px] font-bold uppercase tracking-[0.2em] text-[#2047f0]">
+          FAQ
+        </p>
+        <h2 className="mt-4 text-[clamp(2.1rem,3vw,3.4rem)] font-semibold leading-[1.08] tracking-[-0.045em] text-[#080d22]">
+          Practical answers before you paste the job.
+        </h2>
+      </div>
+      <div className="mt-10 grid gap-4">
+        {faqItems.map((item) => (
+          <details
+            className="group rounded-[15px] border border-[#dfe5ef] bg-white/76 p-6 shadow-[0_16px_34px_rgba(29,42,78,0.08)]"
+            key={item.question}
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-5 text-[18px] font-semibold tracking-[-0.02em] text-[#080d22] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#2047f0]/14">
+              {item.question}
+              <ChevronDown className="h-5 w-5 text-[#2047f0] transition group-open:rotate-180" />
+            </summary>
+            <p className="mt-4 max-w-[780px] text-[15px] leading-7 text-[#42506d]">{item.answer}</p>
+          </details>
+        ))}
       </div>
     </section>
   );
@@ -788,84 +703,14 @@ function PricingSection(props: LandingPageProps) {
 
 export function LandingPage(props: LandingPageProps) {
   return (
-    <main className="relative min-h-screen max-w-[100vw] overflow-x-hidden bg-[#030813] text-white">
+    <main className="relative min-h-screen max-w-[100vw] overflow-x-hidden bg-[#fcfcfd] text-[#080d22]">
+      <LiquidGlassDefs />
       <LandingBackground />
-      <LandingNav {...props} />
-
-      <section className="relative z-10 mx-auto grid w-full max-w-[1920px] grid-cols-1 gap-10 px-5 pb-12 pt-8 sm:px-8 lg:px-10 xl:min-h-[min(820px,calc(100vh-4rem))] xl:grid-cols-[minmax(360px,430px)_minmax(0,1fr)] xl:items-start xl:gap-6 xl:pb-6 xl:pt-9 2xl:grid-cols-[minmax(470px,570px)_minmax(0,1fr)] 2xl:gap-10 2xl:px-14 2xl:pt-11 min-[1900px]:max-w-[2060px] min-[1900px]:!min-h-0 min-[1900px]:grid-cols-[minmax(540px,640px)_minmax(0,1fr)] min-[1900px]:pb-2">
-        <motion.div
-          animate="visible"
-          className="max-w-[590px] xl:max-w-[430px] 2xl:max-w-[570px] min-[1900px]:max-w-[640px]"
-          initial="hidden"
-          transition={{ staggerChildren: 0.1, delayChildren: 0.05 }}
-        >
-          <motion.div
-            className="mb-4 inline-flex items-center gap-2.5 rounded-full border border-cyan-300/12 bg-cyan-300/[0.035] px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.18em] text-cyan-300 shadow-[0_0_24px_rgba(34,211,238,0.08)] 2xl:mb-5"
-            transition={{ duration: 0.58, ease: [0.22, 1, 0.36, 1] }}
-            variants={entrance}
-          >
-            <Sparkles className="h-4 w-4 fill-cyan-300/30" />
-            AI Career Agent
-          </motion.div>
-
-          <motion.h1
-            className="text-balance text-[clamp(3rem,3.55vw,4.55rem)] font-semibold leading-[1.08] tracking-[-0.052em] text-white min-[1900px]:text-[5rem]"
-            transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1] }}
-            variants={entrance}
-          >
-            Build the CV for
-            <br />
-            the job you
-            <br />
-            <span className="bg-[linear-gradient(100deg,#3778ff_0%,#49ddff_96%)] bg-clip-text text-transparent">
-              actually want.
-            </span>
-          </motion.h1>
-
-          <motion.p
-            className="mt-5 max-w-[575px] text-[15.5px] leading-7 text-slate-300/92 2xl:mt-6 2xl:text-[17px] 2xl:leading-8"
-            transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1] }}
-            variants={entrance}
-          >
-            Paste the role. Add your background. Taylor finds your strongest
-            evidence, asks what's missing, and builds a focused CV that matches
-            the job without sounding generic.
-          </motion.p>
-
-          <motion.div
-            transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1] }}
-            variants={entrance}
-          >
-            <LandingCta {...props} />
-            {props.error ? (
-              <p className="mt-4 rounded-lg border border-amber-300/25 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
-                {props.error}
-              </p>
-            ) : null}
-          </motion.div>
-
-          <motion.div
-            transition={{ duration: 0.68, ease: [0.22, 1, 0.36, 1] }}
-            variants={entrance}
-          >
-            <BenefitRows />
-          </motion.div>
-        </motion.div>
-
-        <motion.div
-          animate="visible"
-          className="relative min-w-0"
-          initial="hidden"
-          transition={{ duration: 0.68, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-          variants={entrance}
-        >
-          <div className="pointer-events-none absolute inset-0 translate-x-[6%] bg-[radial-gradient(circle_at_58%_50%,rgba(0,199,255,0.22),transparent_38%),radial-gradient(circle_at_76%_42%,rgba(37,99,235,0.2),transparent_32%)] blur-3xl" />
-          <LandingArtifact />
-        </motion.div>
-      </section>
-      <TrustedCompaniesSection />
-      <HowItWorksSection {...props} />
+      <GlassHeader {...props} />
+      <Hero {...props} />
+      <HowItWorksSection />
       <PricingSection {...props} />
+      <FaqSection />
     </main>
   );
 }

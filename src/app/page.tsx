@@ -22,6 +22,7 @@ import {
   Network,
   RotateCcw,
   Search,
+  Send,
   Sparkles,
   ShieldCheck,
   Target,
@@ -31,7 +32,9 @@ import {
   Link,
   Mail,
   MapPin,
+  MessageSquare,
   Phone,
+  UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -77,12 +80,6 @@ type AppStage =
   | "auth_gate"
   | "paywall"
   | "error";
-type GapAnswerDraft = {
-  selectedOption?: string | null;
-  followUpText?: string | null;
-  skipped?: boolean;
-};
-
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
@@ -134,32 +131,6 @@ function friendlyAnalysisErrorMessage(message: string) {
   return message;
 }
 
-function gapMeta(question: ApplicationState["gapQuestions"][number]) {
-  const meta = isRecord(question.questionJson) ? question.questionJson : {};
-  return {
-    shortQuestion: textFromRecord(meta, "shortQuestion") ?? question.question,
-    whyThisMatters:
-      textFromRecord(meta, "whyThisMatters") ??
-      question.whyItMatters ??
-      question.reason,
-    howYourAnswerHelps:
-      textFromRecord(meta, "howYourAnswerHelps") ??
-      question.answerGuidance ??
-      "A short answer gives Taylor more truthful evidence to use.",
-    quickOptions:
-      stringArray(meta.quickOptions).length > 0
-        ? stringArray(meta.quickOptions).slice(0, 4)
-        : ["Yes", "Somewhat", "Not yet", "Skip"],
-    followUpPrompt:
-      textFromRecord(meta, "followUpPrompt") ??
-      "One line: what did you do, where did it happen, and what changed?",
-    dynamicGuidance:
-      textFromRecord(meta, "dynamicGuidance") ??
-      "Use a real example only. Rough scope is fine if exact numbers are unknown.",
-    exampleAnswer: textFromRecord(meta, "exampleAnswer"),
-  };
-}
-
 function deriveStage(state: ApplicationState | null): AppStage {
   if (!state?.job) return "job_input";
   if (!state.candidateProfile) return "candidate_source";
@@ -173,7 +144,7 @@ function PrimaryButton(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
     <button
       {...props}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-white/10 transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-semibold text-zinc-950 shadow-lg shadow-white/10 transition hover:scale-[1.02] hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50",
         props.className
       )}
     />
@@ -185,7 +156,7 @@ function SecondaryButton(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
     <button
       {...props}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-lg border border-white/12 bg-white/[0.06] px-4 py-2.5 text-sm font-medium text-zinc-100 transition hover:bg-white/[0.1] disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-white/12 bg-white/[0.06] px-4 py-2.5 text-sm font-medium text-zinc-100 transition hover:scale-[1.02] hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-50",
         props.className
       )}
     />
@@ -480,7 +451,7 @@ function JobGlassCard(props: { children: React.ReactNode; className?: string }) 
         props.className
       )}
     >
-      <div className="relative">{props.children}</div>
+      <div className="relative h-full">{props.children}</div>
     </section>
   );
 }
@@ -1131,7 +1102,7 @@ function RoleMatchReadyStage(props: {
             </div>
             <div className="flex shrink-0 gap-3">
               <button
-                className="inline-flex h-12 min-w-[270px] items-center justify-center gap-3 rounded-[10px] bg-gradient-to-r from-sky-500 via-blue-500 to-violet-600 px-5 text-[15px] font-medium text-white shadow-[0_14px_34px_rgba(37,99,235,0.28),inset_0_1px_0_rgba(255,255,255,0.22)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55"
+                className="inline-flex h-12 min-w-[270px] cursor-pointer items-center justify-center gap-3 rounded-[10px] bg-gradient-to-r from-sky-500 via-blue-500 to-violet-600 px-5 text-[15px] font-medium text-white shadow-[0_14px_34px_rgba(37,99,235,0.28),inset_0_1px_0_rgba(255,255,255,0.22)] transition hover:scale-[1.02] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-55"
                 disabled={props.isGenerating}
                 onClick={props.onAnswer}
                 type="button"
@@ -1141,7 +1112,7 @@ function RoleMatchReadyStage(props: {
                 <ArrowRight className="h-5 w-5" />
               </button>
               <button
-                className="inline-flex h-12 min-w-[188px] items-center justify-center gap-3 rounded-[10px] border border-blue-200/34 bg-[#08172b]/86 px-5 text-[15px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition hover:border-blue-200/50 hover:bg-[#0b1c34] disabled:cursor-not-allowed disabled:opacity-55"
+                className="inline-flex h-12 min-w-[188px] cursor-pointer items-center justify-center gap-3 rounded-[10px] border border-blue-200/34 bg-[#08172b]/86 px-5 text-[15px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition hover:scale-[1.02] hover:border-blue-200/50 hover:bg-[#0b1c34] disabled:cursor-not-allowed disabled:opacity-55"
                 disabled={props.isGenerating || !props.state}
                 onClick={props.onSkip}
                 type="button"
@@ -1260,7 +1231,7 @@ function JobInputStage(props: {
           />
           <button
             aria-label="Paste job description"
-            className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-sky-400 transition hover:bg-sky-400/10 hover:text-sky-300"
+            className="absolute right-4 top-4 inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-sky-400 transition hover:scale-110 hover:bg-sky-400/10 hover:text-sky-300"
             onClick={() => void pasteFromClipboard()}
             type="button"
           >
@@ -1683,7 +1654,7 @@ function JobAnalysisStage(props: {
             <p className="mt-2 text-[15px] leading-6 text-red-100/75">{props.error}</p>
             <div className="mt-5 flex flex-wrap gap-3">
               <button
-                className="inline-flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-[14px] font-semibold text-white shadow-[0_14px_36px_rgba(37,99,235,0.22)] transition hover:bg-blue-500"
+                className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-lg bg-blue-600 px-4 text-[14px] font-semibold text-white shadow-[0_14px_36px_rgba(37,99,235,0.22)] transition hover:scale-[1.02] hover:bg-blue-500"
                 onClick={props.onRetry}
                 type="button"
               >
@@ -1691,7 +1662,7 @@ function JobAnalysisStage(props: {
                 <ArrowRight className="h-4 w-4" />
               </button>
               <button
-                className="inline-flex h-11 items-center gap-2 rounded-lg border border-white/12 bg-white/[0.06] px-4 text-[14px] font-semibold text-white transition hover:bg-white/[0.1]"
+                className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-lg border border-white/12 bg-white/[0.06] px-4 text-[14px] font-semibold text-white transition hover:scale-[1.02] hover:bg-white/[0.12]"
                 onClick={props.onEdit}
                 type="button"
               >
@@ -1811,7 +1782,7 @@ function CandidateSourceStage(props: {
                   </p>
                 </div>
                 <button
-                  className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-300 px-5 text-[14px] font-semibold text-emerald-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg bg-emerald-300 px-5 text-[14px] font-semibold text-emerald-950 transition hover:scale-[1.02] hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
                   disabled={props.isLoading}
                   onClick={props.onUseSavedMemory}
                   type="button"
@@ -1836,7 +1807,7 @@ function CandidateSourceStage(props: {
                   <button
                     aria-pressed={active}
                     className={cn(
-                      "relative -mb-px flex h-10 items-center justify-center gap-2 border-b-2 text-[14px] font-semibold transition",
+                      "relative -mb-px flex h-10 cursor-pointer items-center justify-center gap-2 border-b-2 text-[14px] font-semibold transition",
                       active
                         ? "border-blue-500 text-white"
                         : "border-transparent text-slate-500 hover:text-slate-300"
@@ -2031,175 +2002,376 @@ function CandidateSourceStage(props: {
   );
 }
 
-function GapQuestionsStage(props: {
-  questions: ApplicationState["gapQuestions"];
-  answers: Record<string, GapAnswerDraft>;
-  onChange: (id: string, answer: GapAnswerDraft) => void;
-  onSubmit: (skipRemaining?: boolean) => void;
-  isSubmitting: boolean;
-}) {
-  const [index, setIndex] = useState(0);
-  const question = props.questions[index];
-  const answer = question ? props.answers[question.id] ?? {} : {};
-  const meta = question ? gapMeta(question) : null;
-  const selectedTerminal = /^(skip|not yet|none|no)$/i.test(answer.selectedOption ?? "");
-  const canContinue =
-    !!answer.selectedOption && (selectedTerminal || !!answer.followUpText?.trim());
+type GapChatMessage = {
+  id: string;
+  role: "taylor" | "user";
+  text: string;
+  thinking?: boolean;
+};
 
-  if (!question) {
-    return (
-      <WorkflowShell
-        completedThrough={1}
-        contentClassName="max-w-4xl pt-10"
-        currentStep={2}
-      >
-        <div className="mb-7 max-w-3xl">
-          <h1 className="text-balance text-4xl font-semibold leading-tight text-white md:text-6xl">
-            No questions left.
-          </h1>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-zinc-300 md:text-lg">
-            Taylor can generate the CV now.
-          </p>
-        </div>
-        <PrimaryButton onClick={() => props.onSubmit(true)} type="button">
-          Build my tailored CV
-        </PrimaryButton>
-      </WorkflowShell>
+type GapChatEvaluationResult = {
+  boostPercent: number;
+  totalBoostPercent: number;
+  nextGapQuestionId: string | null;
+  allQuestionsComplete: boolean;
+};
+
+function TaylorThinking() {
+  return (
+    <span className="inline-flex items-center gap-1 px-1 py-2" aria-label="Taylor is thinking">
+      {[0, 1, 2].map((dot) => (
+        <span
+          className="h-1.5 w-1.5 animate-bounce rounded-full bg-sky-300/90"
+          key={dot}
+          style={{ animationDelay: `${dot * 120}ms` }}
+        />
+      ))}
+    </span>
+  );
+}
+
+function GapQuestionsStage(props: {
+  applicationId: string;
+  questions: ApplicationState["gapQuestions"];
+  onBack: () => void;
+  onComplete: () => void;
+  onRefresh: () => Promise<void>;
+  onSkip: (gapQuestionId: string) => Promise<ApplicationState["gapQuestions"]>;
+  isGenerating: boolean;
+}) {
+  const initialQuestion = props.questions.find((question) => question.status === "unanswered");
+  const [activeQuestionId, setActiveQuestionId] = useState<string | null>(
+    initialQuestion?.id ?? null
+  );
+  const [messages, setMessages] = useState<GapChatMessage[]>([]);
+  const [draft, setDraft] = useState("");
+  const [isBusy, setIsBusy] = useState(false);
+  const [totalBoost, setTotalBoost] = useState(0);
+  const [acceptedBoostCount, setAcceptedBoostCount] = useState(0);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const displayedBoostTotalRef = useRef(0);
+  const streamedQuestionIdsRef = useRef(new Set<string>());
+  const activeQuestion =
+    props.questions.find((question) => question.id === activeQuestionId) ??
+    props.questions.find((question) => question.status === "unanswered") ??
+    null;
+  const completedCount = props.questions.filter(
+    (question) => question.status !== "unanswered"
+  ).length;
+  const unansweredCount = props.questions.filter(
+    (question) => question.status === "unanswered"
+  ).length;
+  const progressIndex = Math.min(
+    Math.max(1, props.questions.length),
+    Math.max(1, completedCount + (activeQuestion ? 1 : 0))
+  );
+  const isFinalQuestion = !!activeQuestion && unansweredCount <= 1;
+
+  function appendMessage(message: GapChatMessage) {
+    setMessages((current) => [...current, message]);
+  }
+
+  function appendText(id: string, delta: string) {
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === id
+          ? { ...message, text: `${message.text}${delta}`, thinking: false }
+          : message
+      )
     );
+  }
+
+  function showAcceptedBoost(total: number) {
+    if (total <= displayedBoostTotalRef.current) return;
+    displayedBoostTotalRef.current = total;
+    setTotalBoost(total);
+    setAcceptedBoostCount((count) => count + 1);
+  }
+
+  async function streamQuestion(question: ApplicationState["gapQuestions"][number]) {
+    if (streamedQuestionIdsRef.current.has(question.id)) return;
+    streamedQuestionIdsRef.current.add(question.id);
+    setIsBusy(true);
+    const id = `question-${question.id}-${Date.now()}`;
+    appendMessage({ id, role: "taylor", text: "", thinking: true });
+    await new Promise((resolve) => setTimeout(resolve, 320));
+    for (const delta of question.question.match(/\S+\s*|\s+/g) ?? [question.question]) {
+      appendText(id, delta);
+      await new Promise((resolve) => setTimeout(resolve, 24));
+    }
+    setIsBusy(false);
+  }
+
+  useEffect(() => {
+    if (!activeQuestion || messages.length > 0) return;
+    void streamQuestion(activeQuestion);
+  }, [activeQuestion, messages.length]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages]);
+
+  async function readEvaluationStream(userMessage: string) {
+    if (!activeQuestion) throw new Error("No gap question is ready.");
+    const response = await fetch("/api/gap-answer-chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        applicationId: props.applicationId,
+        gapQuestionId: activeQuestion.id,
+        userMessage,
+      }),
+    });
+    if (!response.ok || !response.body) {
+      throw new Error("Taylor could not evaluate that answer.");
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let assistantId: string | null = null;
+    let nextQuestionMessageId: string | null = null;
+    const resultRef: { current: GapChatEvaluationResult | null } = { current: null };
+    const handleEvent = (block: string) => {
+      const eventName = block
+        .split(/\r?\n/)
+        .find((line) => line.startsWith("event:"))
+        ?.slice(6)
+        .trim();
+      const dataLine = block
+        .split(/\r?\n/)
+        .find((line) => line.startsWith("data:"))
+        ?.slice(5)
+        .trim();
+      if (!eventName || !dataLine) return;
+      const data = JSON.parse(dataLine) as Record<string, unknown>;
+      if (eventName === "thinking" && !assistantId) {
+        assistantId = `reply-${Date.now()}`;
+        appendMessage({ id: assistantId, role: "taylor", text: "", thinking: true });
+      }
+      if (eventName === "assistant_delta" && typeof data.delta === "string") {
+        assistantId ??= `reply-${Date.now()}`;
+        appendText(assistantId, data.delta);
+      }
+      if (eventName === "next_question_thinking") {
+        nextQuestionMessageId = `next-${String(data.gapQuestionId)}-${Date.now()}`;
+        appendMessage({
+          id: nextQuestionMessageId,
+          role: "taylor",
+          text: "",
+          thinking: true,
+        });
+      }
+      if (
+        eventName === "next_question_delta" &&
+        nextQuestionMessageId &&
+        typeof data.delta === "string"
+      ) {
+        appendText(nextQuestionMessageId, data.delta);
+      }
+      if (eventName === "result") {
+        resultRef.current = data as unknown as GapChatEvaluationResult;
+      }
+      if (eventName === "boost" && typeof data.totalBoostPercent === "number") {
+        showAcceptedBoost(data.totalBoostPercent);
+      }
+      if (eventName === "error") {
+        throw new Error(
+          typeof data.message === "string"
+            ? data.message
+            : "Taylor could not evaluate that answer."
+        );
+      }
+    };
+    while (true) {
+      const next = await reader.read();
+      buffer += decoder.decode(next.value, { stream: !next.done });
+      const blocks = buffer.split(/\r?\n\r?\n/);
+      buffer = blocks.pop() ?? "";
+      blocks.forEach(handleEvent);
+      if (next.done) break;
+    }
+    const result = resultRef.current;
+    if (!result) throw new Error("Taylor did not finish evaluating that answer.");
+    return result;
+  }
+
+  async function sendAnswer() {
+    const userMessage = draft.trim();
+    if (!activeQuestion || !userMessage || isBusy || props.isGenerating) return;
+    setDraft("");
+    setIsBusy(true);
+    appendMessage({ id: `user-${Date.now()}`, role: "user", text: userMessage });
+    try {
+      const result = await readEvaluationStream(userMessage);
+      if (result.boostPercent > 0) {
+        showAcceptedBoost(result.totalBoostPercent);
+      }
+      setActiveQuestionId(result.nextGapQuestionId);
+      await props.onRefresh();
+      if (result.allQuestionsComplete) props.onComplete();
+    } catch (streamError) {
+      appendMessage({
+        id: `error-${Date.now()}`,
+        role: "taylor",
+        text:
+          streamError instanceof Error
+            ? streamError.message
+            : "Taylor could not evaluate that answer.",
+      });
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function skipCurrent() {
+    if (!activeQuestion || isBusy || props.isGenerating) return;
+    setIsBusy(true);
+    appendMessage({ id: `skip-${Date.now()}`, role: "user", text: "Skip this question." });
+    try {
+      const questions = await props.onSkip(activeQuestion.id);
+      const next = questions.find((question) => question.status === "unanswered");
+      setActiveQuestionId(next?.id ?? null);
+      if (next) {
+        await streamQuestion(next);
+      } else {
+        props.onComplete();
+      }
+    } catch (skipError) {
+      appendMessage({
+        id: `skip-error-${Date.now()}`,
+        role: "taylor",
+        text:
+          skipError instanceof Error
+            ? skipError.message
+            : "Taylor could not skip that question.",
+      });
+    } finally {
+      setIsBusy(false);
+    }
   }
 
   return (
     <WorkflowShell
       completedThrough={1}
-      contentClassName="max-w-4xl pt-10"
+      contentClassName="flex max-w-[1080px] items-start justify-center pt-7 pb-2"
       currentStep={2}
     >
-      <div className="mb-7 max-w-3xl">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-100/80">
-          Optional questions
-        </p>
-        <h1 className="text-balance text-4xl font-semibold leading-tight text-white md:text-6xl">
-          Question {index + 1} of {props.questions.length}
-        </h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-zinc-300 md:text-lg">
-          Answer with one short detail. Skip anything that is not true or useful.
-        </p>
-      </div>
-      <Panel className="max-w-4xl p-6">
-        <div className="grid gap-5 lg:grid-cols-[0.46fr_0.54fr]">
-          <div className="space-y-4">
-            <p className="text-2xl font-semibold leading-tight text-white">{meta?.shortQuestion}</p>
-            <div className="rounded-lg border border-white/10 bg-black/20 p-4">
-              <p className="text-sm font-semibold text-cyan-100">Why this matters</p>
-              <p className="mt-2 text-sm leading-6 text-zinc-300">{meta?.whyThisMatters}</p>
-            </div>
-            <div className="rounded-lg border border-white/10 bg-black/20 p-4">
-              <p className="text-sm font-semibold text-emerald-100">How your answer helps</p>
-              <p className="mt-2 text-sm leading-6 text-zinc-300">{meta?.howYourAnswerHelps}</p>
+      <JobGlassCard className="gap-chat-card flex h-[min(748px,calc(100dvh-216px))] min-h-[600px] w-full max-w-[1030px] flex-col rounded-[20px] px-6 py-6 sm:px-8">
+        <div className="flex h-full min-h-0 flex-col">
+        <header className="flex flex-col gap-5 border-b border-white/10 pb-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-5">
+            <span className="flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-full border border-blue-500/35 bg-[#071632] text-violet-400 shadow-[inset_0_0_24px_rgba(14,165,233,0.10)]">
+              <Sparkles className="h-8 w-8" />
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-[27px] font-medium leading-tight text-white sm:text-[31px]">
+                Answer a few quick gap questions
+              </h1>
+              <p className="mt-2 text-[15px] font-normal leading-6 text-slate-300">
+                Taylor is filling the missing evidence before building your CV plan.
+              </p>
             </div>
           </div>
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              {meta?.quickOptions.map((option) => {
-                const selected = answer.selectedOption === option;
-                return (
-                  <button
-                    className={cn(
-                      "rounded-lg border px-3 py-2 text-sm font-medium transition",
-                      selected
-                        ? "border-cyan-200 bg-cyan-200 text-zinc-950"
-                        : "border-white/10 bg-black/20 text-zinc-100 hover:bg-white/10"
-                    )}
-                    key={option}
-                    onClick={() =>
-                      props.onChange(question.id, {
-                        ...answer,
-                        selectedOption: option,
-                        skipped: /^skip$/i.test(option),
-                        followUpText: /^(skip|not yet|none|no)$/i.test(option)
-                          ? null
-                          : answer.followUpText,
-                      })
-                    }
-                    type="button"
-                  >
-                    {option}
-                  </button>
-                );
-              })}
-            </div>
-            {answer.selectedOption && !selectedTerminal ? (
-              <textarea
-                className="min-h-28 w-full resize-none rounded-lg border border-white/10 bg-black/30 p-3 text-sm leading-6 text-white outline-none placeholder:text-zinc-500 focus:border-cyan-200/60"
-                onChange={(event) =>
-                  props.onChange(question.id, {
-                    ...answer,
-                    followUpText: event.target.value,
-                  })
-                }
-                placeholder={meta?.followUpPrompt}
-                value={answer.followUpText ?? ""}
-              />
+          <div className="flex shrink-0 flex-wrap gap-3">
+            <span className="inline-flex h-[66px] items-center gap-3 rounded-[13px] border border-white/12 bg-[#07162b]/78 px-5 text-[16px] font-normal text-white">
+              <MessageSquare className="h-5 w-5 text-sky-400" />
+              {progressIndex} of {Math.max(1, props.questions.length)}
+            </span>
+            {totalBoost > 0 ? (
+              <span className="inline-flex min-h-[66px] min-w-[188px] flex-col justify-center rounded-[13px] border border-white/12 bg-[#07162b]/78 px-5 text-[13px] font-normal text-slate-300">
+                <span>Match boost</span>
+                <span className="text-[20px] font-normal text-emerald-300">
+                  +{totalBoost}%{acceptedBoostCount > 1 ? " total" : ""}
+                </span>
+              </span>
             ) : null}
-            <p className="text-xs leading-5 text-zinc-400">{meta?.dynamicGuidance}</p>
-            {meta?.exampleAnswer ? (
-              <div className="rounded-lg border border-emerald-300/15 bg-emerald-300/[0.08] p-3">
-                <p className="text-xs font-semibold uppercase tracking-normal text-emerald-200">
-                  Example answer
-                </p>
-                <p className="mt-1.5 text-sm leading-6 text-zinc-300">{meta.exampleAnswer}</p>
+          </div>
+        </header>
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-1 py-6">
+          {messages.map((message) => (
+            <div
+              className={cn(
+                "flex items-end gap-3",
+                message.role === "user" && "justify-end"
+              )}
+              key={message.id}
+            >
+              {message.role === "taylor" ? (
+                <span className="flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-full border border-fuchsia-500/75 bg-[#06152b] shadow-[0_0_20px_rgba(168,85,247,0.12)]">
+                  <TaylorLogoMark className="h-8 w-8" />
+                </span>
+              ) : null}
+              <div className={cn("max-w-[min(650px,78%)]", message.role === "user" && "text-right")}>
+                <div
+                  className={cn(
+                    "rounded-[14px] px-5 py-3.5 text-left text-[16px] font-normal leading-7",
+                    message.role === "taylor" &&
+                      "border border-slate-500/30 bg-[#081a35]/82 text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
+                    message.role === "user" &&
+                      "border border-transparent bg-[linear-gradient(#061833,#061833)_padding-box,linear-gradient(112deg,#00f0d2,#15cfff_36%,#8b32ff)_border-box] text-white shadow-[0_0_16px_rgba(37,99,235,0.10)]"
+                  )}
+                >
+                  {message.thinking ? <TaylorThinking /> : message.text}
+                </div>
               </div>
-            ) : null}
-          </div>
+              {message.role === "user" ? (
+                <span className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full border border-slate-400/45 bg-[#061326] text-slate-200">
+                  <UserRound className="h-7 w-7" />
+                </span>
+              ) : null}
+            </div>
+          ))}
+          <div ref={chatEndRef} />
         </div>
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-          <SecondaryButton
-            disabled={index === 0 || props.isSubmitting}
-            onClick={() => setIndex((current) => Math.max(0, current - 1))}
-            type="button"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Previous
-          </SecondaryButton>
-          <div className="flex flex-wrap gap-2">
-            <SecondaryButton
-              disabled={props.isSubmitting}
-              onClick={() =>
-                props.onChange(question.id, {
-                  selectedOption: "Skip",
-                  skipped: true,
-                  followUpText: null,
-                })
-              }
-              type="button"
-            >
-              Skip current
-            </SecondaryButton>
-            <SecondaryButton
-              disabled={props.isSubmitting}
-              onClick={() => props.onSubmit(true)}
-              type="button"
-            >
-              Skip all remaining
-            </SecondaryButton>
-            <PrimaryButton
-              disabled={props.isSubmitting || !canContinue}
-              onClick={() => {
-                if (index < props.questions.length - 1) {
-                  setIndex((current) => current + 1);
-                  return;
+        <div className="border-t border-white/10 pt-4">
+          <label className="flex min-h-[74px] items-center gap-3 rounded-[13px] border border-sky-500/80 bg-[#031125]/78 px-5 shadow-[inset_0_0_26px_rgba(14,165,233,0.05)] focus-within:border-cyan-300">
+            <textarea
+              className="max-h-28 min-h-[30px] flex-1 resize-none bg-transparent py-2 text-[16px] font-normal leading-6 text-white outline-none placeholder:text-slate-400"
+              disabled={!activeQuestion || isBusy || props.isGenerating}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void sendAnswer();
                 }
-                props.onSubmit();
               }}
+              placeholder="Type your answer here..."
+              rows={1}
+              value={draft}
+            />
+            <button
+              aria-label="Send answer"
+              className="text-white transition hover:text-cyan-200 disabled:opacity-40"
+              disabled={!draft.trim() || !activeQuestion || isBusy || props.isGenerating}
+              onClick={() => void sendAnswer()}
               type="button"
             >
-              {props.isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {index === props.questions.length - 1 ? "Build my tailored CV" : "Next"}
-              <ArrowRight className="h-4 w-4" />
-            </PrimaryButton>
+              <Send className="h-6 w-6" />
+            </button>
+          </label>
+          <div className="mt-4 flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <SecondaryButton disabled={isBusy || props.isGenerating} onClick={props.onBack} type="button">
+              <ArrowLeft className="h-5 w-5" />
+              Back
+            </SecondaryButton>
+            <div className="flex w-full flex-wrap gap-3 sm:w-auto sm:flex-nowrap">
+              <SecondaryButton disabled={!activeQuestion || isBusy || props.isGenerating} onClick={() => void skipCurrent()} type="button">
+                Skip
+              </SecondaryButton>
+              <button
+                className="inline-flex h-12 w-full items-center justify-center gap-3 rounded-[11px] bg-gradient-to-r from-sky-500 via-blue-500 to-violet-600 px-5 text-[16px] font-normal text-white shadow-[0_14px_34px_rgba(37,99,235,0.22)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto sm:min-w-[236px]"
+                disabled={!draft.trim() || !activeQuestion || isBusy || props.isGenerating}
+                onClick={() => void sendAnswer()}
+                type="button"
+              >
+                {isBusy ? "Taylor is thinking" : isFinalQuestion ? "Generate CV" : "Send answer"}
+                <Send className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         </div>
-      </Panel>
+        </div>
+      </JobGlassCard>
     </WorkflowShell>
   );
 }
@@ -2506,7 +2678,6 @@ export default function Home() {
   const [isCandidateFileReading, setIsCandidateFileReading] = useState(false);
   const [candidateMode, setCandidateMode] = useState<"upload" | "linkedin">("upload");
   const [linkedinUrl, setLinkedinUrl] = useState("");
-  const [gapAnswers, setGapAnswers] = useState<Record<string, GapAnswerDraft>>({});
   const [error, setError] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -2542,7 +2713,6 @@ export default function Home() {
     setResumedApplicationId(null);
     setShowLanding(false);
     setStage("job_input");
-    setGapAnswers({});
     setError(null);
     window.history.replaceState(null, "", "/");
 
@@ -2687,19 +2857,7 @@ export default function Home() {
     },
   });
 
-  const answerQuestions = api.application.answerGapQuestions.useMutation({
-    onSuccess: async () => {
-      if (applicationId) await utils.application.getApplicationState.invalidate({ applicationId });
-      startCvGeneration();
-    },
-    onError: (mutationError) => {
-      if (isStaleApplicationError(mutationError.message)) {
-        void recoverFromStaleApplication(true);
-        return;
-      }
-      setError(mutationError.message);
-    },
-  });
+  const skipGapQuestionMutation = api.application.skipGapQuestion.useMutation();
 
   const generateCv = api.application.generateCv.useMutation({
     onSuccess: async () => {
@@ -2750,7 +2908,6 @@ export default function Home() {
       setCandidateFileName(null);
       setLinkedinUrl("");
       setCandidateMode("upload");
-      setGapAnswers({});
       setError(null);
       window.history.replaceState(null, "", `/?applicationId=${data.applicationId}`);
     },
@@ -2832,11 +2989,6 @@ export default function Home() {
 
   function startCvGeneration() {
     if (!applicationId) return;
-    if (!session.data?.user) {
-      localStorage.setItem("pendingGenerateApplicationId", applicationId);
-      setStage("auth_gate");
-      return;
-    }
     setStage("cv_generating");
     generateCv.mutate({ applicationId });
   }
@@ -2848,26 +3000,6 @@ export default function Home() {
     localStorage.removeItem("pendingGenerateApplicationId");
     startCvGeneration();
   }, [applicationId, session.data?.user, state]);
-
-  function submitGapAnswers(skipRemaining = false) {
-    if (!applicationId || !state) return;
-    const questions = state.gapQuestions.filter((question) => question.status === "unanswered");
-    answerQuestions.mutate({
-      applicationId,
-      answers: questions.map((question) => {
-        const draft = gapAnswers[question.id];
-        const skipped = skipRemaining || draft?.skipped || !draft?.selectedOption;
-        return {
-          gapQuestionId: question.id,
-          selectedOption: skipped ? "Skip" : draft?.selectedOption ?? null,
-          followUpText: skipped ? null : draft?.followUpText?.trim() || null,
-          answerText: skipped ? null : draft?.followUpText?.trim() || null,
-          metricText: null,
-          skipped,
-        };
-      }),
-    });
-  }
 
   async function exportWithTiming(kind: "pdf" | "docx") {
     if (!cv) return;
@@ -2901,8 +3033,6 @@ export default function Home() {
     );
   }
 
-  const unansweredQuestions =
-    state?.gapQuestions.filter((question) => question.status === "unanswered").slice(0, 4) ?? [];
   const isJobInputStage = stage === "job_input";
   const isJobAnalysisStage = stage === "job_analysis";
   const isBackgroundStage = stage === "candidate_source";
@@ -3051,14 +3181,25 @@ export default function Home() {
             ) : null}
             {stage === "gap_questions" ? (
               <GapQuestionsStage
-                answers={gapAnswers}
-                isSubmitting={answerQuestions.isPending || generateCv.isPending}
+                applicationId={applicationId ?? ""}
+                isGenerating={generateCv.isPending || skipGapQuestionMutation.isPending}
                 key="gap_questions"
-                onChange={(id, answer) =>
-                  setGapAnswers((current) => ({ ...current, [id]: answer }))
-                }
-                onSubmit={submitGapAnswers}
-                questions={unansweredQuestions}
+                onBack={() => setStage("match_overview")}
+                onComplete={startCvGeneration}
+                onRefresh={async () => {
+                  if (!applicationId) return;
+                  await utils.application.getApplicationState.invalidate({ applicationId });
+                }}
+                onSkip={async (gapQuestionId) => {
+                  if (!applicationId) return [];
+                  const data = await skipGapQuestionMutation.mutateAsync({
+                    applicationId,
+                    gapQuestionId,
+                  });
+                  await utils.application.getApplicationState.invalidate({ applicationId });
+                  return data.gapQuestions;
+                }}
+                questions={state?.gapQuestions ?? []}
               />
             ) : null}
             {stage === "cv_generating" ? <CvGeneratingStage key="cv_generating" /> : null}

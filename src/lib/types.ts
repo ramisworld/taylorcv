@@ -15,6 +15,7 @@ import type {
   EvidenceMatchCvUsefulnessSchema,
   EvidenceScoringOutputSchema,
   ClaimRiskSchema,
+  GapAnswerEvaluatorOutputSchema,
   GapQuestionAgentOutputSchema,
   ImportanceSchema,
   LayoutArchitectureSchema,
@@ -51,6 +52,7 @@ export type BatchEvidenceFitOutput = z.infer<
   typeof BatchEvidenceFitOutputSchema
 >;
 export type GapQuestionAgentOutput = z.infer<typeof GapQuestionAgentOutputSchema>;
+export type GapAnswerEvaluatorOutput = z.infer<typeof GapAnswerEvaluatorOutputSchema>;
 export type CvBuilderOutput = z.infer<typeof CvBuilderOutputSchema>;
 export type EvidenceScoringOutput = z.infer<typeof EvidenceScoringOutputSchema>;
 export type CvStrategyOutput = z.infer<typeof CvStrategyOutputSchema>;

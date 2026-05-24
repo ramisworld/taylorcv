@@ -201,7 +201,7 @@ export function AuthShell(props: { mode: Mode }) {
             ) : null}
 
             <button
-              className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 text-sm font-semibold text-white shadow-[0_0_30px_rgba(37,99,235,.34)] transition hover:bg-blue-500 disabled:opacity-60"
+              className="mt-6 inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-blue-600 text-sm font-semibold text-white shadow-[0_0_30px_rgba(37,99,235,.34)] transition hover:scale-[1.02] hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isPending}
               type="submit"
             >
@@ -218,7 +218,7 @@ export function AuthShell(props: { mode: Mode }) {
 
             {isSignUp ? (
               <button
-                className="mt-3 text-sm font-medium text-blue-300"
+                className="mt-3 cursor-pointer text-sm font-medium text-blue-300 transition hover:text-blue-200"
                 disabled={isPending || !email}
                 onClick={resendVerification}
                 type="button"

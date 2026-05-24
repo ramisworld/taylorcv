@@ -262,6 +262,12 @@ export function buildGapAnswerEvidenceChunk(args: {
   metricText: string | null;
   answerText: string | null;
   trustLevel?: "usable" | "use_carefully" | "suspicious" | "do_not_use";
+  rawUserAnswer?: string | null;
+  extractedEvidenceSummary?: string | null;
+  evidenceQuality?: string | null;
+  boostPercent?: number | null;
+  originalQuestion?: string | null;
+  source?: string | null;
 }): NewCandidateChunk | null {
   const content = compact([
     args.selectedOption && !/^skip$/i.test(args.selectedOption)
@@ -294,6 +300,12 @@ export function buildGapAnswerEvidenceChunk(args: {
       gapQuestionId: args.gapQuestionId,
       gapAnswerId: args.gapAnswerId,
       trustLevel: args.trustLevel ?? "usable",
+      rawUserAnswer: args.rawUserAnswer ?? null,
+      extractedEvidenceSummary: args.extractedEvidenceSummary ?? args.answerText,
+      evidenceQuality: args.evidenceQuality ?? null,
+      boostPercent: args.boostPercent ?? null,
+      originalQuestion: args.originalQuestion ?? null,
+      source: args.source ?? "gap_answer",
       targetRequirementId: args.targetRequirementId,
       targetRequirementLabel: args.targetRequirementLabel,
     },

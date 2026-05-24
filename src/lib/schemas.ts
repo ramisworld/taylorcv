@@ -258,6 +258,49 @@ export const GapQuestionAgentOutputSchema = z.object({
   questions: z.array(GapQuestionAgentQuestionSchema).max(3),
 });
 
+export const GapAnswerMessageTypeSchema = z.enum([
+  "clarification_request",
+  "answer",
+  "vague_answer",
+  "off_topic",
+  "unsafe_or_unusable",
+]);
+
+export const GapAnswerUsableStatusSchema = z.enum([
+  "usable",
+  "use_carefully",
+  "not_usable",
+]);
+
+export const GapAnswerEvidenceQualitySchema = z.enum([
+  "none",
+  "weak",
+  "usable",
+  "strong",
+]);
+
+export const GapAnswerBoostBandSchema = z.enum([
+  "none",
+  "small",
+  "medium",
+  "large",
+]);
+
+export const GapAnswerEvaluatorOutputSchema = z.object({
+  messageType: GapAnswerMessageTypeSchema,
+  assistantReply: z.string().min(1).max(460),
+  shouldSaveEvidence: z.boolean(),
+  usableStatus: GapAnswerUsableStatusSchema,
+  evidenceQuality: GapAnswerEvidenceQualitySchema,
+  targetRequirementId: z.string().nullable(),
+  extractedEvidenceSummary: z.string().nullable(),
+  followUpQuestion: z.string().nullable(),
+  shouldMoveToNextQuestion: z.boolean(),
+  boostBand: GapAnswerBoostBandSchema,
+  suggestedBoostPercent: z.number().int().min(0).max(15),
+  reason: z.string().min(1).max(260),
+});
+
 export const BatchRequirementFitSchema = z.object({
   confidence: EvidenceConfidenceSchema,
   selectedEvidenceIndex: z.number().int().nonnegative().nullable(),

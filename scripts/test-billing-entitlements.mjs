@@ -47,10 +47,10 @@ const generateCvSource = workflowSource.slice(
   workflowSource.indexOf("export async function generateCv")
 );
 assert.equal(
-  generateCvSource.indexOf("const entitlement = await assertCanGenerateCv") <
+  generateCvSource.indexOf("await assertCanGenerateCv") <
     generateCvSource.indexOf("runCvBuilderAgent"),
   true,
-  "entitlement preflight must run before expensive CV builder calls"
+  "signed-in entitlement preflight must run before expensive CV builder calls"
 );
 assert.equal(
   generateCvSource.indexOf("recordSuccessfulCvGeneration") > generateCvSource.indexOf("tx.cvDraft.create"),

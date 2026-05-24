@@ -119,6 +119,93 @@ export async function createStructuredJsonResponse(args: {
   return parseJsonPayload(outputText, "OpenAI output text");
 }
 
+function sseDataLines(block: string) {
+  return block
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice(5).trimStart());
+}
+
+export async function streamStructuredJsonResponse(args: {
+  model: string;
+  systemPrompt: string;
+  userPrompt: string;
+  schemaName: string;
+  jsonSchema: JsonSchema;
+  temperature?: number;
+  onOutputTextDelta: (delta: string) => void | Promise<void>;
+}) {
+  if (!env.OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is required when USE_MOCK_AI is false");
+  }
+
+  const body: ResponsesApiBody & { stream: true } = {
+    model: args.model,
+    temperature: args.temperature,
+    input: [
+      { role: "system", content: args.systemPrompt },
+      { role: "user", content: args.userPrompt },
+    ],
+    stream: true,
+    text: {
+      format: {
+        type: "json_schema",
+        name: args.schemaName,
+        strict: true,
+        schema: args.jsonSchema,
+      },
+    },
+  };
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`OpenAI Responses API failed: ${await response.text()}`);
+  }
+  if (!response.body) {
+    throw new Error("OpenAI streaming response did not include a body");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let pending = "";
+  let outputText = "";
+
+  while (true) {
+    const chunk = await reader.read();
+    pending += decoder.decode(chunk.value, { stream: !chunk.done });
+    const blocks = pending.split(/\r?\n\r?\n/);
+    pending = blocks.pop() ?? "";
+    for (const block of blocks) {
+      for (const data of sseDataLines(block)) {
+        if (!data || data === "[DONE]") continue;
+        const event = parseJsonPayload(data, "OpenAI streaming event") as {
+          type?: string;
+          delta?: string;
+          error?: { message?: string };
+        };
+        if (event.type === "response.output_text.delta" && event.delta) {
+          outputText += event.delta;
+          await args.onOutputTextDelta(event.delta);
+        }
+        if (event.type === "error" || event.type === "response.error") {
+          throw new Error(event.error?.message ?? "OpenAI streaming response failed");
+        }
+      }
+    }
+    if (chunk.done) break;
+  }
+
+  return parseJsonPayload(outputText, "OpenAI output text");
+}
+
 export async function createOpenAIEmbedding(text: string) {
   if (!env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY is required when USE_MOCK_AI is false");

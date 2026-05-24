@@ -2850,7 +2850,7 @@ export namespace Prisma {
      * ```
      * // Shorthand for `emit: 'stdout'`
      * log: ['query', 'info', 'warn', 'error']
-     * 
+     *
      * // Emit as events only
      * log: [
      *   { emit: 'event', level: 'query' },
@@ -2858,7 +2858,7 @@ export namespace Prisma {
      *   { emit: 'event', level: 'warn' }
      *   { emit: 'event', level: 'error' }
      * ]
-     * 
+     *
      * / Emit as events and log to stdout
      * og: [
      *  { emit: 'stdout', level: 'query' },
@@ -20583,19 +20583,38 @@ export namespace Prisma {
 
   export type AggregateGapAnswer = {
     _count: GapAnswerCountAggregateOutputType | null
+    _avg: GapAnswerAvgAggregateOutputType | null
+    _sum: GapAnswerSumAggregateOutputType | null
     _min: GapAnswerMinAggregateOutputType | null
     _max: GapAnswerMaxAggregateOutputType | null
+  }
+
+  export type GapAnswerAvgAggregateOutputType = {
+    boostPercent: number | null
+  }
+
+  export type GapAnswerSumAggregateOutputType = {
+    boostPercent: number | null
   }
 
   export type GapAnswerMinAggregateOutputType = {
     id: string | null
     gapQuestionId: string | null
     applicationId: string | null
+    userId: string | null
+    targetRequirementId: string | null
     buttonAnswer: $Enums.ButtonAnswer | null
     elaboration: string | null
     selectedOption: string | null
     followUpText: string | null
     metricText: string | null
+    rawUserAnswer: string | null
+    extractedEvidenceSummary: string | null
+    originalQuestion: string | null
+    usableStatus: string | null
+    evidenceQuality: string | null
+    boostPercent: number | null
+    source: string | null
     skipped: boolean | null
     createdAt: Date | null
   }
@@ -20604,11 +20623,20 @@ export namespace Prisma {
     id: string | null
     gapQuestionId: string | null
     applicationId: string | null
+    userId: string | null
+    targetRequirementId: string | null
     buttonAnswer: $Enums.ButtonAnswer | null
     elaboration: string | null
     selectedOption: string | null
     followUpText: string | null
     metricText: string | null
+    rawUserAnswer: string | null
+    extractedEvidenceSummary: string | null
+    originalQuestion: string | null
+    usableStatus: string | null
+    evidenceQuality: string | null
+    boostPercent: number | null
+    source: string | null
     skipped: boolean | null
     createdAt: Date | null
   }
@@ -20617,26 +20645,52 @@ export namespace Prisma {
     id: number
     gapQuestionId: number
     applicationId: number
+    userId: number
+    targetRequirementId: number
     buttonAnswer: number
     elaboration: number
     selectedOption: number
     followUpText: number
     metricText: number
+    rawUserAnswer: number
+    extractedEvidenceSummary: number
+    originalQuestion: number
+    usableStatus: number
+    evidenceQuality: number
+    boostPercent: number
+    source: number
     skipped: number
     createdAt: number
     _all: number
   }
 
 
+  export type GapAnswerAvgAggregateInputType = {
+    boostPercent?: true
+  }
+
+  export type GapAnswerSumAggregateInputType = {
+    boostPercent?: true
+  }
+
   export type GapAnswerMinAggregateInputType = {
     id?: true
     gapQuestionId?: true
     applicationId?: true
+    userId?: true
+    targetRequirementId?: true
     buttonAnswer?: true
     elaboration?: true
     selectedOption?: true
     followUpText?: true
     metricText?: true
+    rawUserAnswer?: true
+    extractedEvidenceSummary?: true
+    originalQuestion?: true
+    usableStatus?: true
+    evidenceQuality?: true
+    boostPercent?: true
+    source?: true
     skipped?: true
     createdAt?: true
   }
@@ -20645,11 +20699,20 @@ export namespace Prisma {
     id?: true
     gapQuestionId?: true
     applicationId?: true
+    userId?: true
+    targetRequirementId?: true
     buttonAnswer?: true
     elaboration?: true
     selectedOption?: true
     followUpText?: true
     metricText?: true
+    rawUserAnswer?: true
+    extractedEvidenceSummary?: true
+    originalQuestion?: true
+    usableStatus?: true
+    evidenceQuality?: true
+    boostPercent?: true
+    source?: true
     skipped?: true
     createdAt?: true
   }
@@ -20658,11 +20721,20 @@ export namespace Prisma {
     id?: true
     gapQuestionId?: true
     applicationId?: true
+    userId?: true
+    targetRequirementId?: true
     buttonAnswer?: true
     elaboration?: true
     selectedOption?: true
     followUpText?: true
     metricText?: true
+    rawUserAnswer?: true
+    extractedEvidenceSummary?: true
+    originalQuestion?: true
+    usableStatus?: true
+    evidenceQuality?: true
+    boostPercent?: true
+    source?: true
     skipped?: true
     createdAt?: true
     _all?: true
@@ -20705,6 +20777,18 @@ export namespace Prisma {
     _count?: true | GapAnswerCountAggregateInputType
     /**
      * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     *
+     * Select which fields to average
+    **/
+    _avg?: GapAnswerAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     *
+     * Select which fields to sum
+    **/
+    _sum?: GapAnswerSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
      * 
      * Select which fields to find the minimum value
     **/
@@ -20736,6 +20820,8 @@ export namespace Prisma {
     take?: number
     skip?: number
     _count?: GapAnswerCountAggregateInputType | true
+    _avg?: GapAnswerAvgAggregateInputType
+    _sum?: GapAnswerSumAggregateInputType
     _min?: GapAnswerMinAggregateInputType
     _max?: GapAnswerMaxAggregateInputType
   }
@@ -20744,14 +20830,25 @@ export namespace Prisma {
     id: string
     gapQuestionId: string
     applicationId: string
+    userId: string | null
+    targetRequirementId: string | null
     buttonAnswer: $Enums.ButtonAnswer
     elaboration: string | null
     selectedOption: string | null
     followUpText: string | null
     metricText: string | null
+    rawUserAnswer: string | null
+    extractedEvidenceSummary: string | null
+    originalQuestion: string | null
+    usableStatus: string | null
+    evidenceQuality: string | null
+    boostPercent: number | null
+    source: string | null
     skipped: boolean
     createdAt: Date
     _count: GapAnswerCountAggregateOutputType | null
+    _avg: GapAnswerAvgAggregateOutputType | null
+    _sum: GapAnswerSumAggregateOutputType | null
     _min: GapAnswerMinAggregateOutputType | null
     _max: GapAnswerMaxAggregateOutputType | null
   }
@@ -20774,11 +20871,20 @@ export namespace Prisma {
     id?: boolean
     gapQuestionId?: boolean
     applicationId?: boolean
+    userId?: boolean
+    targetRequirementId?: boolean
     buttonAnswer?: boolean
     elaboration?: boolean
     selectedOption?: boolean
     followUpText?: boolean
     metricText?: boolean
+    rawUserAnswer?: boolean
+    extractedEvidenceSummary?: boolean
+    originalQuestion?: boolean
+    usableStatus?: boolean
+    evidenceQuality?: boolean
+    boostPercent?: boolean
+    source?: boolean
     skipped?: boolean
     createdAt?: boolean
     gapQuestion?: boolean | GapQuestionDefaultArgs<ExtArgs>
@@ -20789,11 +20895,20 @@ export namespace Prisma {
     id?: boolean
     gapQuestionId?: boolean
     applicationId?: boolean
+    userId?: boolean
+    targetRequirementId?: boolean
     buttonAnswer?: boolean
     elaboration?: boolean
     selectedOption?: boolean
     followUpText?: boolean
     metricText?: boolean
+    rawUserAnswer?: boolean
+    extractedEvidenceSummary?: boolean
+    originalQuestion?: boolean
+    usableStatus?: boolean
+    evidenceQuality?: boolean
+    boostPercent?: boolean
+    source?: boolean
     skipped?: boolean
     createdAt?: boolean
     gapQuestion?: boolean | GapQuestionDefaultArgs<ExtArgs>
@@ -20804,11 +20919,20 @@ export namespace Prisma {
     id?: boolean
     gapQuestionId?: boolean
     applicationId?: boolean
+    userId?: boolean
+    targetRequirementId?: boolean
     buttonAnswer?: boolean
     elaboration?: boolean
     selectedOption?: boolean
     followUpText?: boolean
     metricText?: boolean
+    rawUserAnswer?: boolean
+    extractedEvidenceSummary?: boolean
+    originalQuestion?: boolean
+    usableStatus?: boolean
+    evidenceQuality?: boolean
+    boostPercent?: boolean
+    source?: boolean
     skipped?: boolean
     createdAt?: boolean
     gapQuestion?: boolean | GapQuestionDefaultArgs<ExtArgs>
@@ -20819,16 +20943,25 @@ export namespace Prisma {
     id?: boolean
     gapQuestionId?: boolean
     applicationId?: boolean
+    userId?: boolean
+    targetRequirementId?: boolean
     buttonAnswer?: boolean
     elaboration?: boolean
     selectedOption?: boolean
     followUpText?: boolean
     metricText?: boolean
+    rawUserAnswer?: boolean
+    extractedEvidenceSummary?: boolean
+    originalQuestion?: boolean
+    usableStatus?: boolean
+    evidenceQuality?: boolean
+    boostPercent?: boolean
+    source?: boolean
     skipped?: boolean
     createdAt?: boolean
   }
 
-  export type GapAnswerOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "gapQuestionId" | "applicationId" | "buttonAnswer" | "elaboration" | "selectedOption" | "followUpText" | "metricText" | "skipped" | "createdAt", ExtArgs["result"]["gapAnswer"]>
+  export type GapAnswerOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "gapQuestionId" | "applicationId" | "userId" | "targetRequirementId" | "buttonAnswer" | "elaboration" | "selectedOption" | "followUpText" | "metricText" | "rawUserAnswer" | "extractedEvidenceSummary" | "originalQuestion" | "usableStatus" | "evidenceQuality" | "boostPercent" | "source" | "skipped" | "createdAt", ExtArgs["result"]["gapAnswer"]>
   export type GapAnswerInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     gapQuestion?: boolean | GapQuestionDefaultArgs<ExtArgs>
     application?: boolean | ApplicationDefaultArgs<ExtArgs>
@@ -20852,11 +20985,20 @@ export namespace Prisma {
       id: string
       gapQuestionId: string
       applicationId: string
+      userId: string | null
+      targetRequirementId: string | null
       buttonAnswer: $Enums.ButtonAnswer
       elaboration: string | null
       selectedOption: string | null
       followUpText: string | null
       metricText: string | null
+      rawUserAnswer: string | null
+      extractedEvidenceSummary: string | null
+      originalQuestion: string | null
+      usableStatus: string | null
+      evidenceQuality: string | null
+      boostPercent: number | null
+      source: string | null
       skipped: boolean
       createdAt: Date
     }, ExtArgs["result"]["gapAnswer"]>
@@ -21287,11 +21429,20 @@ export namespace Prisma {
     readonly id: FieldRef<"GapAnswer", 'String'>
     readonly gapQuestionId: FieldRef<"GapAnswer", 'String'>
     readonly applicationId: FieldRef<"GapAnswer", 'String'>
+    readonly userId: FieldRef<"GapAnswer", 'String'>
+    readonly targetRequirementId: FieldRef<"GapAnswer", 'String'>
     readonly buttonAnswer: FieldRef<"GapAnswer", 'ButtonAnswer'>
     readonly elaboration: FieldRef<"GapAnswer", 'String'>
     readonly selectedOption: FieldRef<"GapAnswer", 'String'>
     readonly followUpText: FieldRef<"GapAnswer", 'String'>
     readonly metricText: FieldRef<"GapAnswer", 'String'>
+    readonly rawUserAnswer: FieldRef<"GapAnswer", 'String'>
+    readonly extractedEvidenceSummary: FieldRef<"GapAnswer", 'String'>
+    readonly originalQuestion: FieldRef<"GapAnswer", 'String'>
+    readonly usableStatus: FieldRef<"GapAnswer", 'String'>
+    readonly evidenceQuality: FieldRef<"GapAnswer", 'String'>
+    readonly boostPercent: FieldRef<"GapAnswer", 'Int'>
+    readonly source: FieldRef<"GapAnswer", 'String'>
     readonly skipped: FieldRef<"GapAnswer", 'Boolean'>
     readonly createdAt: FieldRef<"GapAnswer", 'DateTime'>
   }
@@ -29923,11 +30074,20 @@ export namespace Prisma {
     id: 'id',
     gapQuestionId: 'gapQuestionId',
     applicationId: 'applicationId',
+    userId: 'userId',
+    targetRequirementId: 'targetRequirementId',
     buttonAnswer: 'buttonAnswer',
     elaboration: 'elaboration',
     selectedOption: 'selectedOption',
     followUpText: 'followUpText',
     metricText: 'metricText',
+    rawUserAnswer: 'rawUserAnswer',
+    extractedEvidenceSummary: 'extractedEvidenceSummary',
+    originalQuestion: 'originalQuestion',
+    usableStatus: 'usableStatus',
+    evidenceQuality: 'evidenceQuality',
+    boostPercent: 'boostPercent',
+    source: 'source',
     skipped: 'skipped',
     createdAt: 'createdAt'
   };
@@ -31758,11 +31918,20 @@ export namespace Prisma {
     id?: StringFilter<"GapAnswer"> | string
     gapQuestionId?: StringFilter<"GapAnswer"> | string
     applicationId?: StringFilter<"GapAnswer"> | string
+    userId?: StringNullableFilter<"GapAnswer"> | string | null
+    targetRequirementId?: StringNullableFilter<"GapAnswer"> | string | null
     buttonAnswer?: EnumButtonAnswerFilter<"GapAnswer"> | $Enums.ButtonAnswer
     elaboration?: StringNullableFilter<"GapAnswer"> | string | null
     selectedOption?: StringNullableFilter<"GapAnswer"> | string | null
     followUpText?: StringNullableFilter<"GapAnswer"> | string | null
     metricText?: StringNullableFilter<"GapAnswer"> | string | null
+    rawUserAnswer?: StringNullableFilter<"GapAnswer"> | string | null
+    extractedEvidenceSummary?: StringNullableFilter<"GapAnswer"> | string | null
+    originalQuestion?: StringNullableFilter<"GapAnswer"> | string | null
+    usableStatus?: StringNullableFilter<"GapAnswer"> | string | null
+    evidenceQuality?: StringNullableFilter<"GapAnswer"> | string | null
+    boostPercent?: IntNullableFilter<"GapAnswer"> | number | null
+    source?: StringNullableFilter<"GapAnswer"> | string | null
     skipped?: BoolFilter<"GapAnswer"> | boolean
     createdAt?: DateTimeFilter<"GapAnswer"> | Date | string
     gapQuestion?: XOR<GapQuestionScalarRelationFilter, GapQuestionWhereInput>
@@ -31773,11 +31942,20 @@ export namespace Prisma {
     id?: SortOrder
     gapQuestionId?: SortOrder
     applicationId?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    targetRequirementId?: SortOrderInput | SortOrder
     buttonAnswer?: SortOrder
     elaboration?: SortOrderInput | SortOrder
     selectedOption?: SortOrderInput | SortOrder
     followUpText?: SortOrderInput | SortOrder
     metricText?: SortOrderInput | SortOrder
+    rawUserAnswer?: SortOrderInput | SortOrder
+    extractedEvidenceSummary?: SortOrderInput | SortOrder
+    originalQuestion?: SortOrderInput | SortOrder
+    usableStatus?: SortOrderInput | SortOrder
+    evidenceQuality?: SortOrderInput | SortOrder
+    boostPercent?: SortOrderInput | SortOrder
+    source?: SortOrderInput | SortOrder
     skipped?: SortOrder
     createdAt?: SortOrder
     gapQuestion?: GapQuestionOrderByWithRelationInput
@@ -31791,11 +31969,20 @@ export namespace Prisma {
     NOT?: GapAnswerWhereInput | GapAnswerWhereInput[]
     gapQuestionId?: StringFilter<"GapAnswer"> | string
     applicationId?: StringFilter<"GapAnswer"> | string
+    userId?: StringNullableFilter<"GapAnswer"> | string | null
+    targetRequirementId?: StringNullableFilter<"GapAnswer"> | string | null
     buttonAnswer?: EnumButtonAnswerFilter<"GapAnswer"> | $Enums.ButtonAnswer
     elaboration?: StringNullableFilter<"GapAnswer"> | string | null
     selectedOption?: StringNullableFilter<"GapAnswer"> | string | null
     followUpText?: StringNullableFilter<"GapAnswer"> | string | null
     metricText?: StringNullableFilter<"GapAnswer"> | string | null
+    rawUserAnswer?: StringNullableFilter<"GapAnswer"> | string | null
+    extractedEvidenceSummary?: StringNullableFilter<"GapAnswer"> | string | null
+    originalQuestion?: StringNullableFilter<"GapAnswer"> | string | null
+    usableStatus?: StringNullableFilter<"GapAnswer"> | string | null
+    evidenceQuality?: StringNullableFilter<"GapAnswer"> | string | null
+    boostPercent?: IntNullableFilter<"GapAnswer"> | number | null
+    source?: StringNullableFilter<"GapAnswer"> | string | null
     skipped?: BoolFilter<"GapAnswer"> | boolean
     createdAt?: DateTimeFilter<"GapAnswer"> | Date | string
     gapQuestion?: XOR<GapQuestionScalarRelationFilter, GapQuestionWhereInput>
@@ -31806,16 +31993,27 @@ export namespace Prisma {
     id?: SortOrder
     gapQuestionId?: SortOrder
     applicationId?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    targetRequirementId?: SortOrderInput | SortOrder
     buttonAnswer?: SortOrder
     elaboration?: SortOrderInput | SortOrder
     selectedOption?: SortOrderInput | SortOrder
     followUpText?: SortOrderInput | SortOrder
     metricText?: SortOrderInput | SortOrder
+    rawUserAnswer?: SortOrderInput | SortOrder
+    extractedEvidenceSummary?: SortOrderInput | SortOrder
+    originalQuestion?: SortOrderInput | SortOrder
+    usableStatus?: SortOrderInput | SortOrder
+    evidenceQuality?: SortOrderInput | SortOrder
+    boostPercent?: SortOrderInput | SortOrder
+    source?: SortOrderInput | SortOrder
     skipped?: SortOrder
     createdAt?: SortOrder
     _count?: GapAnswerCountOrderByAggregateInput
+    _avg?: GapAnswerAvgOrderByAggregateInput
     _max?: GapAnswerMaxOrderByAggregateInput
     _min?: GapAnswerMinOrderByAggregateInput
+    _sum?: GapAnswerSumOrderByAggregateInput
   }
 
   export type GapAnswerScalarWhereWithAggregatesInput = {
@@ -31825,11 +32023,20 @@ export namespace Prisma {
     id?: StringWithAggregatesFilter<"GapAnswer"> | string
     gapQuestionId?: StringWithAggregatesFilter<"GapAnswer"> | string
     applicationId?: StringWithAggregatesFilter<"GapAnswer"> | string
+    userId?: StringNullableWithAggregatesFilter<"GapAnswer"> | string | null
+    targetRequirementId?: StringNullableWithAggregatesFilter<"GapAnswer"> | string | null
     buttonAnswer?: EnumButtonAnswerWithAggregatesFilter<"GapAnswer"> | $Enums.ButtonAnswer
     elaboration?: StringNullableWithAggregatesFilter<"GapAnswer"> | string | null
     selectedOption?: StringNullableWithAggregatesFilter<"GapAnswer"> | string | null
     followUpText?: StringNullableWithAggregatesFilter<"GapAnswer"> | string | null
     metricText?: StringNullableWithAggregatesFilter<"GapAnswer"> | string | null
+    rawUserAnswer?: StringNullableWithAggregatesFilter<"GapAnswer"> | string | null
+    extractedEvidenceSummary?: StringNullableWithAggregatesFilter<"GapAnswer"> | string | null
+    originalQuestion?: StringNullableWithAggregatesFilter<"GapAnswer"> | string | null
+    usableStatus?: StringNullableWithAggregatesFilter<"GapAnswer"> | string | null
+    evidenceQuality?: StringNullableWithAggregatesFilter<"GapAnswer"> | string | null
+    boostPercent?: IntNullableWithAggregatesFilter<"GapAnswer"> | number | null
+    source?: StringNullableWithAggregatesFilter<"GapAnswer"> | string | null
     skipped?: BoolWithAggregatesFilter<"GapAnswer"> | boolean
     createdAt?: DateTimeWithAggregatesFilter<"GapAnswer"> | Date | string
   }
@@ -33967,11 +34174,20 @@ export namespace Prisma {
 
   export type GapAnswerCreateInput = {
     id?: string
+    userId?: string | null
+    targetRequirementId?: string | null
     buttonAnswer: $Enums.ButtonAnswer
     elaboration?: string | null
     selectedOption?: string | null
     followUpText?: string | null
     metricText?: string | null
+    rawUserAnswer?: string | null
+    extractedEvidenceSummary?: string | null
+    originalQuestion?: string | null
+    usableStatus?: string | null
+    evidenceQuality?: string | null
+    boostPercent?: number | null
+    source?: string | null
     skipped?: boolean
     createdAt?: Date | string
     gapQuestion: GapQuestionCreateNestedOneWithoutAnswersInput
@@ -33982,22 +34198,40 @@ export namespace Prisma {
     id?: string
     gapQuestionId: string
     applicationId: string
+    userId?: string | null
+    targetRequirementId?: string | null
     buttonAnswer: $Enums.ButtonAnswer
     elaboration?: string | null
     selectedOption?: string | null
     followUpText?: string | null
     metricText?: string | null
+    rawUserAnswer?: string | null
+    extractedEvidenceSummary?: string | null
+    originalQuestion?: string | null
+    usableStatus?: string | null
+    evidenceQuality?: string | null
+    boostPercent?: number | null
+    source?: string | null
     skipped?: boolean
     createdAt?: Date | string
   }
 
   export type GapAnswerUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetRequirementId?: NullableStringFieldUpdateOperationsInput | string | null
     buttonAnswer?: EnumButtonAnswerFieldUpdateOperationsInput | $Enums.ButtonAnswer
     elaboration?: NullableStringFieldUpdateOperationsInput | string | null
     selectedOption?: NullableStringFieldUpdateOperationsInput | string | null
     followUpText?: NullableStringFieldUpdateOperationsInput | string | null
     metricText?: NullableStringFieldUpdateOperationsInput | string | null
+    rawUserAnswer?: NullableStringFieldUpdateOperationsInput | string | null
+    extractedEvidenceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    originalQuestion?: NullableStringFieldUpdateOperationsInput | string | null
+    usableStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    evidenceQuality?: NullableStringFieldUpdateOperationsInput | string | null
+    boostPercent?: NullableIntFieldUpdateOperationsInput | number | null
+    source?: NullableStringFieldUpdateOperationsInput | string | null
     skipped?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     gapQuestion?: GapQuestionUpdateOneRequiredWithoutAnswersNestedInput
@@ -34008,11 +34242,20 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     gapQuestionId?: StringFieldUpdateOperationsInput | string
     applicationId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetRequirementId?: NullableStringFieldUpdateOperationsInput | string | null
     buttonAnswer?: EnumButtonAnswerFieldUpdateOperationsInput | $Enums.ButtonAnswer
     elaboration?: NullableStringFieldUpdateOperationsInput | string | null
     selectedOption?: NullableStringFieldUpdateOperationsInput | string | null
     followUpText?: NullableStringFieldUpdateOperationsInput | string | null
     metricText?: NullableStringFieldUpdateOperationsInput | string | null
+    rawUserAnswer?: NullableStringFieldUpdateOperationsInput | string | null
+    extractedEvidenceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    originalQuestion?: NullableStringFieldUpdateOperationsInput | string | null
+    usableStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    evidenceQuality?: NullableStringFieldUpdateOperationsInput | string | null
+    boostPercent?: NullableIntFieldUpdateOperationsInput | number | null
+    source?: NullableStringFieldUpdateOperationsInput | string | null
     skipped?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -34021,22 +34264,40 @@ export namespace Prisma {
     id?: string
     gapQuestionId: string
     applicationId: string
+    userId?: string | null
+    targetRequirementId?: string | null
     buttonAnswer: $Enums.ButtonAnswer
     elaboration?: string | null
     selectedOption?: string | null
     followUpText?: string | null
     metricText?: string | null
+    rawUserAnswer?: string | null
+    extractedEvidenceSummary?: string | null
+    originalQuestion?: string | null
+    usableStatus?: string | null
+    evidenceQuality?: string | null
+    boostPercent?: number | null
+    source?: string | null
     skipped?: boolean
     createdAt?: Date | string
   }
 
   export type GapAnswerUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetRequirementId?: NullableStringFieldUpdateOperationsInput | string | null
     buttonAnswer?: EnumButtonAnswerFieldUpdateOperationsInput | $Enums.ButtonAnswer
     elaboration?: NullableStringFieldUpdateOperationsInput | string | null
     selectedOption?: NullableStringFieldUpdateOperationsInput | string | null
     followUpText?: NullableStringFieldUpdateOperationsInput | string | null
     metricText?: NullableStringFieldUpdateOperationsInput | string | null
+    rawUserAnswer?: NullableStringFieldUpdateOperationsInput | string | null
+    extractedEvidenceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    originalQuestion?: NullableStringFieldUpdateOperationsInput | string | null
+    usableStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    evidenceQuality?: NullableStringFieldUpdateOperationsInput | string | null
+    boostPercent?: NullableIntFieldUpdateOperationsInput | number | null
+    source?: NullableStringFieldUpdateOperationsInput | string | null
     skipped?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -34045,11 +34306,20 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     gapQuestionId?: StringFieldUpdateOperationsInput | string
     applicationId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetRequirementId?: NullableStringFieldUpdateOperationsInput | string | null
     buttonAnswer?: EnumButtonAnswerFieldUpdateOperationsInput | $Enums.ButtonAnswer
     elaboration?: NullableStringFieldUpdateOperationsInput | string | null
     selectedOption?: NullableStringFieldUpdateOperationsInput | string | null
     followUpText?: NullableStringFieldUpdateOperationsInput | string | null
     metricText?: NullableStringFieldUpdateOperationsInput | string | null
+    rawUserAnswer?: NullableStringFieldUpdateOperationsInput | string | null
+    extractedEvidenceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    originalQuestion?: NullableStringFieldUpdateOperationsInput | string | null
+    usableStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    evidenceQuality?: NullableStringFieldUpdateOperationsInput | string | null
+    boostPercent?: NullableIntFieldUpdateOperationsInput | number | null
+    source?: NullableStringFieldUpdateOperationsInput | string | null
     skipped?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -35975,6 +36245,17 @@ export namespace Prisma {
     not?: NestedEnumButtonAnswerFilter<$PrismaModel> | $Enums.ButtonAnswer
   }
 
+  export type IntNullableFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableFilter<$PrismaModel> | number | null
+  }
+
   export type GapQuestionScalarRelationFilter = {
     is?: GapQuestionWhereInput
     isNot?: GapQuestionWhereInput
@@ -35984,24 +36265,46 @@ export namespace Prisma {
     id?: SortOrder
     gapQuestionId?: SortOrder
     applicationId?: SortOrder
+    userId?: SortOrder
+    targetRequirementId?: SortOrder
     buttonAnswer?: SortOrder
     elaboration?: SortOrder
     selectedOption?: SortOrder
     followUpText?: SortOrder
     metricText?: SortOrder
+    rawUserAnswer?: SortOrder
+    extractedEvidenceSummary?: SortOrder
+    originalQuestion?: SortOrder
+    usableStatus?: SortOrder
+    evidenceQuality?: SortOrder
+    boostPercent?: SortOrder
+    source?: SortOrder
     skipped?: SortOrder
     createdAt?: SortOrder
+  }
+
+  export type GapAnswerAvgOrderByAggregateInput = {
+    boostPercent?: SortOrder
   }
 
   export type GapAnswerMaxOrderByAggregateInput = {
     id?: SortOrder
     gapQuestionId?: SortOrder
     applicationId?: SortOrder
+    userId?: SortOrder
+    targetRequirementId?: SortOrder
     buttonAnswer?: SortOrder
     elaboration?: SortOrder
     selectedOption?: SortOrder
     followUpText?: SortOrder
     metricText?: SortOrder
+    rawUserAnswer?: SortOrder
+    extractedEvidenceSummary?: SortOrder
+    originalQuestion?: SortOrder
+    usableStatus?: SortOrder
+    evidenceQuality?: SortOrder
+    boostPercent?: SortOrder
+    source?: SortOrder
     skipped?: SortOrder
     createdAt?: SortOrder
   }
@@ -36010,13 +36313,26 @@ export namespace Prisma {
     id?: SortOrder
     gapQuestionId?: SortOrder
     applicationId?: SortOrder
+    userId?: SortOrder
+    targetRequirementId?: SortOrder
     buttonAnswer?: SortOrder
     elaboration?: SortOrder
     selectedOption?: SortOrder
     followUpText?: SortOrder
     metricText?: SortOrder
+    rawUserAnswer?: SortOrder
+    extractedEvidenceSummary?: SortOrder
+    originalQuestion?: SortOrder
+    usableStatus?: SortOrder
+    evidenceQuality?: SortOrder
+    boostPercent?: SortOrder
+    source?: SortOrder
     skipped?: SortOrder
     createdAt?: SortOrder
+  }
+
+  export type GapAnswerSumOrderByAggregateInput = {
+    boostPercent?: SortOrder
   }
 
   export type EnumButtonAnswerWithAggregatesFilter<$PrismaModel = never> = {
@@ -36027,6 +36343,22 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumButtonAnswerFilter<$PrismaModel>
     _max?: NestedEnumButtonAnswerFilter<$PrismaModel>
+  }
+
+  export type IntNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableWithAggregatesFilter<$PrismaModel> | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedIntNullableFilter<$PrismaModel>
+    _max?: NestedIntNullableFilter<$PrismaModel>
   }
 
   export type CvStrategyCountOrderByAggregateInput = {
@@ -38113,6 +38445,14 @@ export namespace Prisma {
     set?: $Enums.ButtonAnswer
   }
 
+  export type NullableIntFieldUpdateOperationsInput = {
+    set?: number | null
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
+  }
+
   export type GapQuestionUpdateOneRequiredWithoutAnswersNestedInput = {
     create?: XOR<GapQuestionCreateWithoutAnswersInput, GapQuestionUncheckedCreateWithoutAnswersInput>
     connectOrCreate?: GapQuestionCreateOrConnectWithoutAnswersInput
@@ -38763,6 +39103,22 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedEnumButtonAnswerFilter<$PrismaModel>
     _max?: NestedEnumButtonAnswerFilter<$PrismaModel>
+  }
+
+  export type NestedIntNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableWithAggregatesFilter<$PrismaModel> | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedIntNullableFilter<$PrismaModel>
+    _max?: NestedIntNullableFilter<$PrismaModel>
   }
 
   export type NestedIntWithAggregatesFilter<$PrismaModel = never> = {
@@ -40286,11 +40642,20 @@ export namespace Prisma {
 
   export type GapAnswerCreateWithoutApplicationInput = {
     id?: string
+    userId?: string | null
+    targetRequirementId?: string | null
     buttonAnswer: $Enums.ButtonAnswer
     elaboration?: string | null
     selectedOption?: string | null
     followUpText?: string | null
     metricText?: string | null
+    rawUserAnswer?: string | null
+    extractedEvidenceSummary?: string | null
+    originalQuestion?: string | null
+    usableStatus?: string | null
+    evidenceQuality?: string | null
+    boostPercent?: number | null
+    source?: string | null
     skipped?: boolean
     createdAt?: Date | string
     gapQuestion: GapQuestionCreateNestedOneWithoutAnswersInput
@@ -40299,11 +40664,20 @@ export namespace Prisma {
   export type GapAnswerUncheckedCreateWithoutApplicationInput = {
     id?: string
     gapQuestionId: string
+    userId?: string | null
+    targetRequirementId?: string | null
     buttonAnswer: $Enums.ButtonAnswer
     elaboration?: string | null
     selectedOption?: string | null
     followUpText?: string | null
     metricText?: string | null
+    rawUserAnswer?: string | null
+    extractedEvidenceSummary?: string | null
+    originalQuestion?: string | null
+    usableStatus?: string | null
+    evidenceQuality?: string | null
+    boostPercent?: number | null
+    source?: string | null
     skipped?: boolean
     createdAt?: Date | string
   }
@@ -40738,11 +41112,20 @@ export namespace Prisma {
     id?: StringFilter<"GapAnswer"> | string
     gapQuestionId?: StringFilter<"GapAnswer"> | string
     applicationId?: StringFilter<"GapAnswer"> | string
+    userId?: StringNullableFilter<"GapAnswer"> | string | null
+    targetRequirementId?: StringNullableFilter<"GapAnswer"> | string | null
     buttonAnswer?: EnumButtonAnswerFilter<"GapAnswer"> | $Enums.ButtonAnswer
     elaboration?: StringNullableFilter<"GapAnswer"> | string | null
     selectedOption?: StringNullableFilter<"GapAnswer"> | string | null
     followUpText?: StringNullableFilter<"GapAnswer"> | string | null
     metricText?: StringNullableFilter<"GapAnswer"> | string | null
+    rawUserAnswer?: StringNullableFilter<"GapAnswer"> | string | null
+    extractedEvidenceSummary?: StringNullableFilter<"GapAnswer"> | string | null
+    originalQuestion?: StringNullableFilter<"GapAnswer"> | string | null
+    usableStatus?: StringNullableFilter<"GapAnswer"> | string | null
+    evidenceQuality?: StringNullableFilter<"GapAnswer"> | string | null
+    boostPercent?: IntNullableFilter<"GapAnswer"> | number | null
+    source?: StringNullableFilter<"GapAnswer"> | string | null
     skipped?: BoolFilter<"GapAnswer"> | boolean
     createdAt?: DateTimeFilter<"GapAnswer"> | Date | string
   }
@@ -42872,11 +43255,20 @@ export namespace Prisma {
 
   export type GapAnswerCreateWithoutGapQuestionInput = {
     id?: string
+    userId?: string | null
+    targetRequirementId?: string | null
     buttonAnswer: $Enums.ButtonAnswer
     elaboration?: string | null
     selectedOption?: string | null
     followUpText?: string | null
     metricText?: string | null
+    rawUserAnswer?: string | null
+    extractedEvidenceSummary?: string | null
+    originalQuestion?: string | null
+    usableStatus?: string | null
+    evidenceQuality?: string | null
+    boostPercent?: number | null
+    source?: string | null
     skipped?: boolean
     createdAt?: Date | string
     application: ApplicationCreateNestedOneWithoutGapAnswersInput
@@ -42885,11 +43277,20 @@ export namespace Prisma {
   export type GapAnswerUncheckedCreateWithoutGapQuestionInput = {
     id?: string
     applicationId: string
+    userId?: string | null
+    targetRequirementId?: string | null
     buttonAnswer: $Enums.ButtonAnswer
     elaboration?: string | null
     selectedOption?: string | null
     followUpText?: string | null
     metricText?: string | null
+    rawUserAnswer?: string | null
+    extractedEvidenceSummary?: string | null
+    originalQuestion?: string | null
+    usableStatus?: string | null
+    evidenceQuality?: string | null
+    boostPercent?: number | null
+    source?: string | null
     skipped?: boolean
     createdAt?: Date | string
   }
@@ -45138,11 +45539,20 @@ export namespace Prisma {
   export type GapAnswerCreateManyApplicationInput = {
     id?: string
     gapQuestionId: string
+    userId?: string | null
+    targetRequirementId?: string | null
     buttonAnswer: $Enums.ButtonAnswer
     elaboration?: string | null
     selectedOption?: string | null
     followUpText?: string | null
     metricText?: string | null
+    rawUserAnswer?: string | null
+    extractedEvidenceSummary?: string | null
+    originalQuestion?: string | null
+    usableStatus?: string | null
+    evidenceQuality?: string | null
+    boostPercent?: number | null
+    source?: string | null
     skipped?: boolean
     createdAt?: Date | string
   }
@@ -45487,11 +45897,20 @@ export namespace Prisma {
 
   export type GapAnswerUpdateWithoutApplicationInput = {
     id?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetRequirementId?: NullableStringFieldUpdateOperationsInput | string | null
     buttonAnswer?: EnumButtonAnswerFieldUpdateOperationsInput | $Enums.ButtonAnswer
     elaboration?: NullableStringFieldUpdateOperationsInput | string | null
     selectedOption?: NullableStringFieldUpdateOperationsInput | string | null
     followUpText?: NullableStringFieldUpdateOperationsInput | string | null
     metricText?: NullableStringFieldUpdateOperationsInput | string | null
+    rawUserAnswer?: NullableStringFieldUpdateOperationsInput | string | null
+    extractedEvidenceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    originalQuestion?: NullableStringFieldUpdateOperationsInput | string | null
+    usableStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    evidenceQuality?: NullableStringFieldUpdateOperationsInput | string | null
+    boostPercent?: NullableIntFieldUpdateOperationsInput | number | null
+    source?: NullableStringFieldUpdateOperationsInput | string | null
     skipped?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     gapQuestion?: GapQuestionUpdateOneRequiredWithoutAnswersNestedInput
@@ -45500,11 +45919,20 @@ export namespace Prisma {
   export type GapAnswerUncheckedUpdateWithoutApplicationInput = {
     id?: StringFieldUpdateOperationsInput | string
     gapQuestionId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetRequirementId?: NullableStringFieldUpdateOperationsInput | string | null
     buttonAnswer?: EnumButtonAnswerFieldUpdateOperationsInput | $Enums.ButtonAnswer
     elaboration?: NullableStringFieldUpdateOperationsInput | string | null
     selectedOption?: NullableStringFieldUpdateOperationsInput | string | null
     followUpText?: NullableStringFieldUpdateOperationsInput | string | null
     metricText?: NullableStringFieldUpdateOperationsInput | string | null
+    rawUserAnswer?: NullableStringFieldUpdateOperationsInput | string | null
+    extractedEvidenceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    originalQuestion?: NullableStringFieldUpdateOperationsInput | string | null
+    usableStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    evidenceQuality?: NullableStringFieldUpdateOperationsInput | string | null
+    boostPercent?: NullableIntFieldUpdateOperationsInput | number | null
+    source?: NullableStringFieldUpdateOperationsInput | string | null
     skipped?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -45512,11 +45940,20 @@ export namespace Prisma {
   export type GapAnswerUncheckedUpdateManyWithoutApplicationInput = {
     id?: StringFieldUpdateOperationsInput | string
     gapQuestionId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetRequirementId?: NullableStringFieldUpdateOperationsInput | string | null
     buttonAnswer?: EnumButtonAnswerFieldUpdateOperationsInput | $Enums.ButtonAnswer
     elaboration?: NullableStringFieldUpdateOperationsInput | string | null
     selectedOption?: NullableStringFieldUpdateOperationsInput | string | null
     followUpText?: NullableStringFieldUpdateOperationsInput | string | null
     metricText?: NullableStringFieldUpdateOperationsInput | string | null
+    rawUserAnswer?: NullableStringFieldUpdateOperationsInput | string | null
+    extractedEvidenceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    originalQuestion?: NullableStringFieldUpdateOperationsInput | string | null
+    usableStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    evidenceQuality?: NullableStringFieldUpdateOperationsInput | string | null
+    boostPercent?: NullableIntFieldUpdateOperationsInput | number | null
+    source?: NullableStringFieldUpdateOperationsInput | string | null
     skipped?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -46063,22 +46500,40 @@ export namespace Prisma {
   export type GapAnswerCreateManyGapQuestionInput = {
     id?: string
     applicationId: string
+    userId?: string | null
+    targetRequirementId?: string | null
     buttonAnswer: $Enums.ButtonAnswer
     elaboration?: string | null
     selectedOption?: string | null
     followUpText?: string | null
     metricText?: string | null
+    rawUserAnswer?: string | null
+    extractedEvidenceSummary?: string | null
+    originalQuestion?: string | null
+    usableStatus?: string | null
+    evidenceQuality?: string | null
+    boostPercent?: number | null
+    source?: string | null
     skipped?: boolean
     createdAt?: Date | string
   }
 
   export type GapAnswerUpdateWithoutGapQuestionInput = {
     id?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetRequirementId?: NullableStringFieldUpdateOperationsInput | string | null
     buttonAnswer?: EnumButtonAnswerFieldUpdateOperationsInput | $Enums.ButtonAnswer
     elaboration?: NullableStringFieldUpdateOperationsInput | string | null
     selectedOption?: NullableStringFieldUpdateOperationsInput | string | null
     followUpText?: NullableStringFieldUpdateOperationsInput | string | null
     metricText?: NullableStringFieldUpdateOperationsInput | string | null
+    rawUserAnswer?: NullableStringFieldUpdateOperationsInput | string | null
+    extractedEvidenceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    originalQuestion?: NullableStringFieldUpdateOperationsInput | string | null
+    usableStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    evidenceQuality?: NullableStringFieldUpdateOperationsInput | string | null
+    boostPercent?: NullableIntFieldUpdateOperationsInput | number | null
+    source?: NullableStringFieldUpdateOperationsInput | string | null
     skipped?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     application?: ApplicationUpdateOneRequiredWithoutGapAnswersNestedInput
@@ -46087,11 +46542,20 @@ export namespace Prisma {
   export type GapAnswerUncheckedUpdateWithoutGapQuestionInput = {
     id?: StringFieldUpdateOperationsInput | string
     applicationId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetRequirementId?: NullableStringFieldUpdateOperationsInput | string | null
     buttonAnswer?: EnumButtonAnswerFieldUpdateOperationsInput | $Enums.ButtonAnswer
     elaboration?: NullableStringFieldUpdateOperationsInput | string | null
     selectedOption?: NullableStringFieldUpdateOperationsInput | string | null
     followUpText?: NullableStringFieldUpdateOperationsInput | string | null
     metricText?: NullableStringFieldUpdateOperationsInput | string | null
+    rawUserAnswer?: NullableStringFieldUpdateOperationsInput | string | null
+    extractedEvidenceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    originalQuestion?: NullableStringFieldUpdateOperationsInput | string | null
+    usableStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    evidenceQuality?: NullableStringFieldUpdateOperationsInput | string | null
+    boostPercent?: NullableIntFieldUpdateOperationsInput | number | null
+    source?: NullableStringFieldUpdateOperationsInput | string | null
     skipped?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -46099,11 +46563,20 @@ export namespace Prisma {
   export type GapAnswerUncheckedUpdateManyWithoutGapQuestionInput = {
     id?: StringFieldUpdateOperationsInput | string
     applicationId?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetRequirementId?: NullableStringFieldUpdateOperationsInput | string | null
     buttonAnswer?: EnumButtonAnswerFieldUpdateOperationsInput | $Enums.ButtonAnswer
     elaboration?: NullableStringFieldUpdateOperationsInput | string | null
     selectedOption?: NullableStringFieldUpdateOperationsInput | string | null
     followUpText?: NullableStringFieldUpdateOperationsInput | string | null
     metricText?: NullableStringFieldUpdateOperationsInput | string | null
+    rawUserAnswer?: NullableStringFieldUpdateOperationsInput | string | null
+    extractedEvidenceSummary?: NullableStringFieldUpdateOperationsInput | string | null
+    originalQuestion?: NullableStringFieldUpdateOperationsInput | string | null
+    usableStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    evidenceQuality?: NullableStringFieldUpdateOperationsInput | string | null
+    boostPercent?: NullableIntFieldUpdateOperationsInput | number | null
+    source?: NullableStringFieldUpdateOperationsInput | string | null
     skipped?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }

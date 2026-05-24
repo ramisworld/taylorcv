@@ -446,21 +446,32 @@ model GapCoachInsight {
 }
 
 model GapAnswer {
-  id             String       @id @default(cuid())
-  gapQuestionId  String       @map("gap_question_id")
-  applicationId  String       @map("application_id")
-  buttonAnswer   ButtonAnswer @map("button_answer")
-  elaboration    String?      @db.Text
-  selectedOption String?      @map("selected_option")
-  followUpText   String?      @map("follow_up_text") @db.Text
-  metricText     String?      @map("metric_text") @db.Text
-  skipped        Boolean      @default(false)
-  createdAt      DateTime     @default(now()) @map("created_at")
-  gapQuestion    GapQuestion  @relation(fields: [gapQuestionId], references: [id], onDelete: Cascade)
-  application    Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  id                       String       @id @default(cuid())
+  gapQuestionId            String       @map("gap_question_id")
+  applicationId            String       @map("application_id")
+  userId                   String?      @map("user_id")
+  targetRequirementId      String?      @map("target_requirement_id")
+  buttonAnswer             ButtonAnswer @map("button_answer")
+  elaboration              String?      @db.Text
+  selectedOption           String?      @map("selected_option")
+  followUpText             String?      @map("follow_up_text") @db.Text
+  metricText               String?      @map("metric_text") @db.Text
+  rawUserAnswer            String?      @map("raw_user_answer") @db.Text
+  extractedEvidenceSummary String?      @map("extracted_evidence_summary") @db.Text
+  originalQuestion         String?      @map("original_question") @db.Text
+  usableStatus             String?      @map("usable_status")
+  evidenceQuality          String?      @map("evidence_quality")
+  boostPercent             Int?         @map("boost_percent")
+  source                   String?
+  skipped                  Boolean      @default(false)
+  createdAt                DateTime     @default(now()) @map("created_at")
+  gapQuestion              GapQuestion  @relation(fields: [gapQuestionId], references: [id], onDelete: Cascade)
+  application              Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
   @@index([applicationId])
   @@index([gapQuestionId])
+  @@index([targetRequirementId])
+  @@index([userId])
   @@map("gap_answers")
 }
 
