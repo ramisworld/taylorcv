@@ -7,8 +7,8 @@ import {
   MapPin,
   ShieldCheck,
 } from "lucide-react";
-import { motion } from "motion/react";
-import { useMemo, useState } from "react";
+import { animate, motion, useMotionValue, useSpring, useTransform } from "motion/react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   paidPlanFromSelection,
@@ -165,10 +165,33 @@ function TaylorWordmark(props: { center?: boolean; compact?: boolean }) {
   );
 }
 
-function ScoreRing() {
+function ScoreRing({ isHovered }: { isHovered?: boolean }) {
   const radius = 47;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference * 0.16;
+
+  const percent = useMotionValue(84);
+  const smoothPercent = useSpring(percent, { stiffness: 180, damping: 22 });
+
+  useEffect(() => {
+    const target = isHovered ? 99.7 : 84;
+    const controls = animate(percent, target, {
+      duration: 0.5,
+      ease: "easeOut",
+    });
+    return controls.stop;
+  }, [isHovered, percent]);
+
+  const offset = useTransform(smoothPercent, (v) => circumference * (1 - v / 100));
+  const rVal = useTransform(smoothPercent, [84, 99.7], [42, 4]);
+  const gVal = useTransform(smoothPercent, [84, 99.7], [83, 214]);
+  const bVal = useTransform(smoothPercent, [84, 99.7], [250, 138]);
+
+  const color = useTransform([rVal, gVal, bVal], ([rv, gv, bv]) =>
+    `rgb(${Math.round(rv as number)}, ${Math.round(gv as number)}, ${Math.round(bv as number)})`
+  );
+
+  const displayPercent = useTransform(smoothPercent, (v) => `${v.toFixed(1)}%`);
+
   return (
     <div className="relative grid h-[126px] w-[126px] place-items-center">
       <svg aria-hidden="true" className="absolute inset-0 h-full w-full" shapeRendering="geometricPrecision" viewBox="0 0 126 126">
@@ -180,23 +203,22 @@ function ScoreRing() {
           stroke="#e8eefb"
           strokeWidth="6"
         />
-        <circle
+        <motion.circle
           cx="63"
           cy="63"
           fill="none"
           r={radius}
-          stroke="#2a53fa"
           strokeDasharray={circumference}
-          strokeDashoffset={offset}
           strokeLinecap="round"
           strokeWidth="6"
+          style={{ strokeDashoffset: offset, stroke: color }}
           transform="rotate(-96 63 63)"
         />
       </svg>
       <div className="relative text-center">
-        <p className="tabular-nums text-[27px] font-semibold leading-[1.05] tracking-[-0.018em] text-[#080d22]">
-          84%
-        </p>
+        <motion.p className="tabular-nums text-[27px] font-semibold leading-[1.05] tracking-[-0.018em] text-[#080d22]">
+          {displayPercent}
+        </motion.p>
         <p className="mt-1 text-[10.5px] font-medium leading-none text-[#64718d]">Overall fit</p>
       </div>
     </div>
@@ -208,13 +230,17 @@ function CardShell(props: {
   className?: string;
   index: number;
   title: string;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }) {
   return (
     <article
       className={cn(
-        "relative min-h-[444px] rounded-[15px] border border-[#dfe6f2] bg-white/82 p-7 text-[#080d22] shadow-[0_24px_56px_rgba(29,42,78,0.12),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-xl xl:h-[444px]",
+        "relative min-h-[444px] rounded-[15px] border border-[#dfe6f2] bg-white/82 p-7 text-[#080d22] shadow-[0_24px_56px_rgba(29,42,78,0.12),inset_0_1px_0_rgba(255,255,255,0.95)] backdrop-blur-xl transition duration-300 ease-out hover:scale-[1.015] hover:shadow-[0_28px_64px_rgba(29,42,78,0.16),inset_0_1px_0_rgba(255,255,255,0.95)] xl:h-[444px]",
         props.className
       )}
+      onMouseEnter={props.onMouseEnter}
+      onMouseLeave={props.onMouseLeave}
     >
       <div className="mb-5 flex items-center gap-4">
         <span className="grid h-8 w-8 place-items-center rounded-[8px] bg-[#2450f4] text-[17px] font-bold text-white shadow-[0_8px_18px_rgba(32,71,240,0.24),inset_0_1px_0_rgba(255,255,255,0.25)]">
@@ -303,10 +329,17 @@ function GapIcon(props: { type: (typeof gapRows)[number]["icon"] }) {
 }
 
 function FitGapsCard() {
+  const [hovered, setHovered] = useState(false);
   return (
-    <CardShell className="min-h-[444px] lg:min-w-[440px]" index={2} title="Role fit + gaps to answer">
+    <CardShell
+      className="min-h-[444px] lg:min-w-[440px]"
+      index={2}
+      title="Role fit + gaps to answer"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <div className="grid grid-cols-[132px_minmax(0,1fr)] items-center gap-3.5 max-sm:grid-cols-1">
-        <ScoreRing />
+        <ScoreRing isHovered={hovered} />
         <div className="flex items-start gap-3 rounded-[10px] bg-[#f1f4fc] p-4">
           <svg aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-[#2450f4]" viewBox="0 0 18 18">
             <path d="M9 1.6 10.4 6l4.4 1.4-4.4 1.4L9 13.2 7.6 8.8 3.2 7.4 7.6 6 9 1.6Z" fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.7" />
