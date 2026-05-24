@@ -109,24 +109,6 @@ export function LandingBackground() {
             stroke="rgba(255,255,255,0.82)"
             strokeWidth="6"
           />
-          <path
-            d="M1228 90C1300 151 1378 249 1462 406"
-            fill="none"
-            filter="url(#tcBgReflectionBlur)"
-            opacity="0.14"
-            stroke="rgba(255,255,255,0.92)"
-            strokeLinecap="round"
-            strokeWidth="8"
-          />
-          <path
-            d="M1138 169C1226 258 1292 365 1348 503"
-            fill="none"
-            filter="url(#tcBgReflectionBlur)"
-            opacity="0.1"
-            stroke="rgba(190,219,255,0.9)"
-            strokeLinecap="round"
-            strokeWidth="6"
-          />
         </g>
 
         <g clipPath="url(#tcRightBubbleClip)">
@@ -140,41 +122,7 @@ export function LandingBackground() {
             stroke="rgba(116,165,242,0.38)"
             strokeWidth="1"
           />
-          <path
-            d="M1438 64C1263 132 1200 353 1288 634"
-            fill="none"
-            opacity="0.28"
-            stroke="rgba(255,255,255,0.84)"
-            strokeLinecap="round"
-            strokeWidth="1.35"
-          />
-          <path
-            d="M1436 80C1278 150 1227 348 1306 604"
-            fill="none"
-            opacity="0.14"
-            stroke="rgba(114,163,239,0.62)"
-            strokeLinecap="round"
-            strokeWidth="1"
-          />
         </g>
-
-        <path
-          d="M370 -84C419 61 512 159 642 210"
-          fill="none"
-          filter="url(#tcBgReflectionBlur)"
-          opacity="0.11"
-          stroke="rgba(255,255,255,0.94)"
-          strokeLinecap="round"
-          strokeWidth="5"
-        />
-        <path
-          d="M-34 690C71 526 123 345 178 105"
-          fill="none"
-          opacity="0.12"
-          stroke="rgba(67,112,255,0.38)"
-          strokeLinecap="round"
-          strokeWidth="1.25"
-        />
       </svg>
 
       <div className="absolute right-[-14%] bottom-[-20%] h-[520px] w-[620px] rounded-full bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.36),rgba(210,226,252,0.16)_48%,transparent_72%)] blur-2xl" />

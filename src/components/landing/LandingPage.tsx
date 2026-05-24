@@ -624,7 +624,7 @@ function PricingSection(props: LandingPageProps) {
   );
 
   return (
-    <section className="relative z-10 border-y border-[#e4e9f2] bg-white/46 px-6 py-24" id="pricing">
+    <section className="relative z-10 bg-white/46 px-6 py-24" id="pricing">
       <div className="mx-auto max-w-[1220px]">
         <div className="text-center">
           <p className="text-[13px] font-bold uppercase tracking-[0.2em] text-[#2047f0]">

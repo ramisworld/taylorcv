@@ -15,6 +15,10 @@ body {
     "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 @keyframes taylor-dotted-spinner-rotate {
   to {
     transform: rotate(360deg);
