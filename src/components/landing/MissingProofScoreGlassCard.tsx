@@ -14,22 +14,22 @@ interface MissingProofScoreGlassCardProps {
 function TrendIcon({ className }: { className?: string }) {
   return (
     <svg
-      viewBox="0 0 26 15"
+      viewBox="0 0 28 16"
       fill="none"
       className={className}
       aria-hidden="true"
     >
       <path
-        d="M2.2 12.1L7.7 7.1L11.4 9.1L19.6 2.7"
+        d="M2.4 12.8L8.2 7.4L12.3 9.7L21.1 2.7"
         stroke="currentColor"
-        strokeWidth="1.9"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
-        d="M16.1 2.5H19.9V6.3"
+        d="M17.3 2.5H21.5V6.7"
         stroke="currentColor"
-        strokeWidth="1.9"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -72,7 +72,7 @@ function InlineRing({
         height={size}
       >
         <defs>
-          <linearGradient id={gradientId} x1="12%" y1="0%" x2="88%" y2="100%">
+          <linearGradient id={gradientId} x1="7%" y1="0%" x2="90%" y2="100%">
             {gradientStops}
           </linearGradient>
         </defs>
@@ -82,7 +82,7 @@ function InlineRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="rgba(221, 227, 248, 0.44)"
+          stroke="rgba(232, 237, 255, 0.58)"
           strokeWidth={strokeWidth}
         />
 
@@ -113,35 +113,36 @@ function GlassArrowOrb() {
     <div className={styles.glassOrb} aria-hidden="true">
       <span className={styles.orbGlow} />
       <span className={styles.orbHighlight} />
+      <span className={styles.orbCaustic} />
 
-      <svg viewBox="0 0 88 88" fill="none" className={styles.orbSvg}>
+      <svg viewBox="0 0 92 92" fill="none" className={styles.orbSvg}>
         <defs>
-          <radialGradient id="match-orb-body" cx="32%" cy="24%" r="76%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.96)" />
-            <stop offset="23%" stopColor="rgba(255,255,255,0.42)" />
-            <stop offset="62%" stopColor="rgba(214,224,255,0.17)" />
-            <stop offset="100%" stopColor="rgba(115,100,255,0.25)" />
+          <radialGradient id="match-orb-body" cx="31%" cy="22%" r="78%">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.99)" />
+            <stop offset="20%" stopColor="rgba(255,255,255,0.5)" />
+            <stop offset="55%" stopColor="rgba(222,229,255,0.17)" />
+            <stop offset="100%" stopColor="rgba(113,99,255,0.22)" />
           </radialGradient>
 
-          <linearGradient id="match-orb-rim" x1="12%" y1="6%" x2="88%" y2="92%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.98)" />
-            <stop offset="44%" stopColor="rgba(255,255,255,0.4)" />
-            <stop offset="100%" stopColor="rgba(108,93,255,0.24)" />
+          <linearGradient id="match-orb-rim" x1="10%" y1="6%" x2="88%" y2="92%">
+            <stop offset="0%" stopColor="rgba(255,255,255,1)" />
+            <stop offset="45%" stopColor="rgba(255,255,255,0.44)" />
+            <stop offset="100%" stopColor="rgba(108,93,255,0.23)" />
           </linearGradient>
         </defs>
 
-        <circle cx="44" cy="44" r="39" fill="url(#match-orb-body)" />
+        <circle cx="46" cy="46" r="40" fill="url(#match-orb-body)" />
         <circle
-          cx="44"
-          cy="44"
-          r="39"
+          cx="46"
+          cy="46"
+          r="40"
           stroke="url(#match-orb-rim)"
-          strokeWidth="1.5"
+          strokeWidth="1.6"
         />
         <path
-          d="M32.5 44H54.5M46.5 35.5L55 44L46.5 52.5"
+          d="M34 46H57M48 37.4L56.8 46L48 54.6"
           stroke="#5c4dff"
-          strokeWidth="4.3"
+          strokeWidth="4.1"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
@@ -174,18 +175,18 @@ export function MissingProofScoreGlassCard({
           <div className={styles.ringBefore}>
             <InlineRing
               percent={58}
-              size={148}
-              strokeWidth={10}
-              rotation={-90}
+              size={158}
+              strokeWidth={11}
+              rotation={-94}
               gradientId="missing-proof-ring-58"
               strokeOpacity={0.82}
               labelClassName={styles.ringLabelWeak}
               gradientStops={
                 <>
-                  <stop offset="0%" stopColor="#c6b8ff" />
-                  <stop offset="32%" stopColor="#9c8fff" />
-                  <stop offset="68%" stopColor="#7e82ff" />
-                  <stop offset="100%" stopColor="#6e99ff" />
+                  <stop offset="0%" stopColor="#d6ccff" />
+                  <stop offset="30%" stopColor="#aa92ff" />
+                  <stop offset="66%" stopColor="#7e86ff" />
+                  <stop offset="100%" stopColor="#72a2ff" />
                 </>
               }
             />
@@ -196,17 +197,17 @@ export function MissingProofScoreGlassCard({
           <div className={styles.ringAfter}>
             <InlineRing
               percent={92}
-              size={148}
-              strokeWidth={10}
-              rotation={-90}
+              size={158}
+              strokeWidth={11}
+              rotation={-94}
               gradientId="missing-proof-ring-92"
               labelClassName={styles.ringLabelStrong}
               gradientStops={
                 <>
-                  <stop offset="0%" stopColor="#bd8cff" />
-                  <stop offset="28%" stopColor="#8254ff" />
-                  <stop offset="62%" stopColor="#4e58ff" />
-                  <stop offset="100%" stopColor="#326cff" />
+                  <stop offset="0%" stopColor="#bf8fff" />
+                  <stop offset="27%" stopColor="#8658ff" />
+                  <stop offset="61%" stopColor="#4d5fff" />
+                  <stop offset="100%" stopColor="#2f6dff" />
                 </>
               }
             />
