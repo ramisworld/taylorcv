@@ -16,17 +16,17 @@
   border-radius: 100px;
   background:
     radial-gradient(
-      ellipse at 15% 44%,
-      rgba(172, 211, 255, 0.32),
-      transparent 38%
+      ellipse at 14% 48%,
+      rgba(172, 211, 255, 0.3),
+      transparent 40%
     ),
     radial-gradient(
-      ellipse at 43% 22%,
+      ellipse at 44% 22%,
       rgba(255, 255, 255, 0.68),
-      transparent 28%
+      transparent 30%
     ),
     radial-gradient(
-      ellipse at 75% 48%,
+      ellipse at 76% 48%,
       rgba(177, 124, 255, 0.24),
       transparent 44%
     ),
@@ -52,488 +52,549 @@
   filter: blur(24px);
 }
 
+.scoreGlass {
+  position: relative;
+  height: 100%;
+  min-height: 196px;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: clamp(46px, 3.8vw, 76px);
+  background:
+    radial-gradient(
+      ellipse at 10% 20%,
+      rgba(255, 255, 255, 0.34),
+      transparent 26%
+    ),
+    radial-gradient(
+      ellipse at 35% 55%,
+      rgba(210, 230, 255, 0.13),
+      transparent 34%
+    ),
+    radial-gradient(
+      ellipse at 72% 50%,
+      rgba(185, 165, 255, 0.12),
+      transparent 32%
+    ),
+    radial-gradient(
+      ellipse at 92% 75%,
+      rgba(155, 110, 255, 0.13),
+      transparent 26%
+    ),
+    linear-gradient(
+      148deg,
+      rgba(255, 255, 255, 0.1),
+      rgba(248, 252, 255, 0.035) 48%,
+      rgba(245, 240, 255, 0.075)
+    ),
+    rgba(255, 255, 255, 0.02);
+  box-shadow:
+    0 42px 120px rgba(46, 65, 160, 0.13),
+    0 18px 52px rgba(80, 70, 200, 0.08),
+    inset 0 2px 0 rgba(255, 255, 255, 0.92),
+    inset 0 -32px 64px rgba(80, 70, 220, 0.07),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(32px) saturate(1.55) brightness(1.06);
+  -webkit-backdrop-filter: blur(32px) saturate(1.55) brightness(1.06);
+}
+
+.scoreRim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: inherit;
+  padding: 6px;
+  background: linear-gradient(
+    162deg,
+    rgba(255, 255, 255, 0.98) 0%,
+    rgba(230, 238, 255, 0.72) 14%,
+    rgba(140, 145, 255, 0.28) 36%,
+    rgba(255, 255, 255, 0.42) 56%,
+    rgba(135, 100, 255, 0.3) 76%,
+    rgba(255, 255, 255, 0.92) 100%
+  );
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+}
+
+.scoreInnerRim {
+  position: absolute;
+  inset: 8px;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.55),
+    inset 0 3px 0 rgba(255, 255, 255, 0.82),
+    inset 0 -3px 0 rgba(93, 76, 214, 0.16),
+    inset 0 0 40px rgba(255, 255, 255, 0.26);
+}
+
+.scoreTopHighlight {
+  position: absolute;
+  top: 3.5%;
+  left: 8%;
+  right: 10%;
+  z-index: 3;
+  height: 2px;
+  pointer-events: none;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.4) 7%,
+    rgba(255, 255, 255, 0.98) 29%,
+    rgba(232, 242, 255, 0.78) 58%,
+    transparent 100%
+  );
+  filter: blur(0.55px);
+}
+
+.scoreBottomHighlight {
+  position: absolute;
+  right: 10%;
+  bottom: 3.5%;
+  left: 9%;
+  z-index: 3;
+  height: 4px;
+  pointer-events: none;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.5) 14%,
+    rgba(255, 255, 255, 0.9) 36%,
+    rgba(215, 226, 255, 0.55) 68%,
+    transparent 100%
+  );
+  filter: blur(2px);
+}
+
+.scoreCausticOne {
+  position: absolute;
+  top: -12%;
+  right: -6%;
+  z-index: 1;
+  width: 42%;
+  height: 58%;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(
+      125deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.68) 48%,
+      transparent 65%
+    ),
+    radial-gradient(
+      ellipse at 70% 25%,
+      rgba(210, 240, 255, 0.58),
+      transparent 35%
+    );
+  opacity: 0.88;
+  filter: blur(10px);
+  mix-blend-mode: screen;
+}
+
+.scoreCausticTwo {
+  position: absolute;
+  bottom: -8%;
+  left: -4%;
+  z-index: 1;
+  width: 36%;
+  height: 48%;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(
+      55deg,
+      transparent 35%,
+      rgba(255, 255, 255, 0.55) 52%,
+      transparent 68%
+    ),
+    radial-gradient(
+      ellipse at 25% 75%,
+      rgba(200, 220, 255, 0.48),
+      transparent 30%
+    );
+  opacity: 0.78;
+  mix-blend-mode: screen;
+}
+
+.scorePrism {
+  position: absolute;
+  top: 8%;
+  right: 6%;
+  z-index: 1;
+  width: 26%;
+  height: 36%;
+  pointer-events: none;
+  border-radius: 999px;
+  background: linear-gradient(
+    108deg,
+    transparent 0%,
+    rgba(215, 245, 255, 0.48) 30%,
+    rgba(255, 255, 255, 0.65) 50%,
+    rgba(185, 145, 255, 0.32) 74%,
+    transparent 100%
+  );
+  filter: blur(12px);
+  opacity: 0.92;
+  transform: rotate(-10deg);
+  mix-blend-mode: screen;
+}
+
+.scoreDots {
+  position: absolute;
+  top: 18%;
+  right: 3.5%;
+  bottom: 14%;
+  z-index: 2;
+  width: 11%;
+  pointer-events: none;
+  opacity: 0.38;
+  background-image: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.65) 1.2px,
+    transparent 1.6px
+  );
+  background-size: 14px 14px;
+  mask-image: linear-gradient(90deg, transparent 0%, black 50%, black 100%);
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    black 50%,
+    black 100%
+  );
+}
+
+/* Content */
+
+.scoreContent {
+  position: relative;
+  z-index: 5;
+  display: grid;
+  grid-template-columns:
+    minmax(92px, 0.82fr)
+    148px
+    72px
+    148px
+    minmax(245px, 1.9fr);
+  align-items: center;
+  height: 100%;
+  padding: 3.2% 6.8% 3.2% 7.2%;
+  gap: clamp(10px, 0.85vw, 17px);
+}
+
+.metaBefore,
+.metaAfter {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.metaBefore {
+  gap: clamp(7px, 0.5vw, 10px);
+  justify-self: start;
+  transform: translateY(1px);
+}
+
+.metaAfter {
+  gap: clamp(7px, 0.48vw, 10px);
+  justify-self: start;
+  transform: translateY(-1px);
+}
+
+.badge {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 4px 13px;
+  color: #6257ff;
+  font-size: clamp(13px, 0.78vw, 15px);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.56),
+      rgba(255, 255, 255, 0.24)
+    ),
+    rgba(255, 255, 255, 0.2);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 2px 7px rgba(44, 59, 131, 0.04);
+  backdrop-filter: blur(8px) saturate(135%);
+  -webkit-backdrop-filter: blur(8px) saturate(135%);
+}
+
+.metaLabel {
+  color: #080a1f;
+  font-size: clamp(16px, 0.98vw, 20px);
+  font-weight: 620;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+}
+
+.metaHeadline {
+  margin: 0;
+  color: #080a1f;
+  font-size: clamp(28px, 1.9vw, 38px);
+  font-weight: 720;
+  line-height: 1.02;
+  letter-spacing: -0.032em;
+  white-space: nowrap;
+}
+
+.improvementChip {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 7px;
+  padding: 5px 13px;
+  color: #5a58ff;
+  font-size: clamp(13px, 0.78vw, 15px);
+  font-weight: 620;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(205, 212, 232, 0.36) 0%,
+      rgba(255, 255, 255, 0.48) 38%,
+      rgba(255, 255, 255, 0.2) 100%
+    ),
+    rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    0 2px 7px rgba(44, 59, 131, 0.045);
+  backdrop-filter: blur(8px) saturate(135%);
+  -webkit-backdrop-filter: blur(8px) saturate(135%);
+}
+
+.trendIcon {
+  width: 22px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.metaSupport {
+  color: #626b82;
+  font-size: clamp(14px, 0.86vw, 17px);
+  font-weight: 400;
+  line-height: 1.35;
+  letter-spacing: -0.004em;
+  white-space: nowrap;
+}
+
+/* Rings */
+
+.ringBefore,
+.ringAfter {
+  display: grid;
+  min-width: 0;
+  place-items: center;
+  align-self: center;
+  justify-self: center;
+}
+
+.ringWrap {
+  position: relative;
+  display: grid;
+  width: var(--ring-size);
+  height: var(--ring-size);
+  flex: 0 0 auto;
+  place-items: center;
+  filter: drop-shadow(0 8px 18px rgba(44, 59, 131, 0.08));
+}
+
+.ringSvg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.ringLabel {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  width: 72%;
+  height: 72%;
+  place-items: center;
+  border-radius: 999px;
+  background:
+    radial-gradient(
+      circle at 36% 22%,
+      rgba(255, 255, 255, 0.97),
+      rgba(255, 255, 255, 0.5) 56%
+    ),
+    rgba(255, 255, 255, 0.16);
+  box-shadow:
+    inset 0 2px 12px rgba(255, 255, 255, 0.95),
+    inset 0 -6px 14px rgba(105, 92, 255, 0.055),
+    0 9px 24px rgba(44, 59, 131, 0.055);
+  backdrop-filter: blur(9px) saturate(135%);
+  -webkit-backdrop-filter: blur(9px) saturate(135%);
+}
+
+.ringLabelWeak {
+  background:
+    radial-gradient(
+      circle at 36% 22%,
+      rgba(255, 255, 255, 0.97),
+      rgba(255, 255, 255, 0.5) 56%
+    ),
+    rgba(255, 255, 255, 0.14);
+}
+
+.ringLabelStrong {
+  background:
+    radial-gradient(
+      circle at 36% 22%,
+      rgba(255, 255, 255, 0.98),
+      rgba(255, 255, 255, 0.52) 56%
+    ),
+    rgba(255, 255, 255, 0.16);
+}
+
+.ringValue {
+  color: #070b1f;
+  font-size: clamp(30px, 1.8vw, 38px);
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.012em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Glass orb */
+
+.glassOrb {
+  position: relative;
+  display: grid;
+  width: clamp(62px, 4vw, 76px);
+  aspect-ratio: 1 / 1;
+  place-items: center;
+  justify-self: center;
+}
+
+.orbSvg {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 10px 20px rgba(55, 70, 160, 0.11));
+}
+
+.orbGlow {
+  position: absolute;
+  inset: 7%;
+  z-index: 0;
+  border-radius: 999px;
+  background: rgba(120, 108, 255, 0.13);
+  filter: blur(12px);
+}
+
+.orbHighlight {
+  position: absolute;
+  top: 17%;
+  left: 21%;
+  z-index: 3;
+  width: 25%;
+  height: 14%;
+  pointer-events: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.84);
+  filter: blur(5px);
+  transform: rotate(-24deg);
+}
+
+/* Fallbacks */
+
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
   .scoreGlass {
-    position: relative;
-    height: 100%;
-    min-height: 196px;
-    overflow: hidden;
-    isolation: isolate;
-    border-radius: clamp(46px, 3.8vw, 76px);
-    background:
-      radial-gradient(
-        ellipse at 10% 20%,
-        rgba(255, 255, 255, 0.38),
-        transparent 26%
-      ),
-      radial-gradient(
-        ellipse at 35% 55%,
-        rgba(210, 230, 255, 0.14),
-        transparent 34%
-      ),
-      radial-gradient(
-        ellipse at 72% 50%,
-        rgba(185, 165, 255, 0.12),
-        transparent 32%
-      ),
-      radial-gradient(
-        ellipse at 92% 75%,
-        rgba(155, 110, 255, 0.14),
-        transparent 26%
-      ),
-      linear-gradient(
-        148deg,
-        rgba(255, 255, 255, 0.10),
-        rgba(248, 252, 255, 0.04) 48%,
-        rgba(245, 240, 255, 0.08)
-      ),
-      rgba(255, 255, 255, 0.02);
-    box-shadow:
-      0 42px 120px rgba(46, 65, 160, 0.13),
-      0 18px 52px rgba(80, 70, 200, 0.08),
-      inset 0 2px 0 rgba(255, 255, 255, 0.92),
-      inset 0 -32px 64px rgba(80, 70, 220, 0.07),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.52);
-    backdrop-filter: blur(32px) saturate(1.55) brightness(1.06);
-    -webkit-backdrop-filter: blur(32px) saturate(1.55) brightness(1.06);
+    background: rgba(248, 250, 255, 0.86);
   }
 
-  .scoreRim {
-    position: absolute;
-    inset: 0;
-    z-index: 2;
-    pointer-events: none;
-    border-radius: inherit;
-    padding: 6px;
-    background: linear-gradient(
-      162deg,
-      rgba(255, 255, 255, 0.98) 0%,
-      rgba(230, 238, 255, 0.72) 14%,
-      rgba(140, 145, 255, 0.28) 36%,
-      rgba(255, 255, 255, 0.42) 56%,
-      rgba(135, 100, 255, 0.30) 76%,
-      rgba(255, 255, 255, 0.92) 100%
-    );
-    mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    mask-composite: exclude;
-    -webkit-mask-composite: xor;
+  .glassOrb,
+  .ringLabel {
+    background: rgba(255, 255, 255, 0.84);
   }
+}
 
-  .scoreInnerRim {
-    position: absolute;
-    inset: 8px;
-    z-index: 2;
-    pointer-events: none;
-    border-radius: inherit;
-    box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.55),
-      inset 0 3px 0 rgba(255, 255, 255, 0.82),
-      inset 0 -3px 0 rgba(93, 76, 214, 0.16),
-      inset 0 0 40px rgba(255, 255, 255, 0.26);
+/* Tablet / mobile */
+
+@media (max-width: 1023px) {
+  .scoreGlass {
+    height: auto;
+    min-height: 0;
+    border-radius: 42px;
   }
-
-  .scoreTopHighlight {
-    position: absolute;
-    top: 3.5%;
-    left: 8%;
-    right: 10%;
-    z-index: 3;
-    height: 2px;
-    pointer-events: none;
-    border-radius: 999px;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgba(255, 255, 255, 0.40) 7%,
-      rgba(255, 255, 255, 0.98) 29%,
-      rgba(232, 242, 255, 0.78) 58%,
-      transparent 100%
-    );
-    filter: blur(0.55px);
-  }
-
-  .scoreBottomHighlight {
-    position: absolute;
-    right: 10%;
-    bottom: 3.5%;
-    left: 9%;
-    z-index: 3;
-    height: 4px;
-    pointer-events: none;
-    border-radius: 999px;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgba(255, 255, 255, 0.50) 14%,
-      rgba(255, 255, 255, 0.90) 36%,
-      rgba(215, 226, 255, 0.55) 68%,
-      transparent 100%
-    );
-    filter: blur(2px);
-  }
-
-  .scoreCausticOne {
-    position: absolute;
-    top: -12%;
-    right: -6%;
-    z-index: 1;
-    width: 42%;
-    height: 58%;
-    pointer-events: none;
-    border-radius: inherit;
-    background:
-      linear-gradient(
-        125deg,
-        transparent 30%,
-        rgba(255, 255, 255, 0.68) 48%,
-        transparent 65%
-      ),
-      radial-gradient(
-        ellipse at 70% 25%,
-        rgba(210, 240, 255, 0.58),
-        transparent 35%
-      );
-    opacity: 0.88;
-    filter: blur(10px);
-    mix-blend-mode: screen;
-  }
-
-  .scoreCausticTwo {
-    position: absolute;
-    bottom: -8%;
-    left: -4%;
-    z-index: 1;
-    width: 36%;
-    height: 48%;
-    pointer-events: none;
-    border-radius: inherit;
-    background:
-      linear-gradient(
-        55deg,
-        transparent 35%,
-        rgba(255, 255, 255, 0.55) 52%,
-        transparent 68%
-      ),
-      radial-gradient(
-        ellipse at 25% 75%,
-        rgba(200, 220, 255, 0.48),
-        transparent 30%
-      );
-    opacity: 0.78;
-    mix-blend-mode: screen;
-  }
-
-  .scorePrism {
-    position: absolute;
-    top: 8%;
-    right: 6%;
-    z-index: 1;
-    width: 26%;
-    height: 36%;
-    pointer-events: none;
-    border-radius: 999px;
-    background: linear-gradient(
-      108deg,
-      transparent 0%,
-      rgba(215, 245, 255, 0.48) 30%,
-      rgba(255, 255, 255, 0.65) 50%,
-      rgba(185, 145, 255, 0.32) 74%,
-      transparent 100%
-    );
-    filter: blur(12px);
-    opacity: 0.92;
-    transform: rotate(-10deg);
-    mix-blend-mode: screen;
-  }
-
-  .scoreDots {
-    position: absolute;
-    top: 18%;
-    right: 3.5%;
-    bottom: 14%;
-    z-index: 2;
-    width: 11%;
-    pointer-events: none;
-    opacity: 0.38;
-    background-image: radial-gradient(
-      circle,
-      rgba(255, 255, 255, 0.65) 1.2px,
-      transparent 1.6px
-    );
-    background-size: 14px 14px;
-    mask-image: linear-gradient(90deg, transparent 0%, black 50%, black 100%);
-    -webkit-mask-image: linear-gradient(
-      90deg,
-      transparent 0%,
-      black 50%,
-      black 100%
-    );
-  }
-
-  /* ─── Content grid ─── */
 
   .scoreContent {
-    position: relative;
-    z-index: 5;
-    display: grid;
-    grid-template-columns:
-      minmax(76px, 11%)
-      minmax(130px, 17%)
-      minmax(48px, 7%)
-      minmax(130px, 17%)
-      minmax(180px, 1fr);
-    align-items: center;
-    height: 100%;
-    padding: 3.2% 8.5% 3.2% 9.5%;
-    gap: clamp(10px, 1.2vw, 18px);
-  }
-
-  /* ─── Meta blocks ─── */
-
-  .metaBefore {
     display: flex;
     flex-direction: column;
-    gap: clamp(6px, 0.48vw, 10px);
+    gap: 22px;
+    padding: 32px 24px;
+    text-align: center;
   }
 
+  .metaBefore,
   .metaAfter {
-    display: flex;
-    flex-direction: column;
-    gap: clamp(6px, 0.42vw, 9px);
+    align-items: center;
   }
 
-  .badge {
-    display: inline-flex;
-    align-self: flex-start;
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: clamp(11px, 0.72vw, 14px);
-    font-weight: 600;
-    line-height: 1.2;
-    color: #5c4dff;
-    background: rgba(255, 255, 255, 0.38);
-    border: 1px solid rgba(255, 255, 255, 0.52);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.7),
-      0 2px 6px rgba(44, 59, 131, 0.04);
-    backdrop-filter: blur(6px) saturate(130%);
-    -webkit-backdrop-filter: blur(6px) saturate(130%);
-  }
-
-  .metaLabel {
-    color: #080a1f;
-    font-size: clamp(13px, 0.88vw, 17px);
-    font-weight: 600;
-    line-height: 1.2;
-    letter-spacing: -0.015em;
-    white-space: nowrap;
+  .badge,
+  .improvementChip {
+    align-self: center;
   }
 
   .metaHeadline {
-    color: #080a1f;
-    font-size: clamp(22px, 1.72vw, 34px);
-    font-weight: 700;
-    line-height: 1.05;
-    letter-spacing: -0.03em;
-    white-space: nowrap;
+    font-size: 30px;
   }
 
-  .improvementChip {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    align-self: flex-start;
-    padding: 3px 9px;
-    border-radius: 999px;
-    font-size: clamp(11px, 0.7vw, 13px);
-    font-weight: 600;
-    line-height: 1.2;
-    color: #5c4dff;
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.44),
-      rgba(255, 255, 255, 0.16)
-    );
-    border: 1px solid rgba(255, 255, 255, 0.48);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.78),
-      0 2px 5px rgba(44, 59, 131, 0.05);
+  .metaLabel,
+  .metaSupport {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 640px) {
+  .scoreGlass {
+    border-radius: 32px;
   }
 
-  .trendIcon {
-    width: 16px;
-    height: 10px;
-    flex-shrink: 0;
+  .scoreContent {
+    padding: 26px 18px;
+  }
+
+  .metaHeadline {
+    font-size: 25px;
+  }
+
+  .metaLabel {
+    font-size: 15px;
   }
 
   .metaSupport {
-    color: #7a829e;
-    font-size: clamp(12px, 0.76vw, 15px);
-    font-weight: 400;
-    line-height: 1.35;
-    letter-spacing: 0;
-    white-space: nowrap;
+    font-size: 14px;
   }
 
-  /* ─── Rings ─── */
-
-  .ringBefore,
-  .ringAfter {
-    display: grid;
-    min-width: 0;
-    place-items: center;
-  }
-
-  .ringBefore > *,
-  .ringAfter > * {
-    transform: scale(clamp(0.78, 7.4vw, 1));
-  }
-
-  .ringWrap {
-    position: relative;
-    display: grid;
-    flex: 0 0 auto;
-    place-items: center;
-    filter: drop-shadow(0 6px 14px rgba(44, 59, 131, 0.08));
-  }
-
-  .ringSvg {
-    position: absolute;
-    inset: 0;
-  }
-
-  .ringLabel {
-    position: relative;
-    z-index: 2;
-    display: grid;
-    place-items: center;
-    width: 72%;
-    height: 72%;
-    border-radius: 999px;
-    background:
-      radial-gradient(
-        circle at 36% 22%,
-        rgba(255, 255, 255, 0.96),
-        rgba(255, 255, 255, 0.46) 55%
-      ),
-      rgba(255, 255, 255, 0.16);
-    box-shadow:
-      inset 0 2px 10px rgba(255, 255, 255, 0.95),
-      inset 0 -5px 12px rgba(105, 92, 255, 0.05),
-      0 8px 24px rgba(44, 59, 131, 0.05);
-    backdrop-filter: blur(8px) saturate(130%);
-    -webkit-backdrop-filter: blur(8px) saturate(130%);
+  .glassOrb {
+    width: 60px;
   }
 
   .ringValue {
-    color: #080a1f;
-    font-size: clamp(18px, 1.3vw, 24px);
-    font-weight: 700;
-    line-height: 1;
-    letter-spacing: -0.025em;
-    font-variant-numeric: tabular-nums;
+    font-size: 27px;
   }
-
-  /* ─── Glass orb ─── */
-
-  .glassOrb {
-    position: relative;
-    display: grid;
-    place-items: center;
-    width: clamp(52px, 3.6vw, 72px);
-    aspect-ratio: 1 / 1;
-  }
-
-  .orbSvg {
-    width: 100%;
-    height: 100%;
-  }
-
-  /* ─── Fallbacks ─── */
-
-  @supports not (
-    (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
-  ) {
-    .scoreGlass {
-      background: rgba(248, 250, 255, 0.86);
-    }
-
-    .glassOrb,
-    .ringLabel {
-      background: rgba(255, 255, 255, 0.84);
-    }
-  }
-
-  /* ─── Tablet / mobile ─── */
-
-  @media (max-width: 1023px) {
-    .scoreGlass {
-      height: auto;
-      min-height: 0;
-      border-radius: 42px;
-    }
-
-    .scoreContent {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      padding: 30px 24px;
-      text-align: center;
-    }
-
-    .metaBefore,
-    .metaAfter {
-      align-items: center;
-    }
-
-    .badge,
-    .improvementChip {
-      align-self: center;
-    }
-
-    .ringBefore > *,
-    .ringAfter > * {
-      transform: none;
-    }
-
-    .metaHeadline {
-      font-size: 28px;
-    }
-
-    .metaLabel,
-    .metaSupport {
-      white-space: normal;
-    }
-  }
-
-  @media (max-width: 640px) {
-    .scoreGlass {
-      border-radius: 32px;
-    }
-
-    .scoreContent {
-      padding: 24px 18px;
-    }
-
-    .metaHeadline {
-      font-size: 24px;
-    }
-
-    .metaLabel {
-      font-size: 14px;
-    }
-
-    .metaSupport {
-      font-size: 13px;
-    }
-
-    .glassOrb {
-      width: 56px;
-    }
-
-    .ringValue {
-      font-size: 20px;
-    }
-  }
-
+}

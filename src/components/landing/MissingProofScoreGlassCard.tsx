@@ -2,6 +2,8 @@
 
 "use client";
 
+import type { CSSProperties, ReactNode } from "react";
+
 import { cn } from "~/lib/utils";
 import styles from "./missing-proof-score-glass-card.module.css";
 
@@ -12,22 +14,22 @@ interface MissingProofScoreGlassCardProps {
 function TrendIcon({ className }: { className?: string }) {
   return (
     <svg
-      viewBox="0 0 20 12"
+      viewBox="0 0 26 15"
       fill="none"
       className={className}
       aria-hidden="true"
     >
       <path
-        d="M1 10.5C3 10.5 4 7.5 6.5 7.5C9 7.5 10 4.5 12.5 4.5C15 4.5 16 2 18.5 1.5"
+        d="M2.2 12.1L7.7 7.1L11.4 9.1L19.6 2.7"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.9"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
-        d="M15.5 1.5H18.5V4.5"
+        d="M16.1 2.5H19.9V6.3"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.9"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -42,8 +44,7 @@ function InlineRing({
   rotation,
   gradientId,
   gradientStops,
-  strokeOpacity,
-  className,
+  strokeOpacity = 1,
   labelClassName,
 }: {
   percent: number;
@@ -51,9 +52,8 @@ function InlineRing({
   strokeWidth: number;
   rotation: number;
   gradientId: string;
-  gradientStops: React.ReactNode;
+  gradientStops: ReactNode;
   strokeOpacity?: number;
-  className?: string;
   labelClassName?: string;
 }) {
   const radius = (size - strokeWidth) / 2;
@@ -62,8 +62,8 @@ function InlineRing({
 
   return (
     <div
-      className={cn(styles.ringWrap, className)}
-      style={{ width: size, height: size }}
+      className={styles.ringWrap}
+      style={{ "--ring-size": `${size}px` } as CSSProperties}
     >
       <svg
         className={styles.ringSvg}
@@ -72,24 +72,20 @@ function InlineRing({
         height={size}
       >
         <defs>
-          <linearGradient
-            id={gradientId}
-            x1="0%"
-            y1="0%"
-            x2="100%"
-            y2="100%"
-          >
+          <linearGradient id={gradientId} x1="12%" y1="0%" x2="88%" y2="100%">
             {gradientStops}
           </linearGradient>
         </defs>
+
         <circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="rgba(210, 218, 240, 0.28)"
+          stroke="rgba(221, 227, 248, 0.44)"
           strokeWidth={strokeWidth}
         />
+
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -101,12 +97,55 @@ function InlineRing({
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           transform={`rotate(${rotation} ${size / 2} ${size / 2})`}
-          opacity={strokeOpacity ?? 1}
+          opacity={strokeOpacity}
         />
       </svg>
+
       <div className={cn(styles.ringLabel, labelClassName)}>
         <span className={styles.ringValue}>{percent}%</span>
       </div>
+    </div>
+  );
+}
+
+function GlassArrowOrb() {
+  return (
+    <div className={styles.glassOrb} aria-hidden="true">
+      <span className={styles.orbGlow} />
+      <span className={styles.orbHighlight} />
+
+      <svg viewBox="0 0 88 88" fill="none" className={styles.orbSvg}>
+        <defs>
+          <radialGradient id="match-orb-body" cx="32%" cy="24%" r="76%">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.96)" />
+            <stop offset="23%" stopColor="rgba(255,255,255,0.42)" />
+            <stop offset="62%" stopColor="rgba(214,224,255,0.17)" />
+            <stop offset="100%" stopColor="rgba(115,100,255,0.25)" />
+          </radialGradient>
+
+          <linearGradient id="match-orb-rim" x1="12%" y1="6%" x2="88%" y2="92%">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.98)" />
+            <stop offset="44%" stopColor="rgba(255,255,255,0.4)" />
+            <stop offset="100%" stopColor="rgba(108,93,255,0.24)" />
+          </linearGradient>
+        </defs>
+
+        <circle cx="44" cy="44" r="39" fill="url(#match-orb-body)" />
+        <circle
+          cx="44"
+          cy="44"
+          r="39"
+          stroke="url(#match-orb-rim)"
+          strokeWidth="1.5"
+        />
+        <path
+          d="M32.5 44H54.5M46.5 35.5L55 44L46.5 52.5"
+          stroke="#5c4dff"
+          strokeWidth="4.3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
     </div>
   );
 }
@@ -127,119 +166,58 @@ export function MissingProofScoreGlassCard({
         <span className={styles.scoreDots} aria-hidden="true" />
 
         <div className={styles.scoreContent}>
-          {/* LEFT META */}
           <div className={styles.metaBefore}>
             <span className={styles.badge}>Before</span>
             <span className={styles.metaLabel}>Initial match</span>
           </div>
 
-          {/* 58 RING */}
           <div className={styles.ringBefore}>
             <InlineRing
               percent={58}
-              size={140}
+              size={148}
               strokeWidth={10}
-              rotation={150}
-              gradientId="grad-58"
-              gradientStops={
-                <>
-                  <stop offset="0%" stopColor="#7a9aff" />
-                  <stop offset="55%" stopColor="#a0aaff" />
-                  <stop offset="100%" stopColor="#c4b8ff" />
-                </>
-              }
+              rotation={-90}
+              gradientId="missing-proof-ring-58"
               strokeOpacity={0.82}
               labelClassName={styles.ringLabelWeak}
+              gradientStops={
+                <>
+                  <stop offset="0%" stopColor="#c6b8ff" />
+                  <stop offset="32%" stopColor="#9c8fff" />
+                  <stop offset="68%" stopColor="#7e82ff" />
+                  <stop offset="100%" stopColor="#6e99ff" />
+                </>
+              }
             />
           </div>
 
-          {/* GLASS ARROW ORB */}
-          <div className={styles.glassOrb}>
-            <svg
-              viewBox="0 0 100 100"
-              fill="none"
-              className={styles.orbSvg}
-              aria-hidden="true"
-            >
-              <defs>
-                <radialGradient
-                  id="orb-grad"
-                  cx="35%"
-                  cy="30%"
-                  r="65%"
-                >
-                  <stop offset="0%" stopColor="rgba(255,255,255,0.88)" />
-                  <stop offset="22%" stopColor="rgba(255,255,255,0.18)" />
-                  <stop offset="68%" stopColor="rgba(210,220,255,0.10)" />
-                  <stop offset="100%" stopColor="rgba(130,120,255,0.22)" />
-                </radialGradient>
-                <radialGradient
-                  id="orb-highlight"
-                  cx="32%"
-                  cy="26%"
-                  r="38%"
-                >
-                  <stop offset="0%" stopColor="rgba(255,255,255,0.95)" />
-                  <stop offset="55%" stopColor="rgba(255,255,255,0.25)" />
-                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-                </radialGradient>
-                <filter id="orb-shadow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="rgba(58,70,135,0.12)" />
-                </filter>
-              </defs>
-              <circle
-                cx="50"
-                cy="50"
-                r="47"
-                fill="url(#orb-grad)"
-                filter="url(#orb-shadow)"
-              />
-              <circle cx="34" cy="30" r="16" fill="url(#orb-highlight)" />
-              <path
-                d="M38 50h24M52 40l10 10-10 10"
-                stroke="#5c4dff"
-                strokeWidth="5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <circle
-                cx="50"
-                cy="50"
-                r="47"
-                fill="none"
-                stroke="rgba(255,255,255,0.55)"
-                strokeWidth="1.5"
-              />
-            </svg>
-          </div>
+          <GlassArrowOrb />
 
-          {/* 92 RING */}
           <div className={styles.ringAfter}>
             <InlineRing
               percent={92}
-              size={140}
+              size={148}
               strokeWidth={10}
-              rotation={50}
-              gradientId="grad-92"
+              rotation={-90}
+              gradientId="missing-proof-ring-92"
+              labelClassName={styles.ringLabelStrong}
               gradientStops={
                 <>
-                  <stop offset="0%" stopColor="#b08aff" />
-                  <stop offset="35%" stopColor="#6b5cff" />
-                  <stop offset="70%" stopColor="#3b6aff" />
-                  <stop offset="100%" stopColor="#5c4dff" />
+                  <stop offset="0%" stopColor="#bd8cff" />
+                  <stop offset="28%" stopColor="#8254ff" />
+                  <stop offset="62%" stopColor="#4e58ff" />
+                  <stop offset="100%" stopColor="#326cff" />
                 </>
               }
-              labelClassName={styles.ringLabelStrong}
             />
           </div>
 
-          {/* RIGHT META */}
           <div className={styles.metaAfter}>
             <span className={styles.badge}>After</span>
             <h3 className={styles.metaHeadline}>Stronger match</h3>
             <span className={styles.improvementChip}>
               <TrendIcon className={styles.trendIcon} />
-              +34 point improvement
+              <span>+34 point improvement</span>
             </span>
             <span className={styles.metaSupport}>
               Clearer evidence. Better alignment.
