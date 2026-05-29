@@ -240,21 +240,18 @@ export default function DashboardPage() {
                     >
                       <div className="min-w-0">
                         <p className="truncate text-lg font-semibold text-white">
-                          {application.dreamRole ?? application.roleArchetype ?? "Application"}
+                          {application.dreamRole ?? "Application"}
                         </p>
                         <p className="mt-1 text-sm text-zinc-400">
-                          {application.cvAngle ?? "CV in progress"}
+                          {application.currentStep ?? "started"}
                         </p>
                       </div>
                       <div>
                         <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">
-                          Match score
+                          Created
                         </p>
                         <p className="mt-1 text-sm text-zinc-200">
-                          {application.originalEvidenceMatchScore !== null &&
-                          application.originalEvidenceMatchScore !== undefined
-                            ? `${Math.round(application.originalEvidenceMatchScore)}%`
-                            : "Not scored"}
+                          {formatDate(application.createdAt)}
                         </p>
                       </div>
                       <div>

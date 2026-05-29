@@ -40,7 +40,7 @@ const proofLogos = [
   },
 ] as const;
 
-const liveCounterStorageKey = "taylorcv_live_counter_state_v2";
+const liveCounterStorageKey = "taylorcv_live_counter_state";
 const liveCounterMin = 900;
 const liveCounterMax = 3100;
 const liveCounterAnchorMin = 1900;

@@ -58,7 +58,6 @@ export const env = createEnv({
     OPENAI_API_KEY: optionalWhenMock,
     OPENAI_FAST_MODEL: optionalWhenMock,
     OPENAI_STRONG_MODEL: optionalWhenMock,
-    OPENAI_EMBEDDING_MODEL: optionalWhenMock,
     USE_MOCK_AI: z.enum(["true", "false"]),
     NODE_ENV: z
       .enum(["development", "test", "production"])
@@ -93,7 +92,6 @@ export const env = createEnv({
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     OPENAI_FAST_MODEL: process.env.OPENAI_FAST_MODEL,
     OPENAI_STRONG_MODEL: process.env.OPENAI_STRONG_MODEL,
-    OPENAI_EMBEDDING_MODEL: process.env.OPENAI_EMBEDDING_MODEL,
     USE_MOCK_AI: process.env.USE_MOCK_AI,
     NODE_ENV: process.env.NODE_ENV,
   },

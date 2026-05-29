@@ -34,12 +34,7 @@ export const RequirementTypeSchema = z.enum([
 ]);
 
 export const ImportanceSchema = z.enum(["high", "medium", "low"]);
-export const EvidenceConfidenceSchema = z.enum([
-  "high",
-  "medium",
-  "low",
-  "missing",
-]);
+
 export const SourceTypeSchema = z.enum([
   "profile",
   "cv_upload",
@@ -94,23 +89,6 @@ export const SectionBudgetTreatmentSchema = z.enum([
   "omit",
 ]);
 export const LayoutArchitectureSchema = z.enum(cvLayoutArchitectures);
-export const EvidenceCardUsefulnessSchema = z.enum([
-  "cv_ready",
-  "supporting",
-  "keyword_only",
-  "caution",
-]);
-export const EvidenceMatchCvUsefulnessSchema = z.enum([
-  "headline",
-  "supporting",
-  "keyword_only",
-  "do_not_use",
-]);
-export const ClaimRiskSchema = z.enum([
-  "safe",
-  "careful_wording",
-  "avoid_claim",
-]);
 export const QualitySeveritySchema = z.enum([
   "pass",
   "minor",
@@ -256,74 +234,6 @@ export const GapQuestionAgentQuestionSchema = z.object({
 
 export const GapQuestionAgentOutputSchema = z.object({
   questions: z.array(GapQuestionAgentQuestionSchema).max(3),
-});
-
-export const GapAnswerMessageTypeSchema = z.enum([
-  "clarification_request",
-  "answer",
-  "vague_answer",
-  "off_topic",
-  "unsafe_or_unusable",
-]);
-
-export const GapAnswerUsableStatusSchema = z.enum([
-  "usable",
-  "use_carefully",
-  "not_usable",
-]);
-
-export const GapAnswerEvidenceQualitySchema = z.enum([
-  "none",
-  "weak",
-  "usable",
-  "strong",
-]);
-
-export const GapAnswerBoostBandSchema = z.enum([
-  "none",
-  "small",
-  "medium",
-  "large",
-]);
-
-export const GapAnswerEvaluatorOutputSchema = z.object({
-  messageType: GapAnswerMessageTypeSchema,
-  assistantReply: z.string().min(1).max(460),
-  shouldSaveEvidence: z.boolean(),
-  usableStatus: GapAnswerUsableStatusSchema,
-  evidenceQuality: GapAnswerEvidenceQualitySchema,
-  targetRequirementId: z.string().nullable(),
-  extractedEvidenceSummary: z.string().nullable(),
-  followUpQuestion: z.string().nullable(),
-  shouldMoveToNextQuestion: z.boolean(),
-  boostBand: GapAnswerBoostBandSchema,
-  suggestedBoostPercent: z.number().int().min(0).max(15),
-  reason: z.string().min(1).max(260),
-});
-
-export const BatchRequirementFitSchema = z.object({
-  confidence: EvidenceConfidenceSchema,
-  selectedEvidenceIndex: z.number().int().nonnegative().nullable(),
-  reason: z.string().min(1).max(140),
-  claimRisk: ClaimRiskSchema,
-  cvUsefulness: EvidenceMatchCvUsefulnessSchema,
-});
-
-export const BatchEvidenceFitOutputSchema = z.object({
-  requirementFitByRequirementId: z.record(BatchRequirementFitSchema),
-});
-
-export const EvidenceScoringMatchSchema = z.object({
-  jobRequirementId: z.string().min(1),
-  candidateChunkId: z.string().nullable(),
-  confidence: EvidenceConfidenceSchema,
-  cvUsefulness: EvidenceMatchCvUsefulnessSchema,
-  claimRisk: ClaimRiskSchema,
-  reason: z.string().min(1),
-});
-
-export const EvidenceScoringOutputSchema = z.object({
-  matches: z.array(EvidenceScoringMatchSchema),
 });
 
 export const CvStrategyOutputSchema = z.object({
@@ -845,45 +755,6 @@ export const AgentJsonSchemas = {
       tools: { type: "array", maxItems: 32, items: { type: "string", maxLength: 80 } },
       achievements: { type: "array", maxItems: 16, items: { type: "string", maxLength: 160 } },
       cautionNotes: { type: "array", maxItems: 6, items: { type: "string", maxLength: 160 } },
-    },
-  },
-  evidenceScoring: {
-    type: "object",
-    additionalProperties: false,
-    required: ["matches"],
-    properties: {
-      matches: {
-        type: "array",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          required: [
-            "jobRequirementId",
-            "candidateChunkId",
-            "confidence",
-            "cvUsefulness",
-            "claimRisk",
-            "reason",
-          ],
-          properties: {
-            jobRequirementId: { type: "string" },
-            candidateChunkId: { type: ["string", "null"] },
-            confidence: {
-              type: "string",
-              enum: ["high", "medium", "low", "missing"],
-            },
-            cvUsefulness: {
-              type: "string",
-              enum: ["headline", "supporting", "keyword_only", "do_not_use"],
-            },
-            claimRisk: {
-              type: "string",
-              enum: ["safe", "careful_wording", "avoid_claim"],
-            },
-            reason: { type: "string" },
-          },
-        },
-      },
     },
   },
   gapQuestion: {

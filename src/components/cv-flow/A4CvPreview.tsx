@@ -19,7 +19,7 @@ export function A4CvPreview(props: {
   );
 
   useEffect(() => {
-    console.info("CV_V2_RENDER_METRICS", {
+    console.info("CV_RENDER_METRICS", {
       renderTarget: "client_preview",
       ...model.metrics,
     });

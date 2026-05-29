@@ -70,7 +70,7 @@ export function JobDescriptionStep(props: {
         <aside className="space-y-3">
           {[
             ["Extracts the role signal", "Taylor finds the requirements that actually shape the CV."],
-            ["Keeps it practical", "No match-score theatre or evidence-map detours in V2."],
+            ["Keeps it practical", "No match-score theatre or evidence-map detours."],
             ["Fast next step", "You move straight to adding your current CV."],
           ].map(([title, copy]) => (
             <GlassCard className="p-4" key={title}>

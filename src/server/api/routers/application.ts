@@ -82,7 +82,7 @@ export const applicationRouter = createTRPCRouter({
       return { applicationId: newApplication.id };
     }),
 
-  submitJobV2: publicProcedure
+  submitJob: publicProcedure
     .input(
       applicationIdSchema.extend({
         rawJobText: z.string().min(1).max(20_000),
@@ -101,7 +101,7 @@ export const applicationRouter = createTRPCRouter({
       });
     }),
 
-  submitCandidateV2: publicProcedure
+  submitCandidate: publicProcedure
     .input(
       applicationIdSchema.extend({
         rawCvText: z.string().min(1).max(30_000),
@@ -120,7 +120,7 @@ export const applicationRouter = createTRPCRouter({
       });
     }),
 
-  submitGapAnswersV2: publicProcedure
+  submitGapAnswers: publicProcedure
     .input(
       applicationIdSchema.extend({
         answers: z.array(
@@ -145,7 +145,7 @@ export const applicationRouter = createTRPCRouter({
       });
     }),
 
-  generateCvV2: publicProcedure
+  generateCv: publicProcedure
     .input(applicationIdSchema)
     .mutation(async ({ ctx, input }) => {
       await assertApplicationOwnership({
@@ -160,7 +160,7 @@ export const applicationRouter = createTRPCRouter({
       });
     }),
 
-  getV2ApplicationState: publicProcedure
+  getApplicationState: publicProcedure
     .input(applicationIdSchema)
     .query(async ({ ctx, input }) => {
       const application = await assertApplicationOwnership({
@@ -192,26 +192,16 @@ export const applicationRouter = createTRPCRouter({
       return {
         application,
         job,
-        jobBrief: null,
-        candidateProfile: null,
-        enhancedCandidateProfile: null,
         candidateProfileRow,
-        fitGapStrategy: null,
-        profileEnhancementSummary: null,
-        cvCompositionBlueprint: null,
-        qualityEditorResult: null,
-        normalizedGapAnswerFacts: [],
-        qa: null,
         gapQuestions,
         gapAnswers,
         cvDraft,
         cvJson: cvDraft?.cvJson ?? null,
         cvText: cvDraft?.cvText ?? null,
-        agentRuns: [],
       };
     }),
 
-  authorizeV2Export: publicProcedure
+  authorizeExport: publicProcedure
     .input(
       applicationIdSchema.extend({
         cvDraftId: z.string().min(1),

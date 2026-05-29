@@ -22,9 +22,9 @@ const staleApplicationErrorFragments = [
   "does not belong to this session",
 ] as const;
 
-type V2State = NonNullable<RouterOutputs["application"]["getV2ApplicationState"]>;
+type ApplicationState = NonNullable<RouterOutputs["application"]["getApplicationState"]>;
 
-type V2Stage =
+type FlowStage =
   | "job_description"
   | "cv_upload"
   | "gap_questions"
@@ -54,14 +54,14 @@ function friendlyError(message: string) {
   return message;
 }
 
-function deriveV2Stage(state: V2State | null): V2Stage {
+function deriveFlowStage(state: ApplicationState | null): FlowStage {
   if (state?.cvDraft) return "final_cv";
-  if (state?.candidateProfile && state.fitGapStrategy) return "gap_questions";
-  if (state?.jobBrief || state?.job) return "cv_upload";
+  if (state?.gapQuestions.length) return "gap_questions";
+  if (state?.job) return "cv_upload";
   return "job_description";
 }
 
-function hasOpenQuestions(state: V2State | null) {
+function hasOpenQuestions(state: ApplicationState | null) {
   return (state?.gapQuestions ?? []).some(
     (question) => question.status === "unanswered" && question.question.trim()
   );
@@ -110,7 +110,7 @@ export default function Home() {
   const [showLanding, setShowLanding] = useState(true);
   const [applicationId, setApplicationId] = useState<string | null>(null);
   const [resumedApplicationId, setResumedApplicationId] = useState<string | null>(null);
-  const [stage, setStage] = useState<V2Stage>("job_description");
+  const [stage, setStage] = useState<FlowStage>("job_description");
   const [jobText, setJobText] = useState("");
   const [candidateText, setCandidateText] = useState("");
   const [candidateFileName, setCandidateFileName] = useState<string | null>(null);
@@ -145,7 +145,7 @@ export default function Home() {
     onError: (mutationError) => setError(friendlyError(mutationError.message)),
   });
 
-  const stateQuery = api.application.getV2ApplicationState.useQuery(
+  const stateQuery = api.application.getApplicationState.useQuery(
     { applicationId: applicationId ?? "" },
     {
       enabled: !!applicationId,
@@ -203,7 +203,7 @@ export default function Home() {
     if (!applicationId || !state || resumedApplicationId === applicationId) return;
     setResumedApplicationId(applicationId);
     if (stage !== "cv_generating") {
-      setStage(deriveV2Stage(state));
+      setStage(deriveFlowStage(state));
     }
     setJobText((current) => state.job?.rawText ?? current);
     setCandidateText((current) => state.candidateProfileRow?.rawCvText ?? current);
@@ -218,10 +218,10 @@ export default function Home() {
     setError(friendlyError(stateQuery.error.message));
   }, [applicationId, stateQuery.error]);
 
-  const submitJob = api.application.submitJobV2.useMutation({
+  const submitJob = api.application.submitJob.useMutation({
     onSuccess: async (_data, variables) => {
       localStorage.setItem(currentApplicationStorageKey, variables.applicationId);
-      await utils.application.getV2ApplicationState.invalidate({
+      await utils.application.getApplicationState.invalidate({
         applicationId: variables.applicationId,
       });
       setStage("cv_upload");
@@ -244,9 +244,9 @@ export default function Home() {
     },
   });
 
-  const submitCandidate = api.application.submitCandidateV2.useMutation({
+  const submitCandidate = api.application.submitCandidate.useMutation({
     onSuccess: async (_data, variables) => {
-      await utils.application.getV2ApplicationState.invalidate({
+      await utils.application.getApplicationState.invalidate({
         applicationId: variables.applicationId,
       });
       setStage("gap_questions");
@@ -264,9 +264,9 @@ export default function Home() {
     },
   });
 
-  const submitGapAnswers = api.application.submitGapAnswersV2.useMutation({
+  const submitGapAnswers = api.application.submitGapAnswers.useMutation({
     onSuccess: async (_data, variables) => {
-      await utils.application.getV2ApplicationState.invalidate({
+      await utils.application.getApplicationState.invalidate({
         applicationId: variables.applicationId,
       });
       startCvGeneration(variables.applicationId);
@@ -281,9 +281,9 @@ export default function Home() {
     },
   });
 
-  const generateCv = api.application.generateCvV2.useMutation({
+  const generateCv = api.application.generateCv.useMutation({
     onSuccess: async (_data, variables) => {
-      await utils.application.getV2ApplicationState.invalidate({
+      await utils.application.getApplicationState.invalidate({
         applicationId: variables.applicationId,
       });
       setStage("final_cv");
@@ -299,7 +299,7 @@ export default function Home() {
     },
   });
 
-  const authorizeExport = api.application.authorizeV2Export.useMutation();
+  const authorizeExport = api.application.authorizeExport.useMutation();
 
   const resetApplication = api.application.resetApplication.useMutation({
     onSuccess: (data) => {

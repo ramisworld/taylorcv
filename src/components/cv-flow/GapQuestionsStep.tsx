@@ -7,8 +7,8 @@ import { GlassCard, WorkflowPanel } from "~/components/cv-flow/JobDescriptionSte
 import { cn } from "~/lib/utils";
 import type { RouterOutputs } from "~/trpc/react";
 
-type V2State = NonNullable<RouterOutputs["application"]["getV2ApplicationState"]>;
-type GapQuestion = V2State["gapQuestions"][number];
+type ApplicationState = NonNullable<RouterOutputs["application"]["getApplicationState"]>;
+type GapQuestion = ApplicationState["gapQuestions"][number];
 
 function questionMeta(question: GapQuestion) {
   const json =
@@ -55,7 +55,7 @@ export function GapQuestionsStep(props: {
     return (
       <WorkflowPanel
         eyebrow="Step 3 of 4"
-        subtitle="Taylor already has enough useful evidence to write the first V2 CV."
+        subtitle="Taylor already has enough useful evidence to write the first CV."
         title="No extra questions needed."
       >
         <GlassCard className="max-w-2xl p-6">

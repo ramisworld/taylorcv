@@ -4,18 +4,12 @@ import type {
   ButtonAnswerSchema,
   CandidateProfilerAgentOutputSchema,
   CandidateProfilerOutputSchema,
-  BatchEvidenceFitOutputSchema,
   CvBuilderOutputSchema,
   CvRewriteOutputSchema,
   CvLayoutStyleOutputSchema,
   CvQualityReviewOutputSchema,
   CvStrategyOutputSchema,
   CvWriterOutputSchema,
-  EvidenceConfidenceSchema,
-  EvidenceMatchCvUsefulnessSchema,
-  EvidenceScoringOutputSchema,
-  ClaimRiskSchema,
-  GapAnswerEvaluatorOutputSchema,
   GapQuestionAgentOutputSchema,
   ImportanceSchema,
   LayoutArchitectureSchema,
@@ -28,11 +22,6 @@ import type {
 
 export type RequirementType = z.infer<typeof RequirementTypeSchema>;
 export type Importance = z.infer<typeof ImportanceSchema>;
-export type EvidenceConfidence = z.infer<typeof EvidenceConfidenceSchema>;
-export type EvidenceMatchCvUsefulness = z.infer<
-  typeof EvidenceMatchCvUsefulnessSchema
->;
-export type ClaimRisk = z.infer<typeof ClaimRiskSchema>;
 export type RoleFamily = z.infer<typeof RoleFamilySchema>;
 export type ProofStyle = z.infer<typeof ProofStyleSchema>;
 export type SectionBudgetTreatment = z.infer<
@@ -48,13 +37,8 @@ export type CandidateProfilerOutput = z.infer<
 export type CandidateProfilerAgentOutput = z.infer<
   typeof CandidateProfilerAgentOutputSchema
 >;
-export type BatchEvidenceFitOutput = z.infer<
-  typeof BatchEvidenceFitOutputSchema
->;
 export type GapQuestionAgentOutput = z.infer<typeof GapQuestionAgentOutputSchema>;
-export type GapAnswerEvaluatorOutput = z.infer<typeof GapAnswerEvaluatorOutputSchema>;
 export type CvBuilderOutput = z.infer<typeof CvBuilderOutputSchema>;
-export type EvidenceScoringOutput = z.infer<typeof EvidenceScoringOutputSchema>;
 export type CvStrategyOutput = z.infer<typeof CvStrategyOutputSchema>;
 export type CvWriterOutput = z.infer<typeof CvWriterOutputSchema>;
 export type CvQualityReviewOutput = z.infer<
@@ -62,13 +46,3 @@ export type CvQualityReviewOutput = z.infer<
 >;
 export type CvLayoutStyleOutput = z.infer<typeof CvLayoutStyleOutputSchema>;
 export type CvRewriteOutput = z.infer<typeof CvRewriteOutputSchema>;
-
-export type RetrievedCandidateChunk = {
-  id: string;
-  content: string;
-  chunkType: string;
-  sourceType: string;
-  tagsJson: unknown;
-  metadataJson: unknown;
-  similarityScore: number;
-};

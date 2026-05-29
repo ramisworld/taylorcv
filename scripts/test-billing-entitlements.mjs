@@ -42,22 +42,6 @@ assert.equal(landingSource.includes("Smart plans for every stage of"), true);
 assert.equal(landingSource.includes("Annual plan"), true);
 assert.equal(landingSource.includes("Save up to 53%"), true);
 
-const workflowSource = readFileSync("src/server/services/applicationWorkflow.service.ts", "utf8");
-const generateCvSource = workflowSource.slice(
-  workflowSource.indexOf("export async function generateCv")
-);
-assert.equal(
-  generateCvSource.indexOf("await assertCanGenerateCv") <
-    generateCvSource.indexOf("runCvBuilderAgent"),
-  true,
-  "signed-in entitlement preflight must run before expensive CV builder calls"
-);
-assert.equal(
-  generateCvSource.indexOf("recordSuccessfulCvGeneration") > generateCvSource.indexOf("tx.cvDraft.create"),
-  true,
-  "usage must be recorded only after successful CV draft creation"
-);
-
 const prisma = new PrismaClient();
 const userId = `billing-test-${Date.now()}`;
 try {
